@@ -1,0 +1,71 @@
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:padding="4dp">
+
+    <!-- 1) The card background stretches to match the width, height wrap_content -->
+    <ImageView
+        android:id="@+id/cardBackground"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:adjustViewBounds="true"
+        android:scaleType="fitXY"
+        android:src="@drawable/chat_card" />
+
+    <!-- 2) Avatar container: wrap_content height, sits at top of the card -->
+    <LinearLayout
+        android:id="@+id/avatarContainer"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_alignTop="@id/cardBackground"
+        android:layout_marginHorizontal="2dp"
+        android:gravity="center_horizontal">
+
+        <!-- Each avatar is a fixed square but no scaling hacks -->
+        <ImageView
+            android:id="@+id/chatAvatar1"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+             android:adjustViewBounds="true"
+             android:scaleType="centerCrop"
+             android:src="@drawable/icon_01" />
+
+        <ImageView
+            android:id="@+id/chatAvatar2"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:adjustViewBounds="true"
+            android:scaleType="centerCrop"
+            android:src="@drawable/icon_02" />
+
+    </LinearLayout>
+
+    <!-- 3) Title sits immediately below the avatarContainer -->
+    <TextView
+        android:id="@+id/chatTitle"
+        android:layout_width="match_parent"
+        android:layout_height="36dp"
+        android:layout_below="@id/avatarContainer"
+        android:layout_marginTop="8dp"
+        android:text="Chat Title"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:textColor="#000"/>
+
+    <!-- 4) Preview sits below the title -->
+    <TextView
+        android:id="@+id/chatPreview"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/chatTitle"
+        android:maxHeight="200dp"
+        android:layout_marginTop="4dp"
+        android:layout_marginBottom="40dp"
+        android:text="Last message preview goes here."
+        android:textSize="14sp"
+        android:textColor="#666"/>
+
+</RelativeLayout>

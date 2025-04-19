@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <!-- Name Input -->
+    <EditText
+        android:id="@+id/characterNameInput"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Enter character name"
+        android:textSize="18sp" />
+
+    <!-- Description Input -->
+    <EditText
+        android:id="@+id/characterDescriptionInput"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Enter public description"
+        android:textSize="16sp" />
+
+    <!-- Tags Input -->
+    <EditText
+        android:id="@+id/characterTagsInput"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Enter tags"
+        android:textSize="16sp" />
+
+    <!-- Emotion Tags -->
+    <EditText
+        android:id="@+id/emotionTagsInput"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Enter emotion tags"
+        android:textSize="16sp" />
+
+    <!-- Private Description Input -->
+    <EditText
+        android:id="@+id/privateDescriptionInput"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Enter private description (for creator)"
+        android:textSize="16sp" />
+
+    <!-- Avatar Selection -->
+    <ImageView
+        android:id="@+id/characterAvatarInput"
+        android:layout_width="100dp"
+        android:layout_height="100dp"
+        android:layout_marginTop="16dp"
+        android:src="@drawable/placeholder_avatar"
+        android:contentDescription="Select Avatar" />
+
+    <!-- Save Button -->
+    <Button
+        android:id="@+id/saveCharacterButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Save Character" />
+
+</LinearLayout>

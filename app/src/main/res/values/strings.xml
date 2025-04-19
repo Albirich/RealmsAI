@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">Emotichat</string>
+    <string name="user_message_default">Your message will appear here</string>
+    <string name="title_default">Title will appear here</string>
+    <string name="text_prompt">Type your message here</string>
+</resources>
+
