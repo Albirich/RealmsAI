@@ -11,4 +11,3 @@ data class CharacterProfile(
     val avatarResId: Int, // Avatar image resource
     val additionalInfo: String, // Age, height, etc. displayed above the description
 )
-*

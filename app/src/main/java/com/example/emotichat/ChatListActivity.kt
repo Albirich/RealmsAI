@@ -3,6 +3,7 @@ package com.example.emotichat
 
 import android.content.Intent
 import android.os.Bundle
+import android.widget.ImageButton
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.GridLayoutManager
@@ -11,7 +12,7 @@ import androidx.recyclerview.widget.RecyclerView
 
 
 
-class ChatListActivity : AppCompatActivity() {
+class ChatListActivity  :   BaseActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -71,6 +72,7 @@ class ChatListActivity : AppCompatActivity() {
         }
     }
 
+
     fun injectMockChatsIfEmpty() {
         val prefs = getSharedPreferences("chat_sessions", MODE_PRIVATE)
         val existing = prefs.getString("all_chats", null)
@@ -104,6 +106,13 @@ class ChatListActivity : AppCompatActivity() {
         }
 
         prefs.edit().putString("all_chats", allChats.toString()).apply()
+    }
+    class ChatListActivity : BaseActivity() {
+        override fun onCreate(savedInstanceState: Bundle?) {
+            super.onCreate(savedInstanceState)
+            setContentView(R.layout.chat_list_activity)
+            // … your existing setup …
+        }
     }
 
 }

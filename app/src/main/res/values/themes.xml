@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <style name="Theme.Emotichat" parent="android:Theme.Material.Light.DarkActionBar" />
+    <style name="Theme.Emotichat" parent="Theme.MaterialComponents.DayNight.NoActionBar" />
+
 </resources>

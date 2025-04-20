@@ -6,19 +6,23 @@
     android:padding="16dp">
 
     <!-- Name Input -->
+
+    <!-- Description Input -->
+
     <EditText
         android:id="@+id/characterNameInput"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:hint="Enter character name"
+        android:padding="16dp"
         android:textSize="18sp" />
 
-    <!-- Description Input -->
     <EditText
         android:id="@+id/characterDescriptionInput"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:hint="Enter public description"
+        android:padding="16dp"
         android:textSize="16sp" />
 
     <!-- Tags Input -->
@@ -27,14 +31,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:hint="Enter tags"
-        android:textSize="16sp" />
-
-    <!-- Emotion Tags -->
-    <EditText
-        android:id="@+id/emotionTagsInput"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:hint="Enter emotion tags"
+        android:padding="16dp"
         android:textSize="16sp" />
 
     <!-- Private Description Input -->
@@ -43,6 +40,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:hint="Enter private description (for creator)"
+        android:padding="16dp"
         android:textSize="16sp" />
 
     <!-- Avatar Selection -->
@@ -55,10 +53,12 @@
         android:contentDescription="Select Avatar" />
 
     <!-- Save Button -->
-    <Button
-        android:id="@+id/saveCharacterButton"
-        android:layout_width="match_parent"
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/submitButton"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Save Character" />
+        android:text="Submit"
+        android:layout_centerInParent="true"/>
+
 
 </LinearLayout>
