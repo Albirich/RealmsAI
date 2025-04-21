@@ -7,7 +7,9 @@ import android.view.MenuItem
 import android.widget.ImageButton
 import androidx.appcompat.app.AppCompatActivity
 
-abstract class BaseActivity : AppCompatActivity() {
+ open class BaseActivity : AppCompatActivity() {
+
+
 
     override fun setContentView(layoutResID: Int) {
         super.setContentView(layoutResID)
@@ -34,8 +36,8 @@ abstract class BaseActivity : AppCompatActivity() {
     /** 2) Bottom‑nav wiring (you already have this) */
     private fun setupBottomNav() {
         findViewById<ImageButton>(R.id.navChats)?.setOnClickListener {
-            if (this !is ChatActivity) {
-                startActivity(Intent(this, ChatActivity::class.java))
+            if (this !is ChatHubActivity) {
+                startActivity(Intent(this, ChatHubActivity::class.java))
             }
         }
         findViewById<ImageButton>(R.id.navCharacters)?.setOnClickListener {

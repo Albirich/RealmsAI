@@ -6,7 +6,7 @@ import android.util.Log
 import android.widget.ImageButton
 import android.widget.Toast
 
-class CreationHubActivity : BaseActivity() {
+ class CreationHubActivity : BaseActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
