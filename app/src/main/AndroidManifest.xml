@@ -19,7 +19,7 @@
             </intent-filter>
         </activity>
         <activity  android:name=".MainActivity"/>
-        <activity android:name=".CharacterListActivity"/>
+        <activity android:name=".CharacterHubActivity"/>
         <activity android:name=".HistoryActivity"/>
         <activity android:name=".ProfileActivity"/>
         <activity android:name=".CreationHubActivity"/>

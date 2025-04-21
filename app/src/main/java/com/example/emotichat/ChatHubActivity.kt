@@ -41,17 +41,23 @@ class ChatHubActivity : BaseActivity() {
             ChatPreview("pub4", "News Bot", "Here's today's headlines", R.drawable.icon_02, R.drawable.icon_01)
         )
 
+        // …
         recyclerView.adapter = ChatPreviewAdapter(sampleChats) { preview ->
-            // On click, generate a new chatId and launch MainActivity
             val newChatId = System.currentTimeMillis().toString()
-            // Copy the profile into user history here (later)
+            // Save it using inherited method:
+            saveChatSession(
+                chatId   = newChatId,
+                title    = preview.title,
+                messages = listOf(ChatMessage("System", preview.lastMessage))
+            )
             startActivity(Intent(this, MainActivity::class.java).apply {
                 putExtra("CHAT_ID", newChatId)
+                putExtra("CHAT_TITLE", preview.title)
+                putExtra("AVATAR1_RES", preview.avatar1ResId)
+                putExtra("AVATAR2_RES", preview.avatar2ResId)
             })
         }
-        recyclerView.adapter = ChatPreviewAdapter(sampleChats) { preview ->
-            // …
-        }
+
 
     }
 }
