@@ -2,6 +2,8 @@ package com.example.emotichat
 
 import android.content.Intent
 import android.os.Bundle
+import android.view.View
+import android.widget.AdapterView
 import android.widget.ArrayAdapter
 import android.widget.EditText
 import android.widget.Spinner
@@ -14,41 +16,38 @@ class ChatHubActivity : BaseActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_chat_hub)
 
+        val previews = loadAllChatPreviews()
 
-        // 1) Wire up Spinner (stub—no action for MVP)
+        // 1) Wire up Sort Spinner
         val sortSpinner: Spinner = findViewById(R.id.sortSpinner)
-        ArrayAdapter.createFromResource(
+        val sortOptions = listOf("Recommended", "Hot", "Latest", "Popular")
+        sortSpinner.adapter = ArrayAdapter(
             this,
-            R.array.chat_hub_sort_options,
-            android.R.layout.simple_spinner_item
-        ).also { adapter ->
-            adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-            sortSpinner.adapter = adapter
+            android.R.layout.simple_spinner_item,
+            sortOptions
+        ).apply {
+            setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
         }
 
-        // 2) Search bar (stub—no filter for MVP)
+
+
+        // 2) Wire up Search Bar (stub for MVP)
         val searchEditText: EditText = findViewById(R.id.searchEditText)
 
-        // 3) RecyclerView as a 2‑column grid
+        // 3) Initialize RecyclerView + Adapter
         val recyclerView: RecyclerView = findViewById(R.id.chatHubRecyclerView)
         recyclerView.layoutManager = GridLayoutManager(this, 2)
 
-        // 4) Sample data (replace with real public-chats later)
-        val sampleChats = listOf(
-            ChatPreview("pub1", "Adventure Bot", "Let's explore!", R.drawable.icon_01, R.drawable.icon_02),
-            ChatPreview("pub2", "Mystery Bot", "Can you solve it?", R.drawable.icon_02, R.drawable.icon_01),
-            ChatPreview("pub3", "Comedy Bot", "Knock knock...", R.drawable.icon_01, R.drawable.icon_02),
-            ChatPreview("pub4", "News Bot", "Here's today's headlines", R.drawable.icon_02, R.drawable.icon_01)
-        )
+        // Load existing chat previews (or public chat templates)
+        val allPreviews = loadAllChatPreviews()
 
-        // …
-        recyclerView.adapter = ChatPreviewAdapter(sampleChats) { preview ->
+        // Create adapter with click handling
+        val adapter = ChatPreviewAdapter(allPreviews) { preview ->
             val newChatId = System.currentTimeMillis().toString()
-            // Save it using inherited method:
             saveChatSession(
-                chatId   = newChatId,
-                title    = preview.title,
-                messages = listOf(ChatMessage("System", preview.lastMessage))
+                chatId = newChatId,
+                title = preview.title,
+                messages = listOf(ChatMessage("System", preview.description))
             )
             startActivity(Intent(this, MainActivity::class.java).apply {
                 putExtra("CHAT_ID", newChatId)
@@ -57,7 +56,30 @@ class ChatHubActivity : BaseActivity() {
                 putExtra("AVATAR2_RES", preview.avatar2ResId)
             })
         }
+        recyclerView.adapter = adapter
 
+        // 4) Sort selection handling
+        sortSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(
+                parent: AdapterView<*>, view: View?, position: Int, id: Long
+            ) {
+                val sorted = when (sortOptions[position]) {
+                    "Latest" -> allPreviews.sortedByDescending { it.timestamp }
+                    "Popular" -> allPreviews.sortedByDescending { it.rating }
+                    "Hot" -> {
+                        val now = System.currentTimeMillis()
+                        allPreviews.sortedByDescending {
+                            val hours = (now - it.timestamp).toDouble() / 3_600_000
+                            it.rating / (hours + 1)
+                        }
+                    }
+                    else /* Recommended */ -> allPreviews
+                }
+                adapter.updateList(sorted)
+            }
+
+            override fun onNothingSelected(parent: AdapterView<*>) {}
+        }
 
     }
 }

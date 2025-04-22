@@ -150,4 +150,15 @@ open class BaseActivity : AppCompatActivity() {
         }
         return messages
     }
+
+    // In BaseActivity.kt
+    protected fun loadAllChatPreviews(): List<ChatPreview> {
+        val now = System.currentTimeMillis()
+        return listOf(
+            ChatPreview("pub1","Adventure Bot","Let's explore!", R.drawable.icon_01, R.drawable.icon_02, 4.8f, now - 56_000),
+            ChatPreview("pub2","Mystery Bot","Can you solve it?",  R.drawable.icon_02, R.drawable.icon_01, 4.3f, now - 15_000),
+            ChatPreview("pub3","Comedy Bot","Knock knock...",    R.drawable.icon_01, R.drawable.icon_02, 3.9f, now - 10_500),
+            ChatPreview("pub4","News Bot","Today's headlines",  R.drawable.icon_02, R.drawable.icon_01, 4.6f, now - 50_000)
+        )
+    }
 }
