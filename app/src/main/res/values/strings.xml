@@ -3,5 +3,15 @@
     <string name="user_message_default">Your message will appear here</string>
     <string name="title_default">Title will appear here</string>
     <string name="text_prompt">Type your message here</string>
+    <string name="description">Description</string>
+    <string name="emotion_Happy">Happy</string>
+    <string name="emotion_Sad">Sad</string>
+    <string name="emotion_Angry">Angry</string>
+    <string name="emotion_surprised">Surprised</string>
+    <string name="emotion_Flirty">Flirty</string>
+    <string name="emotion_Fighting">Fighting</string>
+    <string name="emotion_Thinking">Thinking</string>
+    <string name="emotion_Embarrassed">Embarrassed</string>
+    <string name="emotion_placeholder">emotion_placeholder</string>
 </resources>
 

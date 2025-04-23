@@ -44,7 +44,7 @@ open class BaseActivity : AppCompatActivity() {
     /**
      * Clears the entire saved chat_sessions map.
      */
-    private fun clearChatHistoryFromPrefs() {
+    protected fun clearChatHistoryFromPrefs() {
         getSharedPreferences("chat_sessions", Context.MODE_PRIVATE)
             .edit()
             .remove("all_chats")
@@ -150,6 +150,7 @@ open class BaseActivity : AppCompatActivity() {
         }
         return messages
     }
+
 
     // In BaseActivity.kt
     protected fun loadAllChatPreviews(): List<ChatPreview> {

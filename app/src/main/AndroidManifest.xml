@@ -25,5 +25,8 @@
         <activity android:name=".CreationHubActivity"/>
         <activity android:name=".CharacterCreationActivity" />
         <activity android:name=".ChatListActivity" />
+        <activity android:name=".ChatCreationActivity"/>
+
+
     </application>
 </manifest>

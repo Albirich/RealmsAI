@@ -6,4 +6,11 @@
         <item>Popular</item>
         <item>Recommended</item>
     </string-array>
+    <string-array name="chat_creation_modes">
+        <item>Sandbox</item>
+        <item>Rpg</item>
+        <item>Slow-burn Romance</item>
+        <item>God Mode</item>
+        <item>VN Mode</item>
+    </string-array>
 </resources>

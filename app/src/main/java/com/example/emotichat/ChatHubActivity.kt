@@ -9,6 +9,7 @@ import android.widget.EditText
 import android.widget.Spinner
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.google.gson.Gson
 
 class ChatHubActivity : BaseActivity() {
 
@@ -55,6 +56,28 @@ class ChatHubActivity : BaseActivity() {
                 putExtra("AVATAR1_RES", preview.avatar1ResId)
                 putExtra("AVATAR2_RES", preview.avatar2ResId)
             })
+            // inside ChatHubActivity’s click listener for mockChats:
+            val profile = ChatProfile(
+                id            = newChatId,
+                title         = preview.title,
+                description   = preview.description,
+                tags          = emptyList(),
+                mode          = ChatMode.SANDBOX,
+                backgroundUri = null,
+                sfwOnly       = false,
+                characterIds  = emptyList(),
+                rating        = preview.rating,
+                timestamp     = preview.timestamp
+            )
+
+            val json = Gson().toJson(profile)
+
+            startActivity(
+                Intent(this, MainActivity::class.java)
+                    .putExtra("CHAT_PROFILE_JSON", json)
+                // you can still include old extras if you like...
+            )
+
         }
         recyclerView.adapter = adapter
 

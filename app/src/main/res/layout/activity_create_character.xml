@@ -2,12 +2,12 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:orientation="vertical"
     android:padding="16dp">
 
     <!-- Name Input -->
 
-    <!-- Description Input -->
 
     <EditText
         android:id="@+id/characterNameInput"
@@ -17,13 +17,23 @@
         android:padding="16dp"
         android:textSize="18sp" />
 
-    <EditText
-        android:id="@+id/characterDescriptionInput"
+    <!-- Personality Input-->
+    <com.google.android.material.textfield.TextInputLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:hint="Enter public description"
-        android:padding="16dp"
-        android:textSize="16sp" />
+        app:counterEnabled="true"
+        app:counterMaxLength="4000">
+
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/characterPersonalityInput"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:maxHeight="200dp"
+            android:hint="Enter personality"
+            android:inputType="textMultiLine"/>
+    </com.google.android.material.textfield.TextInputLayout>
+
+
 
     <!-- Tags Input -->
     <EditText
@@ -34,31 +44,91 @@
         android:padding="16dp"
         android:textSize="16sp" />
 
-    <!-- Private Description Input -->
-    <EditText
-        android:id="@+id/privateDescriptionInput"
+
+    <!-- Images -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/emotionRecycler"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:hint="Enter private description (for creator)"
-        android:padding="16dp"
-        android:textSize="16sp" />
+        android:paddingTop="16dp"
+        app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"/>
 
-    <!-- Avatar Selection -->
-    <ImageView
-        android:id="@+id/characterAvatarInput"
-        android:layout_width="100dp"
-        android:layout_height="100dp"
-        android:layout_marginTop="16dp"
-        android:src="@drawable/placeholder_avatar"
-        android:contentDescription="Select Avatar" />
+
+    <!-- 2) Profile Info (collapsible) -->
+    <LinearLayout
+        android:id="@+id/privateDescHeader"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:paddingTop="16dp"
+        android:clickable="true"
+        android:focusable="true">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Private Info"
+            android:textAppearance="?attr/textAppearanceSubtitle1"/>
+
+        <ImageView
+            android:id="@+id/privateDescToggle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:src="@drawable/ic_expand_more"/>
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/privateSection"
+        android:orientation="vertical"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:visibility="gone"
+        android:paddingStart="16dp">
+
+        <EditText
+            android:id="@+id/characterprivateDescriptionInput"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Enter private information (for creator)"/>
+
+        <EditText
+            android:id="@+id/ageEditText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Age"/>
+
+        <EditText
+            android:id="@+id/heightEditText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Height"/>
+
+        <EditText
+            android:id="@+id/weightEditText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Weight"/>
+
+        <EditText
+            android:id="@+id/eyeColorEditText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Eye Color"/>
+
+        <EditText
+            android:id="@+id/hairColorEditText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Hair Color"/>
+    </LinearLayout>
 
     <!-- Save Button -->
     <com.google.android.material.button.MaterialButton
-        android:id="@+id/submitButton"
+        android:id="@+id/charSubmitButton"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="Submit"
         android:layout_centerInParent="true"/>
-
 
 </LinearLayout>

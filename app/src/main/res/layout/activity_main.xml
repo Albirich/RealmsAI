@@ -8,7 +8,7 @@
 
     <!-- Title -->
     <TextView
-        android:id="@+id/TitleTextView"
+        android:id="@+id/chatTitle"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="@string/title_default"
@@ -16,6 +16,49 @@
         android:textColor="@color/teal_200"
         android:layout_marginTop="25dp" />
 
+    <!-- Collapsible description container -->
+    <LinearLayout
+        android:id="@+id/descriptionContainer"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:layout_marginTop="8dp">
+
+        <!-- Header row: “Description” label + toggle icon -->
+        <LinearLayout
+            android:id="@+id/descriptionHeader"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:clickable="true"
+            android:focusable="true"
+            android:padding="8dp">
+
+            <TextView
+                android:id="@+id/chatDescriptionLabel"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/description"
+                android:textAppearance="?attr/textAppearanceSubtitle2"/>
+
+            <ImageView
+                android:id="@+id/descriptionToggle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:src="@drawable/ic_expand_more"/>
+        </LinearLayout>
+
+        <!-- Actual description text, hidden by default -->
+        <TextView
+            android:id="@+id/chatDescription"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:visibility="gone"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:textAppearance="?attr/textAppearanceBody2"/>
+    </LinearLayout>
     <androidx.constraintlayout.widget.ConstraintLayout
         xmlns:app="http://schemas.android.com/apk/res-auto"
         android:layout_width="match_parent"
