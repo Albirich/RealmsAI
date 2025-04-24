@@ -1,82 +1,99 @@
 package com.example.emotichat
 
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.util.Log
 import android.view.Menu
 import android.view.MenuItem
-import android.widget.Button
-import android.widget.EditText
-import android.widget.ImageView
-import android.widget.TextView
-import android.widget.Toast
-import androidx.annotation.DrawableRes
+import android.view.View
+import android.widget.*
+import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.gson.Gson
-import android.view.View
-import android.widget.LinearLayout
-
+import org.json.JSONObject
 
 class MainActivity : BaseActivity() {
+
     private lateinit var chatAdapter: ChatAdapter
     private lateinit var messageEditText: EditText
+    private lateinit var profile: ChatProfile
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        // 1. Grab the JSON string and deserialize
+        // 1. Deserialize ChatProfile
         val json = intent.getStringExtra("CHAT_PROFILE_JSON")
             ?: throw IllegalStateException("No chat profile passed!")
-        val profile = Gson().fromJson(json, ChatProfile::class.java)
+        profile = Gson().fromJson(json, ChatProfile::class.java)
 
-        // 2. Populate header UI from profile
+        // 2. Header: title + collapsible description
         findViewById<TextView>(R.id.chatTitle).text = profile.title
-        findViewById<TextView>(R.id.chatDescription).text = profile.description
-        // TODO: load profile.backgroundUri into an ImageView if you have one
-
-        // find views
-        val descriptionHeader = findViewById<LinearLayout>(R.id.descriptionHeader)
-        val descriptionToggle = findViewById<ImageView>(R.id.descriptionToggle)
-        val chatDescription   = findViewById<TextView>(R.id.chatDescription)
-
-// toggle on click
-        descriptionHeader.setOnClickListener {
-            if (chatDescription.visibility == View.GONE) {
-                chatDescription.visibility = View.VISIBLE
-                descriptionToggle.setImageResource(R.drawable.ic_expand_less)
+        val chatDesc      = findViewById<TextView>(R.id.chatDescription)
+        chatDesc.text     = profile.description
+        val descHeader    = findViewById<LinearLayout>(R.id.descriptionHeader)
+        val descToggle    = findViewById<ImageView>(R.id.descriptionToggle)
+        descHeader.setOnClickListener {
+            if (chatDesc.visibility == View.GONE) {
+                chatDesc.visibility = View.VISIBLE
+                descToggle.setImageResource(R.drawable.ic_expand_less)
             } else {
-                chatDescription.visibility = View.GONE
-                descriptionToggle.setImageResource(R.drawable.ic_expand_more)
+                chatDesc.visibility = View.GONE
+                descToggle.setImageResource(R.drawable.ic_expand_more)
             }
         }
 
-        // 3. Set up RecyclerView + Adapter
+        // 3. Load the two character slots
+        val charIds = profile.characterIds
+        // slot 1
+        charIds.getOrNull(0)?.let { id ->
+            val uriStr = loadAvatarUriForCharacter(id)
+            findViewById<ImageView>(R.id.botAvatar1ImageView)
+                .setImageURI(Uri.parse(uriStr))
+            findViewById<TextView>(R.id.botName1TextView)
+                .text = loadCharacterName(id)
+        }
+        // slot 2
+        charIds.getOrNull(1)?.let { id ->
+            val uriStr = loadAvatarUriForCharacter(id)
+            findViewById<ImageView>(R.id.botAvatar2ImageView)
+                .setImageURI(Uri.parse(uriStr))
+            findViewById<TextView>(R.id.botName2TextView)
+                .text = loadCharacterName(id)
+        }
+
+        // 4. RecyclerView + Adapter
         val chatId = profile.id
         messageEditText = findViewById(R.id.messageEditText)
         chatAdapter = ChatAdapter(mutableListOf())
         findViewById<RecyclerView>(R.id.chatRecyclerView).apply {
             layoutManager = LinearLayoutManager(this@MainActivity)
-            adapter = chatAdapter
+            adapter       = chatAdapter
         }
 
-        // 4. Load previous messages
+        // 5. Load any saved history
         loadChatSession(chatId).forEach { chatAdapter.addMessage(it) }
 
-        // 5. Send button
+        // 6. Send button → generate AI replies for each slot
         findViewById<Button>(R.id.sendButton).setOnClickListener {
             onSendClicked(chatId)
         }
     }
-    private fun getAvatarResource(botId: String, emotion: String): Int {
-        val name = "${emotion}_${botId}"
-        return resources.getIdentifier(name, "drawable", packageName)
+
+    /** Reads the saved avatarUri string for a character ID */
+    private fun loadAvatarUriForCharacter(charId: String): String {
+        val prefs   = getSharedPreferences("characters", MODE_PRIVATE)
+        val jsonStr = prefs.getString(charId, null) ?: return ""
+        return JSONObject(jsonStr).optString("avatarUri", "")
     }
 
-    private fun updateEmotionImage(@DrawableRes resId: Int, imageView: ImageView) {
-        imageView.setImageResource(resId)
-        Log.d("EmotionUpdate", "Avatar updated: $resId")
+    /** Reads the saved name for a character ID */
+    private fun loadCharacterName(charId: String): String {
+        val prefs   = getSharedPreferences("characters", MODE_PRIVATE)
+        val jsonStr = prefs.getString(charId, null) ?: return ""
+        return JSONObject(jsonStr).optString("name", "")
     }
 
     private fun onSendClicked(chatId: String) {
@@ -86,18 +103,25 @@ class MainActivity : BaseActivity() {
             return
         }
 
-        // a) Add user message
-        chatAdapter.addMessage(ChatMessage("User", text))
+        // a) show user message
+        chatAdapter.addMessage(ChatMessage("You", text))
 
-        // b) Generate AI response + emotions
-        listOf("01" to "Bot 1", "02" to "Bot 2").forEach { (botId, label) ->
-            val resp   = generateAIResponse(botId, text)
-            val emot   = detectEmotion(resp)
-            val avatar = getAvatarResource(botId, emot)
+        // b) For each selected character, generate & show a response
+        profile.characterIds.forEachIndexed { index, charId ->
+            val label = loadCharacterName(charId)
+            val resp  = generateAIResponse(charId, text)
+            val emot  = detectEmotion(resp)
+            val avatarUri = loadAvatarUriForCharacter(charId)
+
             chatAdapter.addMessage(ChatMessage(label, resp))
-            updateEmotionImage(avatar, findViewById(
-                if (botId == "01") R.id.botAvatar1ImageView else R.id.botAvatar2ImageView
-            ))
+
+            // update the avatar image for this slot to reflect the new emotion
+            val avatarView = when (index) {
+                0 -> findViewById<ImageView>(R.id.botAvatar1ImageView)
+                1 -> findViewById<ImageView>(R.id.botAvatar2ImageView)
+                else -> null
+            }
+            avatarView?.setImageURI(Uri.parse(avatarUri))
         }
 
         messageEditText.text.clear()
@@ -105,28 +129,20 @@ class MainActivity : BaseActivity() {
             .smoothScrollToPosition(chatAdapter.itemCount - 1)
     }
 
-    override fun onPause() {
-        super.onPause()
-        // persist the current chat
-        saveChatSession(
-            chatId   = intent.getStringExtra("CHAT_ID") ?: return,
-            title    = findViewById<TextView>(R.id.chatTitle).text.toString(),
-            messages = chatAdapter.getMessages()
-        )
+    /** Dummy AI by charId – you can replace with your real logic */
+    private fun generateAIResponse(botId: String, message: String): String = when (botId) {
+        // if you have special logic for certain IDs, do it here
+        else -> "<$botId> received: \"$message\""
     }
 
-    // Helper functions
-    private fun generateAIResponse(botId: String, message: String) = when (botId) {
-        "01" -> "I am feeling really happy today!"
-        "02" -> "I’m not doing so well; I feel a bit sad."
-        else -> "I’m at a loss for words."
-    }
-
-    private fun detectEmotion(message: String) = when {
+    /** Very naive emotion‐detector */
+    private fun detectEmotion(message: String): String = when {
         message.contains("happy", ignoreCase = true) -> "happy"
-        message.contains("sad", ignoreCase = true)   -> "sad"
-        else -> "neutral"
+        message.contains("sad",   ignoreCase = true) -> "sad"
+        else                                         -> "neutral"
     }
+
+    // ── Clearing & menu ──
 
     override fun onCreateOptionsMenu(menu: Menu) =
         menuInflater.inflate(R.menu.main_menu, menu).let { true }
@@ -140,5 +156,13 @@ class MainActivity : BaseActivity() {
         else -> super.onOptionsItemSelected(item)
     }
 
-    // Persisted storage helpers live in BaseActivity
+    override fun onPause() {
+        super.onPause()
+        // persist the current chat under the same ID
+        saveChatSession(
+            chatId   = profile.id,
+            title    = profile.title,
+            messages = chatAdapter.getMessages()
+        )
+    }
 }

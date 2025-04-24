@@ -1,10 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 
+
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:padding="16dp">
+
 
     <!-- Title -->
     <TextView
@@ -14,7 +16,8 @@
         android:text="@string/title_default"
         android:textSize="41sp"
         android:textColor="@color/teal_200"
-        android:layout_marginTop="25dp" />
+        android:layout_marginTop="25dp"
+        />
 
     <!-- Collapsible description container -->
     <LinearLayout
@@ -76,6 +79,14 @@
             android:translationX="0dp"
             android:scaleType="fitCenter"
             android:adjustViewBounds="true" />
+        <TextView
+            android:id="@+id/botName1TextView"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text=""
+            android:textStyle="bold"
+            app:layout_constraintTop_toBottomOf="@id/botAvatar1ImageView"
+            app:layout_constraintStart_toStartOf="@id/botAvatar1ImageView"/>
 
         <!-- Bot2 Avatar, overlapping Bot12-->
         <ImageView
@@ -90,6 +101,14 @@
             android:scaleType="fitCenter"
             android:scaleX="-1"
             android:adjustViewBounds="true" />
+        <TextView
+            android:id="@+id/botName2TextView"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text=""
+            android:textStyle="bold"
+            app:layout_constraintTop_toBottomOf="@id/botAvatar2ImageView"
+            app:layout_constraintEnd_toEndOf="@id/botAvatar2ImageView"/>
     </androidx.constraintlayout.widget.ConstraintLayout>
 
 

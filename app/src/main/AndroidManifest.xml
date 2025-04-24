@@ -26,6 +26,7 @@
         <activity android:name=".CharacterCreationActivity" />
         <activity android:name=".ChatListActivity" />
         <activity android:name=".ChatCreationActivity"/>
+        <activity android:name=".CharacterSelectionActivity"/>
 
 
     </application>
