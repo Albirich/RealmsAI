@@ -35,7 +35,7 @@
             android:orientation="horizontal"
             android:clickable="true"
             android:focusable="true"
-            android:padding="8dp">
+            android:padding="18dp">
 
             <TextView
                 android:id="@+id/chatDescriptionLabel"
