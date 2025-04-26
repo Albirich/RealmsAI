@@ -1,58 +1,146 @@
 <?xml version="1.0" encoding="utf-8"?>
-
 <androidx.constraintlayout.widget.ConstraintLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:paddingTop="15dp">
+    android:layout_height="match_parent">
 
-
-    <!-- “New Chat” Button -->
-    <ImageButton
-        android:id="@+id/btn_new_chat"
+    <!-- 1) Scrollable content -->
+    <ScrollView
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        app:layout_constraintDimensionRatio="12:5"
-        android:background="@drawable/btn_new_chat"
-        android:contentDescription="New Chat"
-        app:layout_constraintTop_toTopOf="parent"
-        android:gravity="center_vertical"/>
+        android:layout_weight="1"
+        android:paddingBottom="72dp"
+        android:clipToPadding="false"
+        android:fillViewport="true">
 
-    <!-- “New Character” Button -->
-    <ImageButton
-        android:id="@+id/btn_new_char"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        app:layout_constraintDimensionRatio="12:5"
-        android:layout_marginTop="30dp"
-        android:background="@drawable/btn_new_char"
-        android:contentDescription="New Character"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/btn_new_chat"
-        android:gravity="center_vertical"/>
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="16dp">
 
-    <!-- “New Persona” Button -->
-    <ImageButton
-        android:id="@+id/btn_new_sona"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        app:layout_constraintDimensionRatio="12:5"
-        android:layout_marginTop="30dp"
-        android:background="@drawable/btn_new_sona"
-        android:contentDescription="New Persona"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/btn_new_char"
-        android:gravity="center_vertical"/>
+            <!-- Chats row -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Chats"
+                android:textSize="18sp"
+                android:layout_marginBottom="8dp"/>
 
-    <!-- Bottom Navigation -->
+            <androidx.constraintlayout.widget.ConstraintLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="24dp">
+
+                <ImageButton
+                    android:id="@+id/btn_new_chat"
+                    android:layout_width="0dp"
+                    android:layout_height="0dp"
+                    android:src="@drawable/btn_new_chat"
+                    android:contentDescription="New Chat"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintTop_toTopOf="parent"
+                    app:layout_constraintBottom_toBottomOf="parent"
+                    app:layout_constraintWidth_percent="0.45"
+                    app:layout_constraintDimensionRatio="1:1"/>
+
+                <ImageButton
+                    android:id="@+id/btn_view_chats"
+                    android:layout_width="0dp"
+                    android:layout_height="0dp"
+                    android:src="@drawable/btn_created_chat"
+                    android:contentDescription="View Created Chats"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    app:layout_constraintTop_toTopOf="parent"
+                    app:layout_constraintBottom_toBottomOf="parent"
+                    app:layout_constraintWidth_percent="0.45"
+                    app:layout_constraintDimensionRatio="1:1"/>
+            </androidx.constraintlayout.widget.ConstraintLayout>
+
+            <!-- Characters row -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Characters"
+                android:textSize="18sp"
+                android:layout_marginBottom="8dp"/>
+
+            <androidx.constraintlayout.widget.ConstraintLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="24dp">
+
+                <ImageButton
+                    android:id="@+id/btn_new_char"
+                    android:layout_width="0dp"
+                    android:layout_height="0dp"
+                    android:src="@drawable/btn_new_char"
+                    android:contentDescription="New Character"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintTop_toTopOf="parent"
+                    app:layout_constraintBottom_toBottomOf="parent"
+                    app:layout_constraintWidth_percent="0.45"
+                    app:layout_constraintDimensionRatio="1:1"/>
+
+                <ImageButton
+                    android:id="@+id/btn_view_characters"
+                    android:layout_width="0dp"
+                    android:layout_height="0dp"
+                    android:src="@drawable/btn_created_char"
+                    android:contentDescription="View Created Characters"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    app:layout_constraintTop_toTopOf="parent"
+                    app:layout_constraintBottom_toBottomOf="parent"
+                    app:layout_constraintWidth_percent="0.45"
+                    app:layout_constraintDimensionRatio="1:1"/>
+            </androidx.constraintlayout.widget.ConstraintLayout>
+
+            <!-- Personas row -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Personas"
+                android:textSize="18sp"
+                android:layout_marginBottom="8dp"/>
+
+            <androidx.constraintlayout.widget.ConstraintLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content">
+
+                <ImageButton
+                    android:id="@+id/btn_new_sona"
+                    android:layout_width="0dp"
+                    android:layout_height="0dp"
+                    android:src="@drawable/btn_new_sona"
+                    android:contentDescription="New Persona"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintTop_toTopOf="parent"
+                    app:layout_constraintBottom_toBottomOf="parent"
+                    app:layout_constraintWidth_percent="0.45"
+                    app:layout_constraintDimensionRatio="1:1"/>
+
+                <ImageButton
+                    android:id="@+id/btn_view_personas"
+                    android:layout_width="0dp"
+                    android:layout_height="0dp"
+                    android:src="@drawable/btn_created_sona"
+                    android:contentDescription="View Created Personas"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    app:layout_constraintTop_toTopOf="parent"
+                    app:layout_constraintBottom_toBottomOf="parent"
+                    app:layout_constraintWidth_percent="0.45"
+                    app:layout_constraintDimensionRatio="1:1"/>
+            </androidx.constraintlayout.widget.ConstraintLayout>
+
+        </LinearLayout>
+    </ScrollView>
+
+    <!-- 2) Include the nav and give it the sole bottomNavBar ID -->
     <include
-        android:id="@+id/include_bottom_nav"
+        android:id="@+id/bottomNavBar"
         layout="@layout/bottom_nav"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"/>
-
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        app:layout_constraintBottom_toBottomOf="parent"/>
 </androidx.constraintlayout.widget.ConstraintLayout>

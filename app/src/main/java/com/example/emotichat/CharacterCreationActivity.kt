@@ -16,13 +16,16 @@ import java.io.File
 import java.io.FileOutputStream
 
 class CharacterCreationActivity : AppCompatActivity() {
-
-    // ——— CLASS-LEVEL MODEL FOR EMOTIONS ———
+    private var avatarUri: Uri? = null
     private val emotionKeys = listOf(
         "happy","sad","angry","surprised","flirty","fight","thinking","embarrassed"
     )
     private val emotionSlots = emotionKeys.map { EmotionSlot(it) }.toMutableList()
     private var currentSlotIndex = 0
+    private lateinit var avatarImageView: ImageView
+    private lateinit var avatarPicker: ActivityResultLauncher<String>
+
+
 
     // single picker for all slots
     private lateinit var imagePicker: ActivityResultLauncher<String>
@@ -30,9 +33,23 @@ class CharacterCreationActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_create_character)
+        //  Find your new ImageView
+        avatarImageView = findViewById(R.id.avatarImageView)
 
+        // Register the picker
+        avatarPicker = registerForActivityResult(GetContent()) { uri: Uri? ->
+            uri?.let {
+                avatarUri = it
+                avatarImageView.setImageURI(it)
+            }
+        }
+
+        //  Launch it when the user taps
+        avatarImageView.setOnClickListener {
+            avatarPicker.launch("image/*")
+        }
         //
-        // 1) COLLAPSIBLE “Private Info” SECTION
+        // COLLAPSIBLE “Private Info” SECTION
         //
         val privateHeader  = findViewById<LinearLayout>(R.id.privateDescHeader)
         val privateToggle  = findViewById<ImageView>(R.id.privateDescToggle)
@@ -67,6 +84,18 @@ class CharacterCreationActivity : AppCompatActivity() {
         emotionRecycler.adapter = EmotionAdapter(emotionSlots) { pos ->
             currentSlotIndex = pos
             imagePicker.launch("image/*")
+        }
+
+        // Avatar picker
+        avatarImageView = findViewById(R.id.avatarImageView)
+        avatarPicker = registerForActivityResult(GetContent()) { uri: Uri? ->
+            uri?.let {
+                avatarUri = it
+                avatarImageView.setImageURI(it)
+            }
+        }
+        avatarImageView.setOnClickListener {
+            avatarPicker.launch("image/*")
         }
 
         //
@@ -126,10 +155,24 @@ class CharacterCreationActivity : AppCompatActivity() {
 
             // -- persist SharedPreferences --
             val charId = System.currentTimeMillis().toString()
+
+            // Copy avatar into internal storage and record its new URI
+            avatarUri?.let { uri ->
+                val outFile = File(filesDir, "avatar_${charId}.png")
+                contentResolver.openInputStream(uri)?.use { input ->
+                    FileOutputStream(outFile).use { output ->
+                        input.copyTo(output)
+                    }
+                }
+                // Store a stable file:// URI in your JSON
+                profileJson.put("avatarUri", Uri.fromFile(outFile).toString())
+            }
+
             getSharedPreferences("characters", MODE_PRIVATE)
                 .edit()
                 .putString(charId, profileJson.toString())
                 .apply()
+
 
             // -- write out each emotion image file --
             val filesDir = this.filesDir

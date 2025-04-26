@@ -53,6 +53,16 @@
         android:paddingTop="16dp"
         app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"/>
 
+    <ImageView
+        android:id="@+id/avatarImageView"
+        android:layout_width="100dp"
+        android:layout_height="100dp"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginBottom="16dp"
+        android:src="@drawable/placeholder_avatar"
+        android:contentDescription="@string/avatar"
+        android:scaleType="centerCrop"/>
+
 
     <!-- 2) Profile Info (collapsible) -->
     <LinearLayout

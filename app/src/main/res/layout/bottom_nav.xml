@@ -13,26 +13,26 @@
         android:weightSum="5"
         app:layout_constraintBaseline_toBottomOf="parent">
 
-    <ImageButton
-        android:id="@+id/navChats"
-        android:layout_weight="1"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:src="@drawable/btn_chats"
-        android:contentDescription="Chats"
-        android:background="@null"
-        android:scaleType="fitEnd"
-        android:paddingBottom="10dp"/>
+        <ImageButton
+            android:id="@+id/navChats"
+            android:layout_weight="1"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:src="@drawable/btn_chats"
+            android:contentDescription="Chats"
+            android:background="@null"
+            android:scaleType="fitEnd"
+            android:paddingBottom="10dp"/>
 
-    <ImageButton
-        android:id="@+id/navCharacters"
-        android:layout_weight="1"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:src="@drawable/btn_characters"
-        android:contentDescription="Characters"
-        android:background="@null"
-        android:scaleType="fitEnd" />
+        <ImageButton
+            android:id="@+id/navCharacters"
+            android:layout_weight="1"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:src="@drawable/btn_characters"
+            android:contentDescription="Characters"
+            android:background="@null"
+            android:scaleType="fitEnd" />
 
         <ImageButton
             android:id="@+id/navCreate"
@@ -51,24 +51,24 @@
             android:paddingBottom="10dp"
             />
 
-    <ImageButton
-        android:id="@+id/navHistory"
-        android:layout_weight="1"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:src="@drawable/btn_history"
-        android:contentDescription="History"
-        android:background="@null"
-        android:scaleType="fitEnd" />
+        <ImageButton
+            android:id="@+id/navHistory"
+            android:layout_weight="1"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:src="@drawable/btn_history"
+            android:contentDescription="History"
+            android:background="trans"
+            android:scaleType="fitEnd" />
 
-    <ImageButton
-        android:id="@+id/navProfile"
-        android:layout_weight="1"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:src="@drawable/btn_profile"
-        android:contentDescription="Profile"
-        android:background="@null"
-        android:scaleType="fitEnd" />
+        <ImageButton
+            android:id="@+id/navProfile"
+            android:layout_weight="1"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:src="@drawable/btn_profile"
+            android:contentDescription="Profile"
+            android:background="@null"
+            android:scaleType="fitEnd" />
     </LinearLayout>
 </androidx.constraintlayout.widget.ConstraintLayout>

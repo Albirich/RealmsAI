@@ -13,5 +13,6 @@
     <string name="emotion_Thinking">Thinking</string>
     <string name="emotion_Embarrassed">Embarrassed</string>
     <string name="emotion_placeholder">emotion_placeholder</string>
+    <string name="avatar">Avatar</string>
 </resources>
 
