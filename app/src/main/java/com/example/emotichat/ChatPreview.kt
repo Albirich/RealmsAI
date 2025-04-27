@@ -13,5 +13,6 @@ data class ChatPreview(
     val avatar2ResId: Int,
     val rating: Float = 0f,
     val timestamp: Long = System.currentTimeMillis(),
-    val mode: ChatMode
+    val mode: ChatMode,
+    val author: String = ""
 )

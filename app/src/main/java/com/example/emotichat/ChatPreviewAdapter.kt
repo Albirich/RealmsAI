@@ -8,6 +8,8 @@ import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 
 
+
+
 class ChatPreviewAdapter(
     private var chatList: List<ChatPreview>,
     private val onClick: (ChatPreview) -> Unit

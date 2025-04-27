@@ -51,7 +51,8 @@ class CharacterHubActivity : BaseActivity() {
                 sfwOnly = false,
                 characterIds = emptyList(),
                 rating = preview.rating,
-                timestamp = preview.timestamp
+                timestamp = preview.timestamp,
+                author = authorId
             )
 
             // 7) Kick off MainActivity with the profile & first message

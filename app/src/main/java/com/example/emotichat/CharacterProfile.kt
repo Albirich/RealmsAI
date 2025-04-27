@@ -5,7 +5,7 @@ data class CharacterProfile(
     val name: String,
     val description: String, // Public description
     val privateDescription: String, // Private description (for the creator)
-    val author: String, // Who created the character
+    val author: String = "" , // Who created the character
     val tags: List<String>, // Public tags
     val emotionTags: Map<String, String>, // Key-Value pairs (e.g., "happy" -> "excited")
     val avatarResId: Int, // Avatar image resource

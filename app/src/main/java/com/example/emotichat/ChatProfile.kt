@@ -11,7 +11,8 @@ data class ChatProfile(
     val sfwOnly: Boolean,
     val characterIds: List<String>,
     val rating: Float,
-    val timestamp: Long
+    val timestamp: Long,
+    val author: String = ""
 )
 
 /** Supported game modes for chats. */
