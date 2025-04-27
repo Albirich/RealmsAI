@@ -1,74 +1,94 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/bottomNavBar"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    xmlns:app="http://schemas.android.com/apk/res-auto">
-    <LinearLayout
-        android:id="@+id/bottomNavBar"
+    android:layout_height="wrap_content"
+    android:clipToPadding="false"
+    android:clipChildren="false"
+    android:paddingBottom="8dp">
+
+    <!-- 1) Halo background -->
+    <ImageView
+        android:id="@+id/halo_background"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        app:layout_constraintBottom_toBottomOf="parent"
-        android:background="#00000000"
-        android:weightSum="5"
-        app:layout_constraintBaseline_toBottomOf="parent">
+        android:adjustViewBounds="true"
+        android:src="@drawable/halo_shape"
+        android:scaleType="centerCrop"
+        android:translationY="6dp"/>
 
+    <!-- 3) Create button -->
+    <ImageButton
+        android:id="@+id/navCreate"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|center_horizontal"
+        android:translationY="-20dp"
+        android:src="@drawable/btn_create2"
+        android:background="@null"
+        android:scaleType="fitXY"
+        android:scaleX="2"
+        android:scaleY="2"/>
+
+    <!-- 2) Four side buttons + one empty weight slot -->
+    <LinearLayout
+        android:id="@+id/bottom_buttons_row"
+        android:layout_width="match_parent"
+        android:layout_height="64dp"
+        android:orientation="horizontal"
+        android:weightSum="5"
+        android:layout_gravity="bottom"
+        android:gravity="center_vertical">
+
+
+        <!-- Chats -->
         <ImageButton
             android:id="@+id/navChats"
-            android:layout_weight="1"
             android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:src="@drawable/btn_chats"
-            android:contentDescription="Chats"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:src="@drawable/btn_chats2"
             android:background="@null"
-            android:scaleType="fitEnd"
-            android:paddingBottom="10dp"/>
+            android:scaleType="fitXY"/>
 
+        <!-- Characters -->
         <ImageButton
             android:id="@+id/navCharacters"
-            android:layout_weight="1"
             android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:src="@drawable/btn_characters"
-            android:contentDescription="Characters"
-            android:background="@null"
-            android:scaleType="fitEnd" />
-
-        <ImageButton
-            android:id="@+id/navCreate"
+            android:layout_height="match_parent"
             android:layout_weight="1"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:src="@drawable/btn_create"
-            android:contentDescription="Create"
+            android:elevation="4dp"
+            android:src="@drawable/btn_characters2"
             android:background="@null"
-            android:layout_gravity="bottom"
-            android:adjustViewBounds="true"
-            android:scaleX="1.2"
-            android:scaleY="1.2"
-            android:translationZ="-1dp"
-            android:scaleType="fitEnd"
-            android:paddingBottom="10dp"
-            />
+            android:scaleType="fitXY"/>
 
+        <!-- Placeholder so center slot stays empty for Create -->
+        <View
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1" />
+
+        <!-- History -->
         <ImageButton
             android:id="@+id/navHistory"
-            android:layout_weight="1"
             android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:src="@drawable/btn_history"
-            android:contentDescription="History"
-            android:background="trans"
-            android:scaleType="fitEnd" />
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:elevation="4dp"
+            android:src="@drawable/btn_history2"
+            android:background="@null"
+            android:scaleType="fitXY"/>
 
+        <!-- Profile -->
         <ImageButton
             android:id="@+id/navProfile"
-            android:layout_weight="1"
             android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:src="@drawable/btn_profile"
-            android:contentDescription="Profile"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:src="@drawable/btn_profile2"
             android:background="@null"
-            android:scaleType="fitEnd" />
+            android:scaleType="fitXY"/>
     </LinearLayout>
-</androidx.constraintlayout.widget.ConstraintLayout>
+
+
+</FrameLayout>

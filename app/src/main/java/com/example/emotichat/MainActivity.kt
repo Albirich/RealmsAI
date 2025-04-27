@@ -22,15 +22,37 @@ class MainActivity : BaseActivity() {
     private lateinit var messageEditText: EditText
     private lateinit var profile: ChatProfile
     private lateinit var parser: AIResponseParser
+    private lateinit var chatAuthor: String
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        // — Deserialize the ChatProfile passed via Intent
-        val json = intent.getStringExtra("CHAT_PROFILE_JSON")
-            ?: throw IllegalStateException("No chat profile passed!")
-        profile = Gson().fromJson(json, ChatProfile::class.java)
+        // 1) “Resume” path: was launched from the preview list
+        intent.getStringExtra("CHAT_ID")?.let { chatId ->
+            // build a minimal ChatProfile with that ID
+            profile = ChatProfile(
+                id            = chatId,
+                title         = intent.getStringExtra("CHAT_TITLE")       ?: "",
+                description   = intent.getStringExtra("CHAT_DESCRIPTION") ?: "",
+                tags          = emptyList(),
+                mode          = ChatMode.SANDBOX,
+                backgroundUri = null,
+                sfwOnly       = true,
+                characterIds  = emptyList(),
+                rating        = 0f,
+                timestamp     = System.currentTimeMillis()
+            )
+        } ?: run {
+            // 2) “New” path: you’re coming from ChatCreationActivity
+            val json = intent.getStringExtra("CHAT_PROFILE_JSON")
+                ?: throw IllegalStateException("No chat profile passed!")
+            profile = Gson().fromJson(json, ChatProfile::class.java)
+        }
+
+
+        //  — Pull author
+        chatAuthor = intent.getStringExtra("CHAT_AUTHOR") ?: ""
 
         // — Title & collapsible description
         findViewById<TextView>(R.id.chatTitle).text = profile.title
@@ -142,7 +164,8 @@ class MainActivity : BaseActivity() {
         saveChatSession(
             chatId   = profile.id,
             title    = profile.title,
-            messages = chatAdapter.getMessages()
+            messages = chatAdapter.getMessages(),
+            author   = chatAuthor
         )
     }
 

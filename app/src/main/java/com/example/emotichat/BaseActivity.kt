@@ -2,6 +2,7 @@ package com.example.emotichat
 
 import android.content.Context
 import android.content.Intent
+import android.os.Bundle
 import android.view.Menu
 import android.view.MenuItem
 import android.widget.ImageButton
@@ -12,6 +13,20 @@ import androidx.appcompat.app.AppCompatActivity
  * and session persistence (save/load chat) for all screens.
  */
 open class BaseActivity : AppCompatActivity() {
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+
+        //  ——————————————————————————————————————————
+        //  Ensure we have a stable userId in prefs
+        //  ——————————————————————————————————————————
+        val userPrefs = getSharedPreferences("user", Context.MODE_PRIVATE)
+        if (!userPrefs.contains("userId")) {
+            userPrefs.edit()
+                .putString("userId", java.util.UUID.randomUUID().toString())
+                .apply()
+        }
+    }
 
     //────────────────────────────────────────────────────────────────
     // 1) Layout Inflation Hook: install toolbar + nav after setContentView
@@ -75,8 +90,8 @@ open class BaseActivity : AppCompatActivity() {
         }
         // History
         findViewById<ImageButton>(R.id.navHistory)?.setOnClickListener {
-            if (this !is HistoryActivity) {
-                startActivity(Intent(this, HistoryActivity::class.java))
+            if (this !is ChatListActivity) {
+                startActivity(Intent(this, ChatListActivity::class.java))
             }
         }
         // Profile
@@ -96,13 +111,15 @@ open class BaseActivity : AppCompatActivity() {
     fun saveChatSession(
         chatId: String,
         title: String,
-        messages: List<ChatMessage>
+        messages: List<ChatMessage>,
+        author: String
     ) {
         val prefs   = getSharedPreferences("chat_sessions", Context.MODE_PRIVATE)
         val editor  = prefs.edit()
 
         // Build JSON payload
         val chatObj = org.json.JSONObject().apply {
+            put("author", author)
             put("title", title)
             put("lastUpdated", System.currentTimeMillis())
 
@@ -156,10 +173,10 @@ open class BaseActivity : AppCompatActivity() {
     protected fun loadAllChatPreviews(): List<ChatPreview> {
         val now = System.currentTimeMillis()
         return listOf(
-            ChatPreview("pub1","Adventure Bot","Let's explore!", R.drawable.icon_01, R.drawable.icon_02, 4.8f, now - 56_000),
-            ChatPreview("pub2","Mystery Bot","Can you solve it?",  R.drawable.icon_02, R.drawable.icon_01, 4.3f, now - 15_000),
-            ChatPreview("pub3","Comedy Bot","Knock knock...",    R.drawable.icon_01, R.drawable.icon_02, 3.9f, now - 10_500),
-            ChatPreview("pub4","News Bot","Today's headlines",  R.drawable.icon_02, R.drawable.icon_01, 4.6f, now - 50_000)
+            ChatPreview("pub1","Adventure Bot","Let's explore!", R.drawable.icon_01, R.drawable.icon_02, 4.8f, now - 56_000,  ChatMode.SANDBOX),
+            ChatPreview("pub2","Mystery Bot","Can you solve it?",  R.drawable.icon_02, R.drawable.icon_01, 4.3f, now - 15_000, ChatMode.SANDBOX),
+            ChatPreview("pub3","Comedy Bot","Knock knock...",    R.drawable.icon_01, R.drawable.icon_02, 3.9f, now - 10_500, ChatMode.SANDBOX),
+            ChatPreview("pub4","News Bot","Today's headlines",  R.drawable.icon_02, R.drawable.icon_01, 4.6f, now - 50_000,  ChatMode.SANDBOX)
         )
     }
 }

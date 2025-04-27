@@ -6,12 +6,6 @@ import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
-import com.example.emotichat.ChatPreview
-import android.widget.AdapterView
-import android.widget.ArrayAdapter
-import android.widget.Spinner
-
-
 
 
 class ChatPreviewAdapter(
@@ -25,6 +19,7 @@ class ChatPreviewAdapter(
         val avatar1: ImageView = itemView.findViewById(R.id.chatAvatar1)
         val avatar2: ImageView = itemView.findViewById(R.id.chatAvatar2)
         val ratingText: TextView = itemView.findViewById(R.id.chatRating)
+        val badge         : TextView = itemView.findViewById(R.id.previewTypeBadge)
 
 
 
@@ -34,13 +29,26 @@ class ChatPreviewAdapter(
             avatar1.setImageResource(chat.avatar1ResId)
             avatar2.setImageResource(chat.avatar2ResId)
             ratingText.text = "★ %.1f".format(chat.rating)
+            badge.text = when(chat.mode) {
+                ChatMode.SANDBOX     -> "SANDBOX"
+                ChatMode.RPG         -> "RPG"
+                ChatMode.SLOW_BURN   -> "SLOW-BURN"
+                ChatMode.VISUAL_NOVEL-> "VN"
+                ChatMode.GOD         -> "GOD"
+                ChatMode.CHARACTER -> "CHARACTER"
+            }
+            badge.visibility = View.VISIBLE
+
             val df = android.text.format.DateFormat.getDateFormat(itemView.context)
 
             itemView.setOnClickListener {
                 onClick(chat)
             }
 
+
         }
+
+
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): PreviewViewHolder {

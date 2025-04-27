@@ -12,7 +12,8 @@
         android:layout_weight="1"
         android:paddingBottom="72dp"
         android:clipToPadding="false"
-        android:fillViewport="true">
+        android:fillViewport="true"
+        app:layout_constraintBottom_toTopOf="@id/bottomNavBar">
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -39,23 +40,28 @@
                     android:layout_height="0dp"
                     android:src="@drawable/btn_new_chat"
                     android:contentDescription="New Chat"
+                    android:scaleType="fitXY"
                     app:layout_constraintStart_toStartOf="parent"
                     app:layout_constraintTop_toTopOf="parent"
                     app:layout_constraintBottom_toBottomOf="parent"
                     app:layout_constraintWidth_percent="0.45"
-                    app:layout_constraintDimensionRatio="1:1"/>
+                    app:layout_constraintDimensionRatio="1:1"
+                    android:background="@null"
+                    />
 
                 <ImageButton
                     android:id="@+id/btn_view_chats"
                     android:layout_width="0dp"
                     android:layout_height="0dp"
                     android:src="@drawable/btn_created_chat"
+                    android:scaleType="fitXY"
                     android:contentDescription="View Created Chats"
                     app:layout_constraintEnd_toEndOf="parent"
                     app:layout_constraintTop_toTopOf="parent"
                     app:layout_constraintBottom_toBottomOf="parent"
                     app:layout_constraintWidth_percent="0.45"
-                    app:layout_constraintDimensionRatio="1:1"/>
+                    app:layout_constraintDimensionRatio="1:1"
+                    android:background="@null"/>
             </androidx.constraintlayout.widget.ConstraintLayout>
 
             <!-- Characters row -->
@@ -77,11 +83,13 @@
                     android:layout_height="0dp"
                     android:src="@drawable/btn_new_char"
                     android:contentDescription="New Character"
+                    android:scaleType="fitXY"
                     app:layout_constraintStart_toStartOf="parent"
                     app:layout_constraintTop_toTopOf="parent"
                     app:layout_constraintBottom_toBottomOf="parent"
                     app:layout_constraintWidth_percent="0.45"
-                    app:layout_constraintDimensionRatio="1:1"/>
+                    app:layout_constraintDimensionRatio="1:1"
+                    android:background="@null"/>
 
                 <ImageButton
                     android:id="@+id/btn_view_characters"
@@ -89,11 +97,13 @@
                     android:layout_height="0dp"
                     android:src="@drawable/btn_created_char"
                     android:contentDescription="View Created Characters"
+                    android:scaleType="fitXY"
                     app:layout_constraintEnd_toEndOf="parent"
                     app:layout_constraintTop_toTopOf="parent"
                     app:layout_constraintBottom_toBottomOf="parent"
                     app:layout_constraintWidth_percent="0.45"
-                    app:layout_constraintDimensionRatio="1:1"/>
+                    app:layout_constraintDimensionRatio="1:1"
+                    android:background="@null"/>
             </androidx.constraintlayout.widget.ConstraintLayout>
 
             <!-- Personas row -->
@@ -112,25 +122,29 @@
                     android:id="@+id/btn_new_sona"
                     android:layout_width="0dp"
                     android:layout_height="0dp"
-                    android:src="@drawable/btn_new_sona"
                     android:contentDescription="New Persona"
+                    android:scaleType="fitXY"
+                    android:src="@drawable/btn_new_sona"
+                    app:layout_constraintBottom_toBottomOf="parent"
+                    app:layout_constraintDimensionRatio="1:1"
                     app:layout_constraintStart_toStartOf="parent"
                     app:layout_constraintTop_toTopOf="parent"
-                    app:layout_constraintBottom_toBottomOf="parent"
                     app:layout_constraintWidth_percent="0.45"
-                    app:layout_constraintDimensionRatio="1:1"/>
+                    android:background="@null" />
 
                 <ImageButton
                     android:id="@+id/btn_view_personas"
                     android:layout_width="0dp"
                     android:layout_height="0dp"
-                    android:src="@drawable/btn_created_sona"
                     android:contentDescription="View Created Personas"
+                    android:scaleType="fitXY"
+                    android:src="@drawable/btn_created_sona"
+                    app:layout_constraintBottom_toBottomOf="parent"
+                    app:layout_constraintDimensionRatio="1:1"
                     app:layout_constraintEnd_toEndOf="parent"
                     app:layout_constraintTop_toTopOf="parent"
-                    app:layout_constraintBottom_toBottomOf="parent"
                     app:layout_constraintWidth_percent="0.45"
-                    app:layout_constraintDimensionRatio="1:1"/>
+                    android:background="@null"/>
             </androidx.constraintlayout.widget.ConstraintLayout>
 
         </LinearLayout>

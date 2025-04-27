@@ -17,7 +17,50 @@ class ChatHubActivity : BaseActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_chat_hub)
 
-        val previews = loadAllChatPreviews()
+        // 1) Pull your userId once for use as the “author”
+        val authorId = getSharedPreferences("user", MODE_PRIVATE)
+            .getString("userId", "")!!
+
+        // 2) Load your preview list
+        val allPreviews = loadAllChatPreviews()
+
+        // 3) Set up RecyclerView + adapter
+        val recyclerView: RecyclerView = findViewById(R.id.chatHubRecyclerView)
+        recyclerView.layoutManager = GridLayoutManager(this, 2)
+        recyclerView.adapter = ChatPreviewAdapter(allPreviews) { preview ->
+
+            // 4) Create a new session ID
+            val newChatId = System.currentTimeMillis().toString()
+
+            // 5) Persist an initial “System” message + author
+            saveChatSession(
+                chatId = newChatId,
+                title = preview.title,
+                messages = listOf(ChatMessage("System", preview.description)),
+                author = authorId
+            )
+
+            // 6) Build ChatProfile from the preview, reusing its mode
+            val profile = ChatProfile(
+                id = newChatId,
+                title = preview.title,
+                description = preview.description,
+                tags = emptyList(),
+                mode = preview.mode,        // ← use preview.mode here
+                backgroundUri = null,
+                sfwOnly = false,
+                characterIds = emptyList(),
+                rating = preview.rating,
+                timestamp = preview.timestamp
+            )
+
+            // 7) Kick off MainActivity with the profile & first message
+            val json = Gson().toJson(profile)
+            Intent(this, MainActivity::class.java).apply {
+                putExtra("CHAT_PROFILE_JSON", json)
+                putExtra("FIRST_MESSAGE", preview.description)
+            }.also(::startActivity)
+        }
 
         // 1) Wire up Sort Spinner
         val sortSpinner: Spinner = findViewById(R.id.sortSpinner)
@@ -29,80 +72,7 @@ class ChatHubActivity : BaseActivity() {
         ).apply {
             setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
         }
-
-
-
         // 2) Wire up Search Bar (stub for MVP)
         val searchEditText: EditText = findViewById(R.id.searchEditText)
-
-        // 3) Initialize RecyclerView + Adapter
-        val recyclerView: RecyclerView = findViewById(R.id.chatHubRecyclerView)
-        recyclerView.layoutManager = GridLayoutManager(this, 2)
-
-        // Load existing chat previews (or public chat templates)
-        val allPreviews = loadAllChatPreviews()
-
-        // Create adapter with click handling
-        val adapter = ChatPreviewAdapter(allPreviews) { preview ->
-            val newChatId = System.currentTimeMillis().toString()
-            saveChatSession(
-                chatId = newChatId,
-                title = preview.title,
-                messages = listOf(ChatMessage("System", preview.description))
-            )
-            startActivity(Intent(this, MainActivity::class.java).apply {
-                putExtra("CHAT_ID", newChatId)
-                putExtra("CHAT_TITLE", preview.title)
-                putExtra("AVATAR1_RES", preview.avatar1ResId)
-                putExtra("AVATAR2_RES", preview.avatar2ResId)
-            })
-            // inside ChatHubActivity’s click listener for mockChats:
-            val profile = ChatProfile(
-                id            = newChatId,
-                title         = preview.title,
-                description   = preview.description,
-                tags          = emptyList(),
-                mode          = ChatMode.SANDBOX,
-                backgroundUri = null,
-                sfwOnly       = false,
-                characterIds  = emptyList(),
-                rating        = preview.rating,
-                timestamp     = preview.timestamp
-            )
-
-            val json = Gson().toJson(profile)
-
-            startActivity(
-                Intent(this, MainActivity::class.java)
-                    .putExtra("CHAT_PROFILE_JSON", json)
-                // you can still include old extras if you like...
-            )
-
-        }
-        recyclerView.adapter = adapter
-
-        // 4) Sort selection handling
-        sortSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-            override fun onItemSelected(
-                parent: AdapterView<*>, view: View?, position: Int, id: Long
-            ) {
-                val sorted = when (sortOptions[position]) {
-                    "Latest" -> allPreviews.sortedByDescending { it.timestamp }
-                    "Popular" -> allPreviews.sortedByDescending { it.rating }
-                    "Hot" -> {
-                        val now = System.currentTimeMillis()
-                        allPreviews.sortedByDescending {
-                            val hours = (now - it.timestamp).toDouble() / 3_600_000
-                            it.rating / (hours + 1)
-                        }
-                    }
-                    else /* Recommended */ -> allPreviews
-                }
-                adapter.updateList(sorted)
-            }
-
-            override fun onNothingSelected(parent: AdapterView<*>) {}
-        }
-
     }
 }

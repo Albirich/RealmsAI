@@ -20,5 +20,6 @@ enum class ChatMode {
     RPG,
     SLOW_BURN,
     GOD,
-    VISUAL_NOVEL
+    VISUAL_NOVEL,
+    CHARACTER
 }
