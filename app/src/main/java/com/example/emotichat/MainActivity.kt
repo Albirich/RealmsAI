@@ -3,6 +3,7 @@ package com.example.emotichat
 import android.content.Context
 import android.net.Uri
 import android.os.Bundle
+import android.util.Log
 import android.view.Menu
 import android.view.MenuItem
 import android.widget.Button
@@ -52,12 +53,22 @@ class MainActivity : BaseActivity() {
 
 
         // e.g. at the top of onCreate()
-        val allCharProfiles: List<CharacterProfile> = profile.characterIds.mapNotNull { charId ->
-            // assume you have a loader that returns a CharacterProfile
-            loadFullCharacterProfile(charId)
+        val allCharProfiles: List<CharacterProfile> = profile.characterIds
+            .mapNotNull { id ->
+                loadFullCharacterProfile(id).also { prof ->
+                    Log.d("DEBUG", "Loaded profile for $id → $prof")
+                }
+            }
+        Log.d("DEBUG", "allCharProfiles IDs = ${allCharProfiles.map { it.id }}")
+
+        // Debug: make sure you actually have some
+        Log.d("DEBUG", "allCharProfiles IDs = ${allCharProfiles.map { it.id }}")
+
+// 1b) Seed with a default so you don’t see [] before the first Facilitator run
+        var currentActiveBotProfiles = allCharProfiles.take(2)
+        var summaryOfInactiveBots    = allCharProfiles.drop(2).map { bot ->
+            mapOf("id" to bot.id, "description" to bot.description)
         }
-
-
 
         // 2) Title & description toggle
         findViewById<TextView>(R.id.chatTitle).text = profile.title
@@ -153,16 +164,31 @@ class MainActivity : BaseActivity() {
             currentFacilitatorState = facMap["notes"] as String
             val activeIds = (facMap["activeBots"] as List<*>).map { it as String }
 
+            Log.d("DEBUG", "facilitator activeBots → $activeIds")
+
 // 2d) **Rebuild** active/inactive lists **before** building AI prompt
-            currentActiveBotProfiles = allCharProfiles.filter { it.characterId in activeIds }
-            summaryOfInactiveBots = allCharProfiles
-                .filter { it.characterId !in activeIds }
-                .map { bot ->
+            currentActiveBotProfiles = activeIds.mapNotNull { slot ->
+                // turn "B1" → index 0, "B2" → index 1, etc
+                val idx = slot.removePrefix("B").toIntOrNull()?.minus(1)
+                idx?.takeIf { it in allCharProfiles.indices }
+                    ?.let { allCharProfiles[it] }
+            }
+
+// Now build the inactive summaries by checking each slot too
+            summaryOfInactiveBots = allCharProfiles.mapIndexedNotNull { index, bot ->
+                val slot = "B${index+1}"
+                if (slot !in activeIds) {
                     mapOf(
-                        "id" to bot.characterId,
+                        "id"          to bot.id,
                         "description" to bot.description
                     )
-                }
+                } else null
+            }
+
+            Log.d("DEBUG", "currentActiveBotProfiles IDs → " +
+                    "${currentActiveBotProfiles.map { it.id }}")
+            Log.d("DEBUG", "summaryOfInactiveBots IDs → " +
+                    "${summaryOfInactiveBots.map { it["id"] }}")
 
 // 3) Now build & show the **AI→API** prompt with the **updated** activeBots
             val fullJson = Gson().toJson(currentActiveBotProfiles)

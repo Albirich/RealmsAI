@@ -1,7 +1,7 @@
 package com.example.emotichat
 
 data class CharacterProfile(
-    val characterId: String,
+    val id: String,
     val name: String,
     val description: String, // Public description
     val privateDescription: String, // Private description (for the creator)

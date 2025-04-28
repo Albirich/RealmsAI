@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import android.os.Bundle
 import android.text.InputFilter
+import android.util.Log
 import android.view.View
 import android.widget.*
 import androidx.activity.result.ActivityResultLauncher
@@ -16,6 +17,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.io.FileOutputStream
+import java.util.UUID
 
 class CharacterCreationActivity : AppCompatActivity() {
     private var avatarUri: Uri? = null
@@ -24,6 +26,7 @@ class CharacterCreationActivity : AppCompatActivity() {
     )
     private val emotionSlots = emotionKeys.map { EmotionSlot(it) }.toMutableList()
     private var currentSlotIndex = 0
+
     private lateinit var avatarImageView: ImageView
     private lateinit var avatarPicker: ActivityResultLauncher<String>
     private lateinit var imagePicker: ActivityResultLauncher<String>
@@ -32,17 +35,19 @@ class CharacterCreationActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_create_character)
 
-        // --- Avatar picker setup ---
+        // ── Avatar picker ──
         avatarImageView = findViewById(R.id.avatarImageView)
-        avatarPicker = registerForActivityResult(GetContent()) { uri: Uri? ->
+        avatarPicker = registerForActivityResult(GetContent()) { uri ->
             uri?.let {
                 avatarUri = it
                 avatarImageView.setImageURI(it)
             }
         }
-        avatarImageView.setOnClickListener { avatarPicker.launch("image/*") }
+        avatarImageView.setOnClickListener {
+            avatarPicker.launch("image/*")
+        }
 
-        // --- Collapsible Private Info Section ---
+        // ── Private‐description collapse ──
         val privateHeader  = findViewById<LinearLayout>(R.id.privateDescHeader)
         val privateToggle  = findViewById<ImageView>(R.id.privateDescToggle)
         val privateSection = findViewById<LinearLayout>(R.id.privateSection)
@@ -56,8 +61,8 @@ class CharacterCreationActivity : AppCompatActivity() {
             }
         }
 
-        // --- Horizontal emotion‐picker RecyclerView ---
-        imagePicker = registerForActivityResult(GetContent()) { uri: Uri? ->
+        // ── Emotion‐slot picker ──
+        imagePicker = registerForActivityResult(GetContent()) { uri ->
             uri?.let {
                 emotionSlots[currentSlotIndex].uri = it
                 (findViewById<RecyclerView>(R.id.emotionRecycler).adapter as? EmotionAdapter)
@@ -71,98 +76,87 @@ class CharacterCreationActivity : AppCompatActivity() {
             imagePicker.launch("image/*")
         }
 
-        // --- Form fields ---
-        val nameEt         = findViewById<EditText>(R.id.characterNameInput)
-        val personalityEt  = findViewById<EditText>(R.id.characterPersonalityInput)
-        val tagsEt         = findViewById<EditText>(R.id.characterTagsInput)
-        val privateDescEt  = findViewById<EditText>(R.id.characterprivateDescriptionInput)
-        val ageEt          = findViewById<EditText>(R.id.ageEditText)
-        val heightEt       = findViewById<EditText>(R.id.heightEditText)
-        val weightEt       = findViewById<EditText>(R.id.weightEditText)
-        val eyeColorEt     = findViewById<EditText>(R.id.eyeColorEditText)
-        val hairColorEt    = findViewById<EditText>(R.id.hairColorEditText)
-        val greetingEt = findViewById<EditText>(R.id.characterGreetingInput)
+        // ── Form fields ──
+        val nameEt        = findViewById<EditText>(R.id.characterNameInput)
+        val personalityEt = findViewById<EditText>(R.id.characterPersonalityInput)
+        val tagsEt        = findViewById<EditText>(R.id.characterTagsInput)
+        val privateEt     = findViewById<EditText>(R.id.characterprivateDescriptionInput)
+        val ageEt         = findViewById<EditText>(R.id.ageEditText)
+        val heightEt      = findViewById<EditText>(R.id.heightEditText)
+        val weightEt      = findViewById<EditText>(R.id.weightEditText)
+        val eyeEt         = findViewById<EditText>(R.id.eyeColorEditText)
+        val hairEt        = findViewById<EditText>(R.id.hairColorEditText)
+        val greetingEt    = findViewById<EditText>(R.id.characterGreetingInput)
 
-        val maxProfileChars  = 4000
-        val maxGreetingChars = 500
-        personalityEt.filters = arrayOf(InputFilter.LengthFilter(maxProfileChars))
-        privateDescEt.filters = arrayOf(InputFilter.LengthFilter(maxProfileChars))
-        greetingEt.filters    = arrayOf(InputFilter.LengthFilter(maxGreetingChars))
+        // (optional) length limits
+        personalityEt.filters = arrayOf(InputFilter.LengthFilter(4000))
+        privateEt   .filters = arrayOf(InputFilter.LengthFilter(4000))
+        greetingEt  .filters = arrayOf(InputFilter.LengthFilter(500))
 
-        // --- Submit button ---
-        findViewById<MaterialButton>(R.id.charSubmitButton)
-            .setOnClickListener {
-                // 1) Validation
-                val name = nameEt.text.toString().trim()
-                if (name.isEmpty()) {
-                    Toast.makeText(this, "Please enter a name", Toast.LENGTH_SHORT).show()
-                    return@setOnClickListener
-                }
+        // ── Submit ──
+        findViewById<MaterialButton>(R.id.charSubmitButton).setOnClickListener {
+            // 1) Generate a new unique ID
+            val charId = System.currentTimeMillis().toString()
 
-                // 2) Gather inputs
-                val personality = personalityEt.text.toString().trim()
-                val tags = tagsEt.text.toString()
-                    .split(",").map { it.trim() }.filter { it.isNotEmpty() }
-                val privateDesc = privateDescEt.text.toString().trim()
-                val age         = ageEt.text.toString().trim()
-                val height      = heightEt.text.toString().trim()
-                val weight      = weightEt.text.toString().trim()
-                val eyeColor    = eyeColorEt.text.toString().trim()
-                val hairColor   = hairColorEt.text.toString().trim()
-
-                // 3) Build JSON profile
-                val profileJson = JSONObject().apply {
-                    put("name", name)
-                    put("personality", personality)
-                    put("tags", JSONArray(tags))
-                    put("privateDescription", privateDesc)
-                    put("profileInfo", JSONObject().apply {
-                        put("age", age)
-                        put("height", height)
-                        put("weight", weight)
-                        put("eyeColor", eyeColor)
-                        put("hairColor", hairColor)
-                    })
-                    // 3a) stamp in the current userId as “author”
-                    val authorId = getSharedPreferences("user", Context.MODE_PRIVATE)
-                        .getString("userId", "")!!
-                    put("author", authorId)
-                }
-
-                // 4) Persist SharedPreferences
-                val charId = System.currentTimeMillis().toString()
-
-                // 5) Save avatar to internal storage & record URI
-                avatarUri?.let { uri ->
-                    val outFile = File(filesDir, "avatar_${charId}.png")
-                    contentResolver.openInputStream(uri)?.use { input ->
-                        FileOutputStream(outFile).use { output ->
-                            input.copyTo(output)
-                        }
-                    }
-                    profileJson.put("avatarUri", Uri.fromFile(outFile).toString())
-                }
-
-                // 6) Write the JSON into your “characters” prefs
-                getSharedPreferences("characters", Context.MODE_PRIVATE)
-                    .edit()
-                    .putString(charId, profileJson.toString())
-                    .apply()
-
-                // 7) Write out each emotion image to filesDir
-                emotionSlots.forEach { slot ->
-                    slot.uri?.let { uri ->
-                        val filename = "${slot.key}_${charId}.png"
-                        val outFile  = File(filesDir, filename)
-                        contentResolver.openInputStream(uri)?.use { inp ->
-                            FileOutputStream(outFile).use { out -> inp.copyTo(out) }
-                        }
-                        profileJson.put("emotionImage_${slot.key}", outFile.absolutePath)
-                    }
-                }
-
-                Toast.makeText(this, "Character created!", Toast.LENGTH_SHORT).show()
-                finish()
+            // 2) Read & split tags into a real List<String>
+            val rawTags = tagsEt.text.toString().trim()
+            val tagsList = if (rawTags.isEmpty()) {
+                emptyList()
+            } else {
+                rawTags.split(',')
+                    .map { it.trim() }
+                    .filter { it.isNotEmpty() }
             }
+
+            // 3) Build our JSON object
+            val profileJson = JSONObject().apply {
+                put("id", charId)
+                put("name", nameEt.text.toString().trim())
+                put("description", personalityEt.text.toString().trim())
+                put("privateDescription", privateEt.text.toString().trim())
+                put("tags", JSONArray(tagsList))
+                put("profileInfo", JSONObject().apply {
+                    put("age", ageEt.text.toString().trim())
+                    put("height", heightEt.text.toString().trim())
+                    put("weight", weightEt.text.toString().trim())
+                    put("eyeColor", eyeEt.text.toString().trim())
+                    put("hairColor", hairEt.text.toString().trim())
+                })
+                put("greeting", greetingEt.text.toString().trim())
+
+                // 3a) Save avatar into internal storage & record its URI
+                avatarUri?.let { uri ->
+                    val outFile = File(filesDir, "avatar_$charId.png")
+                    contentResolver.openInputStream(uri)?.use { inStr ->
+                        FileOutputStream(outFile).use { outStr ->
+                            inStr.copyTo(outStr)
+                        }
+                    }
+                    put("avatarUri", Uri.fromFile(outFile).toString())
+                }
+
+                // 3b) Dump your emotion‐slot URIs
+                val emoJson = JSONObject()
+                emotionSlots.forEach { slot ->
+                    slot.uri?.let { emoJson.put(slot.key, it.toString()) }
+                }
+                put("emotionUris", emoJson)
+
+                // 3c) Stamp in the author (current userId)
+                val authorId = getSharedPreferences("user", Context.MODE_PRIVATE)
+                    .getString("userId","")!!
+                put("author", authorId)
+            }
+
+            // 4) Persist to SharedPreferences
+            getSharedPreferences("characters", Context.MODE_PRIVATE)
+                .edit()
+                .putString(charId, profileJson.toString())
+                .apply()
+
+            // 5) Log & finish
+            Log.d("CHAR_SAVE", profileJson.toString())
+            finish()
+        }
     }
 }
