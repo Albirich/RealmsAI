@@ -1,7 +1,6 @@
 package com.example.emotichat
 
 import android.content.Context
-import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.view.Menu
@@ -13,9 +12,16 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.example.emotichat.ai.buildAiPrompt
+import com.example.emotichat.ai.buildFacilitatorPrompt
 import com.example.emotichat.ai.AIResponseParser
 import com.google.gson.Gson
 import org.json.JSONObject
+import com.example.emotichat.ai.FakeAiService
+import com.example.emotichat.ai.FakeFacilitatorService
+import com.squareup.moshi.Moshi
+import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
+
 
 class MainActivity : BaseActivity() {
 
@@ -23,6 +29,12 @@ class MainActivity : BaseActivity() {
     private lateinit var messageEditText: EditText
     private lateinit var profile: ChatProfile
     private lateinit var parser: AIResponseParser
+
+    // A minimal placeholder state for testing
+    private var currentFacilitatorState = """{"locations":{},"volumes":{}}"""
+    private var currentActiveBotProfiles = emptyList<CharacterProfile>()
+    private var summaryOfInactiveBots    = emptyList<Map<String,Any>>()
+
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -32,6 +44,20 @@ class MainActivity : BaseActivity() {
         val json = intent.getStringExtra("CHAT_PROFILE_JSON")
             ?: throw IllegalStateException("No chat profile passed!")
         profile = Gson().fromJson(json, ChatProfile::class.java)
+
+        fun loadFullCharacterProfile(id: String): CharacterProfile? {
+            val prefs = getSharedPreferences("characters", MODE_PRIVATE)
+            val json  = prefs.getString(id, null) ?: return null
+            return Gson().fromJson(json, CharacterProfile::class.java)        }
+
+
+        // e.g. at the top of onCreate()
+        val allCharProfiles: List<CharacterProfile> = profile.characterIds.mapNotNull { charId ->
+            // assume you have a loader that returns a CharacterProfile
+            loadFullCharacterProfile(charId)
+        }
+
+
 
         // 2) Title & description toggle
         findViewById<TextView>(R.id.chatTitle).text = profile.title
@@ -101,20 +127,65 @@ class MainActivity : BaseActivity() {
 
         // 8) Send button
         findViewById<Button>(R.id.sendButton).setOnClickListener {
-            val text = messageEditText.text.toString().trim()
-            if (text.isEmpty()) return@setOnClickListener
+            val userInput = messageEditText.text.toString().trim()
+            if (userInput.isEmpty()) return@setOnClickListener
 
-            // a) show user
-            chatAdapter.addMessage(ChatMessage("You", text))
+            // 1) Show user & persist…
+            chatAdapter.addMessage(ChatMessage("You", userInput))
             messageEditText.text.clear()
-
-            // Optional: persist after each message
             persistChat()
 
-            // b) call stub or real AI
-            val raw = callYourAiService(text)
+// 2a) Build & show the facilitator→API prompt
+            val historySnippet = chatAdapter.getMessages().takeLast(3)
+                .joinToString("\n") { "${it.sender}: ${it.messageText}" }
+            val facPrompt =
+                buildFacilitatorPrompt(userInput, historySnippet, currentFacilitatorState)
+            chatAdapter.addMessage(ChatMessage("Facilitator→API", facPrompt))
+
+// 2b) Fake-call the facilitator and show its JSON
+            val facRaw = FakeFacilitatorService.getResponse(facPrompt)
+            chatAdapter.addMessage(ChatMessage("Facilitator", facRaw))
+
+// 2c) **Parse** facilitator JSON into activeIds and notes
+            val moshi = Moshi.Builder().add(KotlinJsonAdapterFactory()).build()
+            val mapAdapter = moshi.adapter(Map::class.java)
+            val facMap = mapAdapter.fromJson(facRaw) as Map<*, *>
+            currentFacilitatorState = facMap["notes"] as String
+            val activeIds = (facMap["activeBots"] as List<*>).map { it as String }
+
+// 2d) **Rebuild** active/inactive lists **before** building AI prompt
+            currentActiveBotProfiles = allCharProfiles.filter { it.characterId in activeIds }
+            summaryOfInactiveBots = allCharProfiles
+                .filter { it.characterId !in activeIds }
+                .map { bot ->
+                    mapOf(
+                        "id" to bot.characterId,
+                        "description" to bot.description
+                    )
+                }
+
+// 3) Now build & show the **AI→API** prompt with the **updated** activeBots
+            val fullJson = Gson().toJson(currentActiveBotProfiles)
+            val summaryJson = Gson().toJson(summaryOfInactiveBots)
+            val aiPrompt = buildAiPrompt(
+                userInput = userInput,
+                history = historySnippet,
+                fullProfilesJson = fullJson,
+                summariesJson = summaryJson,
+                facilitatorNotes = currentFacilitatorState,
+                chatDescription = profile.description
+            )
+            chatAdapter.addMessage(ChatMessage("AI→API", aiPrompt))
+
+// 4) Fake AI reply and parse
+            val raw = FakeAiService.getResponse(userInput)
             parser.handle(raw)
+
+// 5) Persist again
+            persistChat()
         }
+
+
     }
 
     /** Persists the current chat session */
