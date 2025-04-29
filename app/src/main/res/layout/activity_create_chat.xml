@@ -17,6 +17,18 @@
             android:layout_height="wrap_content"
             android:hint="Enter chat title" />
 
+        <!-- Game Mode Spinner -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="Game Mode"
+            android:textStyle="bold" />
+        <Spinner
+            android:id="@+id/modeSpinner"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+
         <!-- Description -->
         <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"
@@ -30,19 +42,6 @@
             android:hint="Enter description"
             android:maxHeight="200dp" />
         </com.google.android.material.textfield.TextInputLayout>
-
-        <!-- Tags -->
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:text="Tags (comma-separated)"
-            android:textStyle="bold" />
-        <EditText
-            android:id="@+id/tagsEditText"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:hint="e.g. fantasy, mystery" />
 
         <!-- First Message -->
         <com.google.android.material.textfield.TextInputLayout
@@ -58,18 +57,6 @@
             android:maxHeight="200dp" />
         </com.google.android.material.textfield.TextInputLayout>
 
-        <!-- Game Mode Spinner -->
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:text="Game Mode"
-            android:textStyle="bold" />
-        <Spinner
-            android:id="@+id/modeSpinner"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content" />
-
         <!-- Background Selector -->
         <TextView
             android:layout_width="wrap_content"
@@ -77,15 +64,24 @@
             android:layout_marginTop="12dp"
             android:text="Background"
             android:textStyle="bold" />
+
         <ImageButton
             android:id="@+id/backgroundButton"
-            android:layout_width="match_parent"
-            android:layout_height="200dp"
-            android:scaleType="fitCenter"
+            android:layout_width="64dp"
+            android:layout_height="64dp"
             android:src="@drawable/placeholder_background"
-            android:contentDescription="Select Background"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:adjustViewBounds="true" />
+            android:scaleType="fitXY"
+            android:contentDescription="Upload background"/>
+
+        <!-- NEW: Preset backgrounds gallery -->
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/backgroundRecycler"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingTop="8dp"
+            android:overScrollMode="never"
+            android:scrollbars="horizontal"
+            app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"/>
 
         <!-- Safe-for-Work Toggle -->
         <LinearLayout
@@ -94,13 +90,11 @@
             android:orientation="horizontal"
             android:layout_marginTop="16dp"
             android:gravity="center_vertical">
-
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="SFW Only"
                 android:textStyle="bold" />
-
             <Switch
                 android:id="@+id/sfwSwitch"
                 android:layout_width="wrap_content"
@@ -185,10 +179,21 @@
                     android:contentDescription="Character slot 6"
                     android:background="?attr/selectableItemBackgroundBorderless"
                     android:scaleType="centerCrop" />
-
             </LinearLayout>
         </HorizontalScrollView>
 
+        <!-- Tags -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="15dp"
+            android:text="Tags (comma-separated)"
+            android:textStyle="bold" />
+        <EditText
+            android:id="@+id/tagsEditText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="e.g. fantasy, mystery" />
         <!-- Create Button -->
         <Button
             android:id="@+id/createChatButton"
@@ -196,6 +201,5 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="24dp"
             android:text="Create Chat" />
-
     </LinearLayout>
 </ScrollView>

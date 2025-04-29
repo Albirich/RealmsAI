@@ -22,6 +22,10 @@ import com.example.emotichat.ai.FakeAiService
 import com.example.emotichat.ai.FakeFacilitatorService
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
+import android.graphics.BitmapFactory
+import android.graphics.drawable.BitmapDrawable
+
+
 
 
 class MainActivity : BaseActivity() {
@@ -30,6 +34,7 @@ class MainActivity : BaseActivity() {
     private lateinit var messageEditText: EditText
     private lateinit var profile: ChatProfile
     private lateinit var parser: AIResponseParser
+    private lateinit var chatRoot: LinearLayout
 
     // A minimal placeholder state for testing
     private var currentFacilitatorState = """{"locations":{},"volumes":{}}"""
@@ -40,6 +45,10 @@ class MainActivity : BaseActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+
+        // 0) find your root container
+        chatRoot = findViewById(R.id.chatRoot)
+
 
         // 1) Deserialize profile
         val json = intent.getStringExtra("CHAT_PROFILE_JSON")
@@ -63,6 +72,32 @@ class MainActivity : BaseActivity() {
 
         // Debug: make sure you actually have some
         Log.d("DEBUG", "allCharProfiles IDs = ${allCharProfiles.map { it.id }}")
+
+        // 1) if ChatProfile passed a backgroundUri, load & apply it
+        profile.backgroundUri
+            ?.takeIf { it.isNotBlank() }
+            ?.let { uriStr ->
+                // if it's a file:// URI you saved under filesDir:
+                val uri = Uri.parse(uriStr)
+                when (uri.scheme) {
+                    "file" -> Uri.parse(uriStr).path?.let { path ->
+                        BitmapFactory.decodeFile(path)?.let { bmp ->
+                            chatRoot.background = BitmapDrawable(resources, bmp)
+                        }
+                    }
+                    "android.resource" -> {
+                        // last segment is the resId
+                        uri.lastPathSegment?.toIntOrNull()?.let { resId ->
+                            chatRoot.setBackgroundResource(resId)
+                        }
+                    }
+                    "content" -> contentResolver.openInputStream(uri)?.use { stream ->
+                        BitmapFactory.decodeStream(stream)?.let { bmp ->
+                            chatRoot.background = BitmapDrawable(resources, bmp)
+                        }
+                    }
+                }
+            }
 
 // 1b) Seed with a default so you don’t see [] before the first Facilitator run
         var currentActiveBotProfiles = allCharProfiles.take(2)

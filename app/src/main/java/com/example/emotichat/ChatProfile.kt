@@ -7,7 +7,7 @@ data class ChatProfile(
     val description: String,
     val tags: List<String>,
     val mode: ChatMode,
-    val backgroundUri: String?,    // URI string or resource identifier
+    val backgroundUri: String?,
     val sfwOnly: Boolean,
     val characterIds: List<String>,
     val rating: Float,
