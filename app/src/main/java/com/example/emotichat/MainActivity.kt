@@ -102,7 +102,7 @@ class MainActivity : BaseActivity() {
 // 1b) Seed with a default so you don’t see [] before the first Facilitator run
         var currentActiveBotProfiles = allCharProfiles.take(2)
         var summaryOfInactiveBots    = allCharProfiles.drop(2).map { bot ->
-            mapOf("id" to bot.id, "description" to bot.description)
+            mapOf("id" to bot.id, "description" to bot.personality)
         }
 
         // 2) Title & description toggle
@@ -215,7 +215,7 @@ class MainActivity : BaseActivity() {
                 if (slot !in activeIds) {
                     mapOf(
                         "id"          to bot.id,
-                        "description" to bot.description
+                        "description" to bot.personality
                     )
                 } else null
             }
@@ -291,7 +291,7 @@ class MainActivity : BaseActivity() {
         when (item.itemId) {
             R.id.clear_chat -> {
                 chatAdapter.clearMessages()
-                clearChatHistoryFromPrefs()
+                clearChatHistoryFromPrefs(profile.id)
                 true
             }
             else -> super.onOptionsItemSelected(item)

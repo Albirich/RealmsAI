@@ -6,18 +6,19 @@ import android.os.Bundle
 import android.text.InputFilter
 import android.util.Log
 import android.view.View
-import android.widget.*
+import android.widget.EditText
+import android.widget.ImageView
+import android.widget.LinearLayout
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts.GetContent
 import androidx.appcompat.app.AppCompatActivity
-import androidx.recyclerview.widget.LinearLayoutManager
-import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.button.MaterialButton
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.io.FileOutputStream
-import java.util.UUID
 
 class CharacterCreationActivity : AppCompatActivity() {
     private var avatarUri: Uri? = null
@@ -87,6 +88,7 @@ class CharacterCreationActivity : AppCompatActivity() {
         val eyeEt         = findViewById<EditText>(R.id.eyeColorEditText)
         val hairEt        = findViewById<EditText>(R.id.hairColorEditText)
         val greetingEt    = findViewById<EditText>(R.id.characterGreetingInput)
+        val summaryEt     = findViewById<EditText>(R.id.etSummary)
 
         // (optional) length limits
         personalityEt.filters = arrayOf(InputFilter.LengthFilter(4000))
@@ -108,11 +110,15 @@ class CharacterCreationActivity : AppCompatActivity() {
                     .filter { it.isNotEmpty() }
             }
 
+            // 2a) Read the new summary
+            val summary = summaryEt.text.toString().trim()
+
             // 3) Build our JSON object
             val profileJson = JSONObject().apply {
                 put("id", charId)
                 put("name", nameEt.text.toString().trim())
-                put("description", personalityEt.text.toString().trim())
+                put("personality", personalityEt.text.toString().trim())
+                put("summary", summary)  // ← store it here
                 put("privateDescription", privateEt.text.toString().trim())
                 put("tags", JSONArray(tagsList))
                 put("profileInfo", JSONObject().apply {

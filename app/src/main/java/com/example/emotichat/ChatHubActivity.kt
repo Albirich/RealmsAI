@@ -16,6 +16,7 @@ class ChatHubActivity : BaseActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_chat_hub)
+        setupBottomNav()
 
         // 1) Pull your userId once for use as the “author”
         val authorId = getSharedPreferences("user", MODE_PRIVATE)
@@ -32,13 +33,7 @@ class ChatHubActivity : BaseActivity() {
             // 4) Create a new session ID
             val newChatId = System.currentTimeMillis().toString()
 
-            // 5) Persist an initial “System” message + author
-            saveChatSession(
-                chatId = newChatId,
-                title = preview.title,
-                messages = listOf(ChatMessage("System", preview.description)),
-                author = authorId
-            )
+
 
             // 6) Build ChatProfile from the preview, reusing its mode
             val profile = ChatProfile(
@@ -51,7 +46,8 @@ class ChatHubActivity : BaseActivity() {
                 sfwOnly = false,
                 characterIds = emptyList(),
                 rating = preview.rating,
-                timestamp = preview.timestamp
+                timestamp = preview.timestamp,
+                author        = authorId
             )
 
             // 7) Kick off MainActivity with the profile & first message

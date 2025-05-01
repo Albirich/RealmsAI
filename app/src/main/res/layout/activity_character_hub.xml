@@ -7,7 +7,7 @@
 
     <!-- chat_list_activity.xml -->
     <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/chatListRecyclerView"
+        android:id="@+id/characterHubRecyclerView"
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
     <!-- at the end of your root layout -->

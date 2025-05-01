@@ -34,7 +34,7 @@
     <LinearLayout
         android:id="@+id/bottom_buttons_row"
         android:layout_width="match_parent"
-        android:layout_height="64dp"
+        android:layout_height="75dp"
         android:orientation="horizontal"
         android:weightSum="5"
         android:layout_gravity="bottom"

@@ -39,7 +39,7 @@
             android:layout_weight="1"
             android:adjustViewBounds="true"
             android:scaleType="centerCrop"
-            android:src="@drawable/icon_02" />
+            android:src="@drawable/icon_01" />
 
     </LinearLayout>
 
@@ -88,7 +88,7 @@
         android:layout_height="wrap_content"
         android:padding="4dp"
         android:text="TYPE"
-        android:textSize="20sp"
+        android:textSize="16sp"
         android:textStyle="bold"
         android:layout_alignBottom="@id/cardBackground"
         android:layout_alignParentEnd="true"

@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:padding="4dp">
+
+    <!-- (a) Card background, same as chat -->
+    <ImageView
+        android:id="@+id/cardBackground"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:adjustViewBounds="true"
+        android:scaleType="fitCenter"
+        android:src="@drawable/chat_card" />
+
+    <!-- (b) One‐slot avatar container with weighted spacers -->
+    <LinearLayout
+        android:id="@+id/avatarContainer"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_alignTop="@id/cardBackground"
+        android:layout_marginHorizontal="2dp"
+        android:layout_marginTop="3dp"
+        android:orientation="horizontal"
+        android:weightSum="2"
+        >
+
+        <!-- left spacer (0.5 of width) -->
+        <View
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="0.5" />
+
+        <!-- avatar slot (1 of width) -->
+        <ImageView
+            android:id="@+id/chatAvatar1"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:adjustViewBounds="true"
+            android:scaleType="centerInside"
+            android:src="@drawable/icon_01"
+            android:contentDescription="@null" />
+
+        <!-- right spacer -->
+        <View
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="0.5" />
+    </LinearLayout>
+
+    <!-- (c) Name (reusing chatTitle id) -->
+    <TextView
+        android:id="@+id/chatTitle"
+        android:layout_width="match_parent"
+        android:layout_height="36dp"
+        android:layout_below="@id/avatarContainer"
+        android:layout_marginTop="8dp"
+        android:layout_marginHorizontal="4dp"
+        android:text="Character Name"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:textColor="#000" />
+
+    <!-- (d) Summary (reusing chatPreview id) -->
+    <TextView
+        android:id="@+id/chatPreview"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/chatTitle"
+        android:layout_marginTop="4dp"
+        android:layout_marginHorizontal="4dp"
+        android:layout_marginBottom="40dp"
+        android:text="Short summary"
+        android:textSize="14sp"
+        android:textColor="#666"
+        android:ellipsize="end"
+        android:maxLines="2" />
+
+</RelativeLayout>

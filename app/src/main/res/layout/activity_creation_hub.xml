@@ -3,7 +3,8 @@
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    android:padding="8dp">
 
     <!-- 1) Scrollable content -->
     <ScrollView
@@ -13,21 +14,13 @@
         android:paddingBottom="72dp"
         android:clipToPadding="false"
         android:fillViewport="true"
-        app:layout_constraintBottom_toTopOf="@id/bottomNavBar">
+        app:layout_constraintTop_toTopOf="parent">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
             android:padding="16dp">
-
-            <!-- Chats row -->
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Chats"
-                android:textSize="18sp"
-                android:layout_marginBottom="8dp"/>
 
             <androidx.constraintlayout.widget.ConstraintLayout
                 android:layout_width="match_parent"
@@ -38,114 +31,65 @@
                     android:id="@+id/btn_new_chat"
                     android:layout_width="0dp"
                     android:layout_height="0dp"
-                    android:src="@drawable/btn_new_chat"
+                    android:layout_marginStart="4dp"
+                    android:background="@null"
                     android:contentDescription="New Chat"
                     android:scaleType="fitXY"
+                    android:src="@drawable/btn_new_chat"
+                    app:layout_constraintBottom_toBottomOf="parent"
+                    app:layout_constraintDimensionRatio="1:1"
                     app:layout_constraintStart_toStartOf="parent"
                     app:layout_constraintTop_toTopOf="parent"
-                    app:layout_constraintBottom_toBottomOf="parent"
-                    app:layout_constraintWidth_percent="0.45"
-                    app:layout_constraintDimensionRatio="1:1"
-                    android:background="@null"
-                    />
-
-                <ImageButton
-                    android:id="@+id/btn_view_chats"
-                    android:layout_width="0dp"
-                    android:layout_height="0dp"
-                    android:src="@drawable/btn_created_chat"
-                    android:scaleType="fitXY"
-                    android:contentDescription="View Created Chats"
-                    app:layout_constraintEnd_toEndOf="parent"
-                    app:layout_constraintTop_toTopOf="parent"
-                    app:layout_constraintBottom_toBottomOf="parent"
-                    app:layout_constraintWidth_percent="0.45"
-                    app:layout_constraintDimensionRatio="1:1"
-                    android:background="@null"/>
-            </androidx.constraintlayout.widget.ConstraintLayout>
-
-            <!-- Characters row -->
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Characters"
-                android:textSize="18sp"
-                android:layout_marginBottom="8dp"/>
-
-            <androidx.constraintlayout.widget.ConstraintLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="24dp">
+                    app:layout_constraintVertical_bias="0.0"
+                    app:layout_constraintWidth_percent="0.45" />
 
                 <ImageButton
                     android:id="@+id/btn_new_char"
                     android:layout_width="0dp"
                     android:layout_height="0dp"
+                    android:background="@null"
+                    android:contentDescription="View New Chars"
+                    android:scaleType="fitXY"
                     android:src="@drawable/btn_new_char"
-                    android:contentDescription="New Character"
-                    android:scaleType="fitXY"
-                    app:layout_constraintStart_toStartOf="parent"
-                    app:layout_constraintTop_toTopOf="parent"
                     app:layout_constraintBottom_toBottomOf="parent"
-                    app:layout_constraintWidth_percent="0.45"
                     app:layout_constraintDimensionRatio="1:1"
-                    android:background="@null"/>
-
-                <ImageButton
-                    android:id="@+id/btn_view_characters"
-                    android:layout_width="0dp"
-                    android:layout_height="0dp"
-                    android:src="@drawable/btn_created_char"
-                    android:contentDescription="View Created Characters"
-                    android:scaleType="fitXY"
                     app:layout_constraintEnd_toEndOf="parent"
                     app:layout_constraintTop_toTopOf="parent"
-                    app:layout_constraintBottom_toBottomOf="parent"
-                    app:layout_constraintWidth_percent="0.45"
-                    app:layout_constraintDimensionRatio="1:1"
-                    android:background="@null"/>
-            </androidx.constraintlayout.widget.ConstraintLayout>
-
-            <!-- Personas row -->
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Personas"
-                android:textSize="18sp"
-                android:layout_marginBottom="8dp"/>
-
-            <androidx.constraintlayout.widget.ConstraintLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content">
+                    app:layout_constraintVertical_bias="0.0"
+                    app:layout_constraintWidth_percent="0.45" />
 
                 <ImageButton
                     android:id="@+id/btn_new_sona"
                     android:layout_width="0dp"
                     android:layout_height="0dp"
-                    android:contentDescription="New Persona"
-                    android:scaleType="fitXY"
                     android:src="@drawable/btn_new_sona"
-                    app:layout_constraintBottom_toBottomOf="parent"
-                    app:layout_constraintDimensionRatio="1:1"
+                    android:contentDescription="New sonas"
+                    android:scaleType="fitXY"
                     app:layout_constraintStart_toStartOf="parent"
-                    app:layout_constraintTop_toTopOf="parent"
+                    app:layout_constraintTop_toBottomOf="@id/btn_new_chat"
+                    app:layout_constraintBottom_toBottomOf="parent"
+                    android:layout_marginTop="16dp"
+                    android:layout_marginStart="4dp"
                     app:layout_constraintWidth_percent="0.45"
-                    android:background="@null" />
+                    app:layout_constraintDimensionRatio="1:1"
+                    android:background="@null"/>
 
                 <ImageButton
-                    android:id="@+id/btn_view_personas"
+                    android:id="@+id/btn_view_created"
                     android:layout_width="0dp"
                     android:layout_height="0dp"
-                    android:contentDescription="View Created Personas"
+                    android:src="@drawable/btn_creations"
+                    android:contentDescription="View Created Characters"
                     android:scaleType="fitXY"
-                    android:src="@drawable/btn_created_sona"
-                    app:layout_constraintBottom_toBottomOf="parent"
-                    app:layout_constraintDimensionRatio="1:1"
                     app:layout_constraintEnd_toEndOf="parent"
-                    app:layout_constraintTop_toTopOf="parent"
+                    app:layout_constraintTop_toBottomOf="@id/btn_new_char"
+                    app:layout_constraintBottom_toBottomOf="parent"
+                    android:layout_marginTop="16dp"
                     app:layout_constraintWidth_percent="0.45"
+                    app:layout_constraintDimensionRatio="1:1"
                     android:background="@null"/>
             </androidx.constraintlayout.widget.ConstraintLayout>
+
 
         </LinearLayout>
     </ScrollView>

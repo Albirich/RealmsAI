@@ -10,13 +10,14 @@ class ChatListActivity : BaseActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.chat_list_activity)
+        setContentView(R.layout.activity_character_hub)
+        setupBottomNav()
 
         // 1) Load both character‐only and sandbox chat previews
         val previews = loadAllPreviews()
 
         // 2) Wire up RecyclerView
-        val recyclerView = findViewById<RecyclerView>(R.id.chatListRecyclerView)
+        val recyclerView = findViewById<RecyclerView>(R.id.createdRecycler)
         recyclerView.layoutManager = GridLayoutManager(this, 2)
         recyclerView.adapter = ChatPreviewAdapter(previews) { preview ->
             // Launch MainActivity, passing along ID / title / description
@@ -28,12 +29,7 @@ class ChatListActivity : BaseActivity() {
         }
     }
 
-    /**
-     * Reads:
-     *  • /data/data/.../shared_prefs/characters.xml
-     *  • /data/data/.../shared_prefs/chat_sessions.xml
-     * and returns a merged, sorted list of ChatPreview.
-     */
+
     private fun loadAllPreviews(): List<ChatPreview> {
         val list = mutableListOf<ChatPreview>()
 
@@ -53,7 +49,7 @@ class ChatListActivity : BaseActivity() {
                 avatar2ResId  = 0,               // no second avatar
                 rating        = 0f,
                 timestamp     = obj.optLong("createdTimestamp", System.currentTimeMillis()),
-                mode         = ChatMode.CHARACTER
+                mode         = ChatMode.SANDBOX
             )
         }
 
@@ -77,7 +73,7 @@ class ChatListActivity : BaseActivity() {
                 title         = title,
                 description   = snippet,
                 avatar1ResId  = R.drawable.icon_01,
-                avatar2ResId  = R.drawable.icon_02,
+                avatar2ResId  = R.drawable.icon_01,
                 rating        = 0f,
                 timestamp     = updated,
                 mode         = chatObj.optString("mode")

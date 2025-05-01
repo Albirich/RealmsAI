@@ -1,13 +1,19 @@
 package com.example.emotichat
 
+import com.google.gson.annotations.SerializedName
+
 data class CharacterProfile(
-    val id: String,
-    val name: String,
-    val description: String, // Public description
-    val privateDescription: String, // Private description (for the creator)
-    val author: String = "" , // Who created the character
-    val tags: List<String>, // Public tags
-    val emotionTags: Map<String, String>, // Key-Value pairs (e.g., "happy" -> "excited")
-    val avatarResId: Int, // Avatar image resource
-    val additionalInfo: String, // Age, height, etc. displayed above the description
+    val id                 : String,
+    val name               : String,
+    val personality        : String,
+    val privateDescription : String,
+    val author             : String = "",
+    val tags               : List<String>,
+    val emotionTags        : Map<String, String>,
+    val avatarResId        : Int,
+    val additionalInfo     : String,
+    val summary            : String? = null,
+
+    @SerializedName("avatarUri")
+    val avatarUri          : String? = null   // ← add this back in
 )

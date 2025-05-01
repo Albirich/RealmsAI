@@ -14,5 +14,11 @@
     <string name="emotion_Embarrassed">Embarrassed</string>
     <string name="emotion_placeholder">emotion_placeholder</string>
     <string name="avatar">Avatar</string>
+    <string-array name="created_filter_options">
+        <item>All</item>
+        <item>Chats</item>
+        <item>Characters</item>
+        <item>Personas</item>
+    </string-array>
 </resources>
 

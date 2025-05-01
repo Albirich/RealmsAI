@@ -1,26 +1,23 @@
 package com.example.emotichat
 
-/** Full chat profile passed between activities as JSON. */
 data class ChatProfile(
     val id: String,
     val title: String,
     val description: String,
     val tags: List<String>,
     val mode: ChatMode,
-    val backgroundUri: String?,
+    val backgroundUri: String?,     // e.g. "android.resource://…"/custom URI
     val sfwOnly: Boolean,
-    val characterIds: List<String>,
+    val characterIds: List<String>, // IDs of the characters in this chat
     val rating: Float,
     val timestamp: Long,
-    val author: String = ""
+    val author: String
 )
 
-/** Supported game modes for chats. */
 enum class ChatMode {
     SANDBOX,
     RPG,
     SLOW_BURN,
     GOD,
-    VISUAL_NOVEL,
-    CHARACTER
+    VISUAL_NOVEL
 }

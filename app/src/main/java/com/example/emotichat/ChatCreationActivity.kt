@@ -164,13 +164,6 @@ class ChatCreationActivity : BaseActivity() {
                 author        = getCurrentUserId()
             )
 
-            // persist empty session
-            saveChatSession(
-                chatId   = chatId,
-                title    = title,
-                messages = emptyList(),
-                author   = profile.author
-            )
 
             // launch main
             Intent(this, MainActivity::class.java).apply {

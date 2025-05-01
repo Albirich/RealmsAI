@@ -37,7 +37,6 @@ class ChatPreviewAdapter(
                 ChatMode.SLOW_BURN   -> "SLOW-BURN"
                 ChatMode.VISUAL_NOVEL-> "VN"
                 ChatMode.GOD         -> "GOD"
-                ChatMode.CHARACTER -> "CHARACTER"
             }
             badge.visibility = View.VISIBLE
 

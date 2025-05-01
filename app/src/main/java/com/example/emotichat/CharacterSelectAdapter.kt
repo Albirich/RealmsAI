@@ -13,11 +13,11 @@ import androidx.recyclerview.widget.RecyclerView
  * @param selectedIds  a mutable set of currently–selected character IDs
  * @param onToggle     callback invoked (charId, isNowSelected) when user taps an item
  */
-class CharacterAdapter(
+class CharacterSelectAdapter(
     private val characters: List<Character>,
     private val selectedIds: MutableSet<String>,
     private val onToggle: (String, Boolean) -> Unit
-) : RecyclerView.Adapter<CharacterAdapter.VH>() {
+) : RecyclerView.Adapter<CharacterSelectAdapter.VH>() {
 
     inner class VH(itemView: View) : RecyclerView.ViewHolder(itemView) {
         val avatar: ImageView = itemView.findViewById(R.id.itemCharAvatar)

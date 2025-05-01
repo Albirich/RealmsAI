@@ -4,7 +4,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    android:padding="16dp">
+    android:padding="8dp">
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
@@ -20,6 +20,15 @@
             android:layout_height="wrap_content"
             android:hint="Enter character name"
             android:textSize="18sp" />
+
+        <!-- Summary -->
+        <EditText
+            android:id="@+id/etSummary"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Short summary (1–2 lines)"
+            android:maxLines="2"
+            android:inputType="textCapSentences|textMultiLine"/>
 
         <!-- Personality Input-->
         <com.google.android.material.textfield.TextInputLayout

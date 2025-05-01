@@ -2,181 +2,125 @@ package com.example.emotichat
 
 import android.content.Context
 import android.content.Intent
-import android.os.Bundle
-import android.view.Menu
-import android.view.MenuItem
+import android.util.Log
 import android.widget.ImageButton
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import com.google.gson.Gson
+import org.json.JSONArray
+import org.json.JSONObject
 
-/**
- * BaseActivity centralizes shared UI (toolbar, bottom navigation)
- * and session persistence (save/load chat) for all screens.
- */
 open class BaseActivity : AppCompatActivity() {
 
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
+    protected fun setupBottomNav() {
 
-        //  ——————————————————————————————————————————
-        //  Ensure we have a stable userId in prefs
-        //  ——————————————————————————————————————————
-        val userPrefs = getSharedPreferences("user", Context.MODE_PRIVATE)
-        if (!userPrefs.contains("userId")) {
-            userPrefs.edit()
-                .putString("userId", java.util.UUID.randomUUID().toString())
-                .apply()
+        // Chats
+        findViewById<ImageButton>(R.id.navChats).setOnClickListener {
+            startActivity(Intent(this, ChatHubActivity::class.java))
         }
-    }
-
-    //────────────────────────────────────────────────────────────────
-    // 1) Layout Inflation Hook: install toolbar + nav after setContentView
-    //────────────────────────────────────────────────────────────────
-    override fun setContentView(layoutResID: Int) {
-        super.setContentView(layoutResID)
-        setupBottomNav()
-        // If you ever add a common Toolbar, call setupToolbar() here too
-    }
-
-    //────────────────────────────────────────────────────────────────
-    // 2) Options Menu (CLEAR CHAT)
-    //────────────────────────────────────────────────────────────────
-    override fun onCreateOptionsMenu(menu: Menu): Boolean {
-        menuInflater.inflate(R.menu.main_menu, menu)
-        return true
-    }
-
-    override fun onOptionsItemSelected(item: MenuItem): Boolean {
-        return when (item.itemId) {
-            R.id.clear_chat -> {
-                // Default clear‐history action (overridden in some screens if desired)
-                clearChatHistoryFromPrefs()
-                true
-            }
-            else -> super.onOptionsItemSelected(item)
+        // Characters
+        findViewById<ImageButton>(R.id.navCharacters).setOnClickListener {
+            startActivity(Intent(this, CharacterHubActivity::class.java))
         }
-    }
-
-    /**
-     * Clears the entire saved chat_sessions map.
-     */
-    protected fun clearChatHistoryFromPrefs() {
-        getSharedPreferences("chat_sessions", Context.MODE_PRIVATE)
-            .edit()
-            .remove("all_chats")
-            .apply()
-    }
-
-    //────────────────────────────────────────────────────────────────
-    // 3) Bottom Navigation Wiring
-    //────────────────────────────────────────────────────────────────
-    private fun setupBottomNav() {
-        // Chats hub
-        findViewById<ImageButton>(R.id.navChats)?.setOnClickListener {
-            if (this !is ChatHubActivity) {
-                startActivity(Intent(this, ChatHubActivity::class.java))
-            }
+        // Create (hub)
+        findViewById<ImageButton>(R.id.navCreate).setOnClickListener {
+            startActivity(Intent(this, CreationHubActivity::class.java))
         }
-        // Characters hub
-        findViewById<ImageButton>(R.id.navCharacters)?.setOnClickListener {
-            if (this !is CharacterHubActivity) {
-                startActivity(Intent(this, CharacterHubActivity::class.java))
-            }
-        }
-        // Create hub
-        findViewById<ImageButton>(R.id.navCreate)?.setOnClickListener {
-            if (this !is CreationHubActivity) {
-                startActivity(Intent(this, CreationHubActivity::class.java))
-            }
-        }
-        // History
-        findViewById<ImageButton>(R.id.navHistory)?.setOnClickListener {
-            if (this !is ChatListActivity) {
-                startActivity(Intent(this, ChatListActivity::class.java))
-            }
+        // History / “Created”
+        findViewById<ImageButton>(R.id.navHistory).setOnClickListener {
+            startActivity(Intent(this, CreatedListActivity::class.java))
         }
         // Profile
-        findViewById<ImageButton>(R.id.navProfile)?.setOnClickListener {
-            if (this !is ProfileActivity) {
-                startActivity(Intent(this, ProfileActivity::class.java))
-            }
+        findViewById<ImageButton>(R.id.navProfile).setOnClickListener {
+            startActivity(Intent(this, ProfileActivity::class.java))
         }
     }
 
-    //────────────────────────────────────────────────────────────────
-    // 4) Chat Session Persistence
-    //────────────────────────────────────────────────────────────────
+    protected fun loadAllChatPreviews(): List<ChatPreview> {
+        val now = System.currentTimeMillis()
+
+        // Build a quick lookup of character‐ID → avatarResId
+        val charMap: Map<String, Int> = loadAllCharacterProfiles()
+            .associate { it.id to it.avatarResId }
+
+        val prefs = getSharedPreferences("chats", Context.MODE_PRIVATE)
+        return prefs.all.values
+            .mapNotNull { it as? String }
+            .mapNotNull { json ->
+                runCatching {
+                    Gson().fromJson(json, ChatProfile::class.java)
+                }.getOrNull()
+            }
+            .map { profile ->
+                // pick your first two character avatars (or fallback to icon_01)
+                val ids    = profile.characterIds
+                val avatar1 = ids.getOrNull(0)?.let { charMap[it] } ?: R.drawable.icon_01
+                val avatar2 = ids.getOrNull(1)?.let { charMap[it] } ?: avatar1
+
+                ChatPreview(
+                    id           = profile.id,
+                    title        = profile.title,
+                    description  = profile.description,
+                    avatar1ResId = avatar1,
+                    avatar2ResId = avatar2,
+                    rating       = profile.rating,
+                    timestamp    = profile.timestamp.takeIf { it > 0 } ?: now,
+                    mode         = profile.mode,
+                    author       = profile.author
+                )
+            }
+    }
+
     /**
-     * Saves (or updates) a chat session under `chatId` with given title/messages.
+     * Loads every saved CharacterProfile from SharedPreferences.
      */
-    fun saveChatSession(
+    protected fun loadAllCharacterProfiles(): List<CharacterProfile> {
+        val prefs = getSharedPreferences("characters", Context.MODE_PRIVATE)
+        return prefs.all.values
+            .mapNotNull { it as? String }
+            .mapNotNull { json ->
+                runCatching {
+                    Gson().fromJson(json, CharacterProfile::class.java)
+                }.getOrNull()
+            }
+    }
+
+    protected fun loadChatSession(chatId: String): List<ChatMessage> {
+        val prefs = getSharedPreferences("sessions", Context.MODE_PRIVATE)
+        val raw   = prefs.getString(chatId, null) ?: return emptyList()
+
+        return runCatching {
+            val root = JSONObject(raw)
+            val arr  = root.getJSONArray("messages")
+            val gson = Gson()
+            List(arr.length()) { i ->
+                gson.fromJson(arr.getJSONObject(i).toString(), ChatMessage::class.java)
+            }
+        }.getOrDefault(emptyList())
+    }
+
+    protected fun saveChatSession(
         chatId: String,
         title: String,
         messages: List<ChatMessage>,
         author: String
     ) {
-        val prefs   = getSharedPreferences("chat_sessions", Context.MODE_PRIVATE)
-        val editor  = prefs.edit()
-
-        // Build JSON payload
-        val chatObj = org.json.JSONObject().apply {
-            put("author", author)
-            put("title", title)
-            put("lastUpdated", System.currentTimeMillis())
-
-            val arr = org.json.JSONArray()
-            messages.forEach { msg ->
-                arr.put(org.json.JSONObject().apply {
-                    put("sender",      msg.sender)
-                    put("messageText", msg.messageText)
-                    put("timeStamp",   msg.timeStamp)
-                })
-            }
-            put("messages", arr)
+        val obj = JSONObject().apply {
+            put("id",       chatId)
+            put("title",    title)
+            put("author",   author)
+            put("messages", JSONArray(Gson().toJson(messages)))
         }
-
-        // Merge into the full sessions map
-        val allChatsStr = prefs.getString("all_chats", "{}")
-        val allChats    = org.json.JSONObject(allChatsStr)
-        allChats.put(chatId, chatObj)
-
-        editor.putString("all_chats", allChats.toString())
+        getSharedPreferences("sessions", Context.MODE_PRIVATE)
+            .edit()
+            .putString(chatId, obj.toString())
             .apply()
     }
 
-    /**
-     * Loads the chat session for [chatId], or returns empty if it doesn’t exist.
-     */
-    fun loadChatSession(chatId: String): List<ChatMessage> {
-        val prefs      = getSharedPreferences("chat_sessions", Context.MODE_PRIVATE)
-        val jsonString = prefs.getString("all_chats", null) ?: return emptyList()
-        val allChats   = org.json.JSONObject(jsonString)
-        if (!allChats.has(chatId)) return emptyList()
-
-        val chatObj    = allChats.getJSONObject(chatId)
-        val arr        = chatObj.getJSONArray("messages")
-        val messages   = mutableListOf<ChatMessage>()
-        for (i in 0 until arr.length()) {
-            val o = arr.getJSONObject(i)
-            messages.add(
-                ChatMessage(
-                    sender      = o.getString("sender"),
-                    messageText = o.getString("messageText"),
-                    timeStamp   = o.getLong("timeStamp")
-                )
-            )
-        }
-        return messages
-    }
-
-
-    // In BaseActivity.kt
-    protected fun loadAllChatPreviews(): List<ChatPreview> {
-        val now = System.currentTimeMillis()
-        return listOf(
-            ChatPreview("pub1","Adventure Bot","Let's explore!", R.drawable.icon_01, R.drawable.icon_02, 4.8f, now - 56_000,  ChatMode.SANDBOX),
-            ChatPreview("pub2","Mystery Bot","Can you solve it?",  R.drawable.icon_02, R.drawable.icon_01, 4.3f, now - 15_000, ChatMode.SANDBOX),
-            ChatPreview("pub3","Comedy Bot","Knock knock...",    R.drawable.icon_01, R.drawable.icon_02, 3.9f, now - 10_500, ChatMode.SANDBOX),
-            ChatPreview("pub4","News Bot","Today's headlines",  R.drawable.icon_02, R.drawable.icon_01, 4.6f, now - 50_000,  ChatMode.SANDBOX)
-        )
+    protected fun clearChatHistoryFromPrefs(chatId: String) {
+        getSharedPreferences("sessions", Context.MODE_PRIVATE)
+            .edit()
+            .remove(chatId)
+            .apply()
     }
 }

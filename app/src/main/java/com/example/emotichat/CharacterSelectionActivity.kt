@@ -34,7 +34,7 @@ class CharacterSelectionActivity : AppCompatActivity() {
         // 3) Setup RecyclerView + adapter
         val recycler = findViewById<RecyclerView>(R.id.characterRecycler)
         recycler.layoutManager = LinearLayoutManager(this)
-        val adapter = CharacterAdapter(allChars, selectedIds) { charId, isNowSelected ->
+        val adapter = CharacterSelectAdapter(allChars, selectedIds) { charId, isNowSelected ->
             if (isNowSelected) selectedIds += charId else selectedIds -= charId
         }
         recycler.adapter = adapter

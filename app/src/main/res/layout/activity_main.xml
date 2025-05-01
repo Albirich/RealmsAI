@@ -80,15 +80,6 @@
             android:translationX="0dp"
             android:scaleType="fitCenter"
             android:adjustViewBounds="true" />
-        <TextView
-            android:id="@+id/botName1TextView"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text=""
-            android:textStyle="bold"
-            app:layout_constraintTop_toBottomOf="@id/botAvatar1ImageView"
-            app:layout_constraintStart_toStartOf="@id/botAvatar1ImageView"/>
-
         <!-- Bot2 Avatar, overlapping Bot12-->
         <ImageView
             android:id="@+id/botAvatar2ImageView"
@@ -102,14 +93,6 @@
             android:scaleType="fitCenter"
             android:scaleX="-1"
             android:adjustViewBounds="true" />
-        <TextView
-            android:id="@+id/botName2TextView"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text=""
-            android:textStyle="bold"
-            app:layout_constraintTop_toBottomOf="@id/botAvatar2ImageView"
-            app:layout_constraintEnd_toEndOf="@id/botAvatar2ImageView"/>
     </androidx.constraintlayout.widget.ConstraintLayout>
 
 
