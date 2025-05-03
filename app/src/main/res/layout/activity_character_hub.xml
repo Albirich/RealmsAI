@@ -1,16 +1,47 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/characterHubRoot"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    xmlns:app="http://schemas.android.com/apk/res-auto">
+    android:orientation="vertical"
+    android:padding="8dp">
 
+    <!-- Search + Spinner row -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="8dp">
 
-    <!-- chat_list_activity.xml -->
+        <EditText
+            android:id="@+id/searchEditText"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:hint="Search characters…" />
+
+        <Spinner
+            android:id="@+id/sortSpinner"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:entries="@array/character_hub_sort_options"
+            android:layout_marginStart="8dp"/>
+    </LinearLayout>
+
+    <!-- RecyclerView must use 0dp + weight to fill remaining space -->
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/characterHubRecyclerView"
         android:layout_width="match_parent"
-        android:layout_height="match_parent" />
-    <!-- at the end of your root layout -->
-    <include layout="@layout/bottom_nav"/>
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:paddingTop="12dp"/>
 
-</androidx.constraintlayout.widget.ConstraintLayout>
+    <!-- Bottom nav include -->
+    <include
+        layout="@layout/bottom_nav"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"/>
+
+</LinearLayout>

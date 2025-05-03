@@ -13,6 +13,8 @@ import androidx.recyclerview.widget.RecyclerView
 class ChatAdapter(private val messages: MutableList<ChatMessage>) :
     RecyclerView.Adapter<ChatAdapter.ChatViewHolder>() {
 
+
+
     data class MessageStyle(
         val backgroundColor: Int,
         val textColor: Int
@@ -43,7 +45,7 @@ class ChatAdapter(private val messages: MutableList<ChatMessage>) :
         val messageContainer = holder.itemView.findViewById<LinearLayout>(R.id.messageContainer)
 
         val params = messageContainer.layoutParams as androidx.constraintlayout.widget.ConstraintLayout.LayoutParams
-        if (chatMessage.sender == "User") {
+        if (chatMessage.sender == "You") {
             params.horizontalBias = 1f
         } else {
             params.horizontalBias = 0f

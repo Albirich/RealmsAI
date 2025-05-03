@@ -13,6 +13,7 @@ data class CharacterProfile(
     val avatarResId        : Int,
     val additionalInfo     : String,
     val summary            : String? = null,
+    val createdAt: Long = System.currentTimeMillis(),
 
     @SerializedName("avatarUri")
     val avatarUri          : String? = null   // ← add this back in

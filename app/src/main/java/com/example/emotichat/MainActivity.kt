@@ -1,11 +1,14 @@
 package com.example.emotichat
 
 import android.content.Context
+import android.graphics.BitmapFactory
+import android.graphics.drawable.BitmapDrawable
 import android.net.Uri
 import android.os.Bundle
 import android.util.Log
 import android.view.Menu
 import android.view.MenuItem
+import android.view.View
 import android.widget.Button
 import android.widget.EditText
 import android.widget.ImageView
@@ -13,277 +16,214 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import com.example.emotichat.ai.buildAiPrompt
-import com.example.emotichat.ai.buildFacilitatorPrompt
 import com.example.emotichat.ai.AIResponseParser
+import com.example.emotichat.ai.FakeAiService
 import com.google.gson.Gson
 import org.json.JSONObject
-import com.example.emotichat.ai.FakeAiService
-import com.example.emotichat.ai.FakeFacilitatorService
-import com.squareup.moshi.Moshi
-import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
-import android.graphics.BitmapFactory
-import android.graphics.drawable.BitmapDrawable
-
-
-
+import java.io.File
 
 class MainActivity : BaseActivity() {
+
+    // pull the current user ID from prefs once
+    private val currentUserId: String by lazy {
+        getSharedPreferences("user", Context.MODE_PRIVATE)
+            .getString("userId", "")!!
+    }
 
     private lateinit var chatAdapter: ChatAdapter
     private lateinit var messageEditText: EditText
     private lateinit var profile: ChatProfile
     private lateinit var parser: AIResponseParser
-    private lateinit var chatRoot: LinearLayout
-
-    // A minimal placeholder state for testing
-    private var currentFacilitatorState = """{"locations":{},"volumes":{}}"""
-    private var currentActiveBotProfiles = emptyList<CharacterProfile>()
-    private var summaryOfInactiveBots    = emptyList<Map<String,Any>>()
-
+    private var sessionId: String? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        // 0) find your root container
-        chatRoot = findViewById(R.id.chatRoot)
+        // 1) figure out if we were given an existing session:
+        val incomingChatId = intent.getStringExtra("CHAT_ID")
+        profile = if (incomingChatId != null) {
+            // load the serialized ChatProfile you saved under prefs["chats"]
+            val prefs = getSharedPreferences("chats", Context.MODE_PRIVATE)
+            val raw = prefs.getString(incomingChatId, null)
+                ?: throw IllegalStateException("No saved chat for $incomingChatId")
+            Gson().fromJson(raw, ChatProfile::class.java)
+        } else {
+            // old behavior: brand-new chat from JSON blob
+            val json = intent.getStringExtra("CHAT_PROFILE_JSON")
+                ?: error("No profile JSON or session ID!")
+            Gson().fromJson(json, ChatProfile::class.java)
+        }
 
+        // 2) Now you already have profile.id set appropriately (either the existing sessionId
+        // or the newly created one), so you can immediately load history:
+        loadChatSession(profile.id).forEach { chatAdapter.addMessage(it) }
 
-        // 1) Deserialize profile
+        // 1) Deserialize the ChatProfile
         val json = intent.getStringExtra("CHAT_PROFILE_JSON")
             ?: throw IllegalStateException("No chat profile passed!")
         profile = Gson().fromJson(json, ChatProfile::class.java)
 
-        fun loadFullCharacterProfile(id: String): CharacterProfile? {
-            val prefs = getSharedPreferences("characters", MODE_PRIVATE)
-            val json  = prefs.getString(id, null) ?: return null
-            return Gson().fromJson(json, CharacterProfile::class.java)        }
-
-
-        // e.g. at the top of onCreate()
-        val allCharProfiles: List<CharacterProfile> = profile.characterIds
-            .mapNotNull { id ->
-                loadFullCharacterProfile(id).also { prof ->
-                    Log.d("DEBUG", "Loaded profile for $id → $prof")
-                }
+        // 2) Header: title + collapsible description
+        findViewById<TextView>(R.id.chatTitle).text = profile.title
+        val chatDesc = findViewById<TextView>(R.id.chatDescription)
+        chatDesc.text = profile.description
+        findViewById<LinearLayout>(R.id.descriptionHeader).setOnClickListener {
+            val toggle = findViewById<ImageView>(R.id.descriptionToggle)
+            if (chatDesc.visibility == TextView.GONE) {
+                chatDesc.visibility = TextView.VISIBLE
+                toggle.setImageResource(R.drawable.ic_expand_less)
+            } else {
+                chatDesc.visibility = TextView.GONE
+                toggle.setImageResource(R.drawable.ic_expand_more)
             }
-        Log.d("DEBUG", "allCharProfiles IDs = ${allCharProfiles.map { it.id }}")
+        }
 
-        // Debug: make sure you actually have some
-        Log.d("DEBUG", "allCharProfiles IDs = ${allCharProfiles.map { it.id }}")
-
-        // 1) if ChatProfile passed a backgroundUri, load & apply it
+        // 1) find your root container
+        val chatRoot = findViewById<View>(R.id.chatRoot)
+// first try the gallery URI
         profile.backgroundUri
             ?.takeIf { it.isNotBlank() }
             ?.let { uriStr ->
-                // if it's a file:// URI you saved under filesDir:
                 val uri = Uri.parse(uriStr)
                 when (uri.scheme) {
-                    "file" -> Uri.parse(uriStr).path?.let { path ->
+                    "file" -> uri.path?.let { path ->
                         BitmapFactory.decodeFile(path)?.let { bmp ->
                             chatRoot.background = BitmapDrawable(resources, bmp)
                         }
                     }
+                    "content" -> {
+                        contentResolver.openInputStream(uri)
+                            ?.use { stream ->
+                                BitmapFactory.decodeStream(stream)
+                                    ?.let { bmp -> chatRoot.background = BitmapDrawable(resources, bmp) }
+                            }
+                    }
                     "android.resource" -> {
-                        // last segment is the resId
+                        // e.g. "android.resource://com.example.emotichat/2131230894"
                         uri.lastPathSegment?.toIntOrNull()?.let { resId ->
                             chatRoot.setBackgroundResource(resId)
                         }
                     }
-                    "content" -> contentResolver.openInputStream(uri)?.use { stream ->
-                        BitmapFactory.decodeStream(stream)?.let { bmp ->
-                            chatRoot.background = BitmapDrawable(resources, bmp)
-                        }
-                    }
                 }
             }
 
-// 1b) Seed with a default so you don’t see [] before the first Facilitator run
-        var currentActiveBotProfiles = allCharProfiles.take(2)
-        var summaryOfInactiveBots    = allCharProfiles.drop(2).map { bot ->
-            mapOf("id" to bot.id, "description" to bot.personality)
+// if no URI, fall back to any built-in drawable you saved
+        profile.backgroundResId?.let { resId ->
+            chatRoot.setBackgroundResource(resId)
         }
 
-        // 2) Title & description toggle
-        findViewById<TextView>(R.id.chatTitle).text = profile.title
-        val chatDesc = findViewById<TextView>(R.id.chatDescription)
-        chatDesc.text = profile.description
-        findViewById<LinearLayout>(R.id.descriptionHeader)
-            .setOnClickListener {
-                val toggle = findViewById<ImageView>(R.id.descriptionToggle)
-                if (chatDesc.visibility == TextView.GONE) {
-                    chatDesc.visibility = TextView.VISIBLE
-                    toggle.setImageResource(R.drawable.ic_expand_less)
-                } else {
-                    chatDesc.visibility = TextView.GONE
-                    toggle.setImageResource(R.drawable.ic_expand_more)
-                }
-            }
 
-        // 3) Load static avatars
+
+        // 3) Load initial avatars for the first two characters
         profile.characterIds.getOrNull(0)?.let { charId ->
             val uri = loadAvatarUriForCharacter(charId)
-            findViewById<ImageView>(R.id.botAvatar1ImageView)
-                .setImageURI(Uri.parse(uri))
+            findViewById<ImageView>(R.id.botAvatar1ImageView).setImageDrawable(null)
         }
         profile.characterIds.getOrNull(1)?.let { charId ->
             val uri = loadAvatarUriForCharacter(charId)
-            findViewById<ImageView>(R.id.botAvatar2ImageView)
-                .setImageURI(Uri.parse(uri))
+            findViewById<ImageView>(R.id.botAvatar2ImageView).setImageDrawable(null)
         }
 
-        // 4) Recycler + Adapter
+        // 4) Set up chat RecyclerView + Adapter
         messageEditText = findViewById(R.id.messageEditText)
         chatAdapter     = ChatAdapter(mutableListOf())
         val recycler    = findViewById<RecyclerView>(R.id.chatRecyclerView)
         recycler.layoutManager = LinearLayoutManager(this)
         recycler.adapter       = chatAdapter
 
-        // 5) Load saved history
+        // 5) Pre‐load any existing messages for this profile.id
         loadChatSession(profile.id).forEach { chatAdapter.addMessage(it) }
 
-        // 6) Setup the parser
+        // 6) Set up the AIResponseParser
+        val speakerTokens = listOf("B1","B2","B3","B4","B5","B6")
         parser = AIResponseParser(
-            chatAdapter   = chatAdapter,
-            chatRecycler  = recycler,
-            updateAvatar  = { speakerId, emotion ->
-                val botIndex = speakerId.removePrefix("B").toIntOrNull()?.minus(1)
-                    ?: return@AIResponseParser
-                val charId = profile.characterIds.getOrNull(botIndex) ?: return@AIResponseParser
-                val iv = when (botIndex) {
+            chatAdapter              = chatAdapter,
+            chatRecycler             = recycler,
+            updateAvatar             = { token, emotion ->
+                // map token→character index, then load from internal storage
+                val idx = speakerTokens.indexOf(token)
+                val charId = profile.characterIds.getOrNull(idx) ?: return@AIResponseParser
+                val file = File(filesDir, "${emotion}_$charId.png")
+                val iv = when(idx) {
                     0 -> findViewById<ImageView>(R.id.botAvatar1ImageView)
                     1 -> findViewById<ImageView>(R.id.botAvatar2ImageView)
                     else -> null
                 }
-                iv?.setImageURI(Uri.parse(loadAvatarUriForCharacter(charId)))
+                if (file.exists()) {
+                    BitmapFactory.decodeFile(file.absolutePath)?.let { bmp ->
+                        iv?.setImageDrawable(BitmapDrawable(resources, bmp))
+                    }
+                }
             },
-            loadName = { speakerId ->
-                val botIndex = speakerId.removePrefix("B").toIntOrNull()?.minus(1)
-                    ?: return@AIResponseParser ""
-                val charId = profile.characterIds.getOrNull(botIndex) ?: return@AIResponseParser ""
-                loadCharacterName(charId)
+            loadName                 = { token ->
+                // map token→characterId→name from prefs
+                val idx = speakerTokens.indexOf(token)
+                val charId = profile.characterIds.getOrNull(idx) ?: return@AIResponseParser token
+                val str = getSharedPreferences("characters", Context.MODE_PRIVATE)
+                    .getString(charId, null) ?: return@AIResponseParser token
+                JSONObject(str).optString("name", token)
             }
         )
 
-        // 7) Preload first message
-        intent.getStringExtra("FIRST_MESSAGE")
-            ?.takeIf { it.isNotBlank() }
-            ?.let { chatAdapter.addMessage(ChatMessage("Bot", it)) }
-
-        // 8) Send button
+        // 7) Wire up the Send button
         findViewById<Button>(R.id.sendButton).setOnClickListener {
-            val userInput = messageEditText.text.toString().trim()
-            if (userInput.isEmpty()) return@setOnClickListener
+            onSendClicked()
+        }
+    }
 
-            // 1) Show user & persist…
-            chatAdapter.addMessage(ChatMessage("You", userInput))
-            messageEditText.text.clear()
-            persistChat()
+    private fun onSendClicked() {
+        val text = messageEditText.text.toString().trim()
+        if (text.isEmpty()) return
 
-// 2a) Build & show the facilitator→API prompt
-            val historySnippet = chatAdapter.getMessages().takeLast(3)
-                .joinToString("\n") { "${it.sender}: ${it.messageText}" }
-            val facPrompt =
-                buildFacilitatorPrompt(userInput, historySnippet, currentFacilitatorState)
-            chatAdapter.addMessage(ChatMessage("Facilitator→API", facPrompt))
-
-// 2b) Fake-call the facilitator and show its JSON
-            val facRaw = FakeFacilitatorService.getResponse(facPrompt)
-            chatAdapter.addMessage(ChatMessage("Facilitator", facRaw))
-
-// 2c) **Parse** facilitator JSON into activeIds and notes
-            val moshi = Moshi.Builder().add(KotlinJsonAdapterFactory()).build()
-            val mapAdapter = moshi.adapter(Map::class.java)
-            val facMap = mapAdapter.fromJson(facRaw) as Map<*, *>
-            currentFacilitatorState = facMap["notes"] as String
-            val activeIds = (facMap["activeBots"] as List<*>).map { it as String }
-
-            Log.d("DEBUG", "facilitator activeBots → $activeIds")
-
-// 2d) **Rebuild** active/inactive lists **before** building AI prompt
-            currentActiveBotProfiles = activeIds.mapNotNull { slot ->
-                // turn "B1" → index 0, "B2" → index 1, etc
-                val idx = slot.removePrefix("B").toIntOrNull()?.minus(1)
-                idx?.takeIf { it in allCharProfiles.indices }
-                    ?.let { allCharProfiles[it] }
-            }
-
-// Now build the inactive summaries by checking each slot too
-            summaryOfInactiveBots = allCharProfiles.mapIndexedNotNull { index, bot ->
-                val slot = "B${index+1}"
-                if (slot !in activeIds) {
-                    mapOf(
-                        "id"          to bot.id,
-                        "description" to bot.personality
-                    )
-                } else null
-            }
-
-            Log.d("DEBUG", "currentActiveBotProfiles IDs → " +
-                    "${currentActiveBotProfiles.map { it.id }}")
-            Log.d("DEBUG", "summaryOfInactiveBots IDs → " +
-                    "${summaryOfInactiveBots.map { it["id"] }}")
-
-// 3) Now build & show the **AI→API** prompt with the **updated** activeBots
-            val fullJson = Gson().toJson(currentActiveBotProfiles)
-            val summaryJson = Gson().toJson(summaryOfInactiveBots)
-            val aiPrompt = buildAiPrompt(
-                userInput = userInput,
-                history = historySnippet,
-                fullProfilesJson = fullJson,
-                summariesJson = summaryJson,
-                facilitatorNotes = currentFacilitatorState,
-                chatDescription = profile.description
+        // A) On first send, create a new session entry
+        if (sessionId == null) {
+            sessionId = System.currentTimeMillis().toString()
+            saveChatSession(
+                chatId   = sessionId!!,
+                title    = profile.title,
+                messages = emptyList(),
+                author   = currentUserId
             )
-            chatAdapter.addMessage(ChatMessage("AI→API", aiPrompt))
-
-// 4) Fake AI reply and parse
-            val raw = FakeAiService.getResponse(userInput)
-            parser.handle(raw)
-
-// 5) Persist again
-            persistChat()
         }
 
-
-    }
-
-    /** Persists the current chat session */
-    private fun persistChat() {
-        val me = getSharedPreferences("user", Context.MODE_PRIVATE)
-            .getString("userId", "") ?: ""
+        // B) Show user message & persist
+        chatAdapter.addMessage(ChatMessage("You", text))
+        messageEditText.text.clear()
         saveChatSession(
-            chatId   = profile.id,
+            chatId   = sessionId!!,
             title    = profile.title,
             messages = chatAdapter.getMessages(),
-            author   = me         // ← match the 'author' parameter name
+            author   = currentUserId
         )
+
+        // C) Fake‐AI reply → parser
+        val rawAi = FakeAiService.getResponse(text)
+        parser.handle(rawAi)
+
+        // D) Persist again with the newly added AI messages
+        saveChatSession(
+            chatId   = sessionId!!,
+            title    = profile.title,
+            messages = chatAdapter.getMessages(),
+            author   = currentUserId
+        )
+
+        // E) Scroll to bottom
+        findViewById<RecyclerView>(R.id.chatRecyclerView)
+            .smoothScrollToPosition(chatAdapter.itemCount - 1)
     }
 
-    override fun onPause() {
-        super.onPause()
-        persistChat()
-    }
-
-    // ── Utility loaders ──
-
+    /** Load the local URI for a character’s avatar (saved under “avatar_<id>.png”) */
     private fun loadAvatarUriForCharacter(charId: String): String {
         val prefs = getSharedPreferences("characters", Context.MODE_PRIVATE)
         val str   = prefs.getString(charId, null) ?: return ""
-        val obj   = JSONObject(str)
-        return obj.optString("avatarLocalPath",
-            obj.optString("avatarUri", ""))
+        return JSONObject(str).optString("avatarUri", "")
     }
 
-    private fun loadCharacterName(charId: String): String {
-        val prefs = getSharedPreferences("characters", Context.MODE_PRIVATE)
-        val str   = prefs.getString(charId, null) ?: return ""
-        return JSONObject(str).optString("name", "")
-    }
-
-    // ── Menu & stub ──
-
+    // ─────────────────────────────────────────────────────────────────
+    // Preserve “clear chat” menu behavior from BaseActivity
+    // ─────────────────────────────────────────────────────────────────
     override fun onCreateOptionsMenu(menu: Menu) =
         menuInflater.inflate(R.menu.main_menu, menu).let { true }
 
@@ -291,17 +231,9 @@ class MainActivity : BaseActivity() {
         when (item.itemId) {
             R.id.clear_chat -> {
                 chatAdapter.clearMessages()
-                clearChatHistoryFromPrefs(profile.id)
+                clearChatHistoryFromPrefs(chatId = profile.id)
                 true
             }
             else -> super.onOptionsItemSelected(item)
         }
-
-    private fun callYourAiService(userInput: String): String {
-        // Your existing stub or real implementation
-        return """
-            [B1,angry] "Watch your tone—I'm not the one you should be yelling at."
-            [B2,shy]   "M-maybe we should all just calm down a little..."
-        """.trimIndent()
-    }
 }

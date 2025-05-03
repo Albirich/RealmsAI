@@ -1,5 +1,6 @@
 package com.example.emotichat
 
+import android.net.Uri
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -28,8 +29,16 @@ class ChatPreviewAdapter(
         fun bind(chat: ChatPreview) {
             title.text = chat.title
             description.text = chat.description
-            avatar1.setImageResource(chat.avatar1ResId)
-            avatar2.setImageResource(chat.avatar2ResId)
+            chat.avatar1Uri
+                ?.takeIf { it.isNotBlank() }
+                ?.let { avatar1.setImageURI(Uri.parse(it)) }
+                ?: avatar1.setImageResource(chat.avatar1ResId)
+
+            // Avatar #2: same
+            chat.avatar2Uri
+                ?.takeIf { it.isNotBlank() }
+                ?.let { avatar2.setImageURI(Uri.parse(it)) }
+                ?: avatar2.setImageResource(chat.avatar2ResId)
             ratingText.text = "★ %.1f".format(chat.rating)
             badge.text = when(chat.mode) {
                 ChatMode.SANDBOX     -> "SANDBOX"

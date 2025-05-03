@@ -36,40 +36,51 @@ open class BaseActivity : AppCompatActivity() {
         }
     }
 
+    // in BaseActivity.kt
     protected fun loadAllChatPreviews(): List<ChatPreview> {
         val now = System.currentTimeMillis()
 
-        // Build a quick lookup of character‐ID → avatarResId
-        val charMap: Map<String, Int> = loadAllCharacterProfiles()
-            .associate { it.id to it.avatarResId }
+        // --- 1) build a lookup of characterId → CharacterProfile ---
+        val charProfilesById = loadAllCharacterProfiles()
+            .associateBy { it.id }
 
         val prefs = getSharedPreferences("chats", Context.MODE_PRIVATE)
         return prefs.all.values
             .mapNotNull { it as? String }
             .mapNotNull { json ->
-                runCatching {
-                    Gson().fromJson(json, ChatProfile::class.java)
-                }.getOrNull()
+                runCatching { Gson().fromJson(json, ChatProfile::class.java) }
+                    .getOrNull()
             }
             .map { profile ->
-                // pick your first two character avatars (or fallback to icon_01)
-                val ids    = profile.characterIds
-                val avatar1 = ids.getOrNull(0)?.let { charMap[it] } ?: R.drawable.icon_01
-                val avatar2 = ids.getOrNull(1)?.let { charMap[it] } ?: avatar1
+                val ids = profile.characterIds
+
+                // first slot
+                val cp1       = charProfilesById[ids.getOrNull(0)]
+                val uri1      = cp1?.avatarUri
+                val res1      = cp1?.avatarResId ?: R.drawable.icon_01
+
+                // second slot
+                val cp2       = charProfilesById[ids.getOrNull(1)]
+                val uri2      = cp2?.avatarUri
+                val res2      = cp2?.avatarResId ?: res1
 
                 ChatPreview(
                     id           = profile.id,
                     title        = profile.title,
                     description  = profile.description,
-                    avatar1ResId = avatar1,
-                    avatar2ResId = avatar2,
+                    avatar1ResId = res1,
+                    avatar2ResId = res2,
+                    avatar1Uri   = uri1,
+                    avatar2Uri   = uri2,
                     rating       = profile.rating,
-                    timestamp    = profile.timestamp.takeIf { it > 0 } ?: now,
+                    timestamp    = profile.timestamp.takeIf { it>0 } ?: now,
                     mode         = profile.mode,
                     author       = profile.author
                 )
             }
     }
+
+
 
     /**
      * Loads every saved CharacterProfile from SharedPreferences.

@@ -1,191 +1,270 @@
 package com.example.emotichat
 
+import android.R.string.ok
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
-import android.text.InputFilter
+import android.view.ViewGroup
 import android.widget.*
 import androidx.activity.result.ActivityResultLauncher
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.result.contract.ActivityResultContracts.GetContent
 import androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult
+import androidx.appcompat.app.AppCompatActivity
+import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.gson.Gson
-import java.util.UUID
 import org.json.JSONObject
 
+class ChatCreationActivity : AppCompatActivity() {
 
-class ChatCreationActivity : BaseActivity() {
+    // UI widgets
+    private lateinit var titleEt: EditText
+    private lateinit var modeSpinner: Spinner
+    private lateinit var descEt: EditText
+    private lateinit var firstMsgEt: EditText
+    private lateinit var bgButton: ImageButton
+    private lateinit var bgRecycler: RecyclerView
+    private lateinit var sfwSwitch: Switch
+    private lateinit var charSlots: List<ImageButton>
+    private lateinit var tagsEt: EditText
+    private lateinit var createBtn: Button
 
-    // ─── Class‐level properties ─────────────────────────────────────────────────
-    var selectedBgUri: String? = null
+    // State
+    private var selectedBackgroundUri: Uri? = null
+    private var selectedBackgroundResId: Int? = null
+    private lateinit var bgPicker: ActivityResultLauncher<String>
 
-    // For your 6 character slots
-    private var currentSlotIndex = 0
+    private val presetBackgrounds = listOf(
+        R.drawable.bg_beach,
+        R.drawable.bg_castle,
+        R.drawable.bg_comedy_club,
+        R.drawable.bg_forest,
+        R.drawable.bg_mountain_path,
+        R.drawable.bg_newsroom,
+        R.drawable.bg_office,
+        R.drawable.bg_space,
+        R.drawable.bg_woods
+    )
+
+    // for character‐slot picking
     private val selectedCharIds = MutableList<String?>(6) { null }
-
-    // Launcher for your character picker
-    private lateinit var selectCharLauncher: ActivityResultLauncher<Intent>
+    private var currentCharSlot = 0
+    private lateinit var charSelectLauncher: ActivityResultLauncher<Intent>
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // **NO** bottom nav here
         setContentView(R.layout.activity_create_chat)
 
-         fun loadAvatarUriForCharacter(charId: String): String {
-            val prefs = getSharedPreferences("characters", Context.MODE_PRIVATE)
-            val json  = prefs.getString(charId, null) ?: return ""
-            return JSONObject(json).optString("avatarUri", "")
-        }
+        // 1) bind all views
+        titleEt = findViewById(R.id.titleEditText)
+        modeSpinner = findViewById(R.id.modeSpinner)
+        descEt = findViewById(R.id.descriptionEditText)
+        firstMsgEt = findViewById(R.id.firstMessageEditText)
+        bgButton = findViewById(R.id.backgroundButton)
+        bgRecycler = findViewById(R.id.backgroundRecycler)
+        sfwSwitch = findViewById(R.id.sfwSwitch)
+        tagsEt = findViewById(R.id.tagsEditText)
+        createBtn = findViewById(R.id.createChatButton)
 
-
-// 1) Grab your form fields
-        val titleEt       = findViewById<EditText>(R.id.titleEditText)
-        val descEt        = findViewById<EditText>(R.id.descriptionEditText)
-        val tagsEt        = findViewById<EditText>(R.id.tagsEditText)
-        val firstMsgEt    = findViewById<EditText>(R.id.firstMessageEditText)
-        val sfwSwitch     = findViewById<Switch>(R.id.sfwSwitch)
-        val modeSpinner   = findViewById<Spinner>(R.id.modeSpinner)
-        var currentSlotIndex = 0
-        val selectedCharIds = MutableList<String?>(6) { null }
-        lateinit var selectCharLauncher: ActivityResultLauncher<Intent>
-
-        // ─── 2) Background picker ──────────────────────────────────────────────────
-        val backgroundBtn     = findViewById<ImageButton>(R.id.backgroundButton)
-        val backgroundRecycler = findViewById<RecyclerView>(R.id.backgroundRecycler)
-
-        // 1) Preset URIs (these could also come from a JSON config or server):
-        val presetUris = listOf(
-            "android.resource://${packageName}/${R.drawable.bg_forest}",
-            "android.resource://${packageName}/${R.drawable.bg_beach}",
-            "android.resource://${packageName}/${R.drawable.bg_space}",
-            "android.resource://${packageName}/${R.drawable.bg_castle}",
-            "android.resource://${packageName}/${R.drawable.bg_comedy_club}",
-            "android.resource://${packageName}/${R.drawable.bg_newsroom}",
-            "android.resource://${packageName}/${R.drawable.bg_mountain_path}",
-            "android.resource://${packageName}/${R.drawable.bg_woods}",
+        charSlots = listOf(
+            findViewById(R.id.charButton1),
+            findViewById(R.id.charButton2),
+            findViewById(R.id.charButton3),
+            findViewById(R.id.charButton4),
+            findViewById(R.id.charButton5),
+            findViewById(R.id.charButton6)
         )
 
-        // 2) Attach the adapter
-        backgroundRecycler.adapter = BackgroundAdapter(presetUris) { uriStr ->
-            // when user taps a preset
-            selectedBgUri = uriStr
-            backgroundBtn.setImageURI(Uri.parse(uriStr))
-        }
-
-        // 3) Keep your existing “upload-your-own” launcher
-        val bgLauncher = registerForActivityResult(GetContent()) { uri ->
-            uri?.let {
-                selectedBgUri = it.toString()
-                backgroundBtn.setImageURI(it)
-            }
-        }
-        backgroundBtn.setOnClickListener {
-            // if you want upload to override presets:
-            bgLauncher.launch("image/*")
-        }
-
-        // ─── 3) Character‐slot picker ───────────────────────────────────────────────
-        // 3a) Register your launcher just once:
-        selectCharLauncher = registerForActivityResult(
-            ActivityResultContracts.StartActivityForResult()
-        ) { result ->
-            if (result.resultCode == RESULT_OK) {
-                val picked = result.data
-                    ?.getStringArrayListExtra("SELECTED_CHARS")
-                    ?: return@registerForActivityResult
-                val chosenId = picked.firstOrNull() ?: return@registerForActivityResult
-
-                // 3b) Save into your list
-                selectedCharIds[currentSlotIndex] = chosenId
-
-                // 3c) Load its saved avatar URI (SharedPrefs helper)
-                val avatarUri = loadAvatarUriForCharacter(chosenId)
-
-                // 3d) Find the correct ImageButton and set it
-                val btnId = resources.getIdentifier(
-                    "charButton${currentSlotIndex + 1}",
-                    "id",
-                    packageName
-                )
-                findViewById<ImageButton>(btnId)
-                    .setImageURI(Uri.parse(avatarUri))
-            }
-        }
-
-        // 3e) Wire up each of your 6 slots
-        (0 until 6).forEach { slot ->
-            val btnId = resources.getIdentifier("charButton${slot + 1}", "id", packageName)
-            findViewById<ImageButton>(btnId).setOnClickListener {
-                currentSlotIndex = slot
-                // Optionally pass a “preselected” so the picker highlights existing choice
-                val intent = Intent(this, CharacterSelectionActivity::class.java).apply {
-                    selectedCharIds[slot]?.let {
-                        putStringArrayListExtra("PRESELECTED_CHARS", arrayListOf(it))
-                    }
-                }
-                selectCharLauncher.launch(intent)
-            }
-        }
-        // 4) Populate your spinner
+        // 2) Spinner: load your array from resources
         ArrayAdapter.createFromResource(
-            this, R.array.chat_creation_modes, android.R.layout.simple_spinner_item
+            this, R.array.chat_creation_modes,
+            android.R.layout.simple_spinner_item
         ).also { adapter ->
             adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
             modeSpinner.adapter = adapter
         }
 
-        // 5) Submit → build ChatProfile, save & launch
-        findViewById<Button>(R.id.createChatButton).setOnClickListener {
-            val chatId    = UUID.randomUUID().toString()
-            val title     = titleEt.text.toString().trim()
-            val desc      = descEt.text.toString().trim()
-            val tags      = tagsEt.text.toString()
-                .split(',').map(String::trim).filter(String::isNotEmpty)
-            val firstMsg  = firstMsgEt.text.toString().trim()
-            val sfw       = sfwSwitch.isChecked
+        // 3) Custom gallery‐picker for background
+        bgPicker = registerForActivityResult(GetContent()) { uri: Uri? ->
+            uri?.let {
+                selectedBackgroundUri = null
+                selectedBackgroundResId = R.drawable.bg_forest
+                bgButton.setImageResource(R.drawable.bg_forest)
+            }
+        }
+        bgButton.setOnClickListener {
+            bgPicker.launch("image/*")
+        }
+
+        // 4) Preset backgrounds recycler
+        bgRecycler.layoutManager =
+            LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
+        bgRecycler.adapter = object : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
+            override fun getItemCount() = presetBackgrounds.size
+            override fun onCreateViewHolder(parent: ViewGroup, viewType: Int) =
+                object : RecyclerView.ViewHolder(ImageView(parent.context).apply {
+                    val dps = (64 * resources.displayMetrics.density).toInt()
+                    layoutParams = ViewGroup.LayoutParams(dps, dps)
+                    scaleType = ImageView.ScaleType.CENTER_CROP
+                    setPadding(8, 8, 8, 8)
+                }) {}
+
+            override fun onBindViewHolder(holder: RecyclerView.ViewHolder, pos: Int) {
+                val resId = presetBackgrounds[pos]
+                (holder.itemView as ImageView).apply {
+                    setImageResource(resId)
+                    setOnClickListener {
+                        // choose this preset
+                        selectedBackgroundUri = null
+                        selectedBackgroundResId = resId
+                        bgButton.setImageResource(resId)
+                    }
+                }
+            }
+        }
+
+        // 5) Character‐slot launcher
+        charSelectLauncher = registerForActivityResult(StartActivityForResult()) { res ->
+            if (res.resultCode == RESULT_OK) {
+                val list = res.data
+                    ?.getStringArrayListExtra("SELECTED_CHARS")
+                    ?: return@registerForActivityResult
+                selectedCharIds[currentCharSlot] = list.firstOrNull()
+                // load its avatar right on the slot button
+                selectedCharIds[currentCharSlot]?.let { id ->
+                    val uri = loadAvatarUriForCharacter(id)
+                    charSlots[currentCharSlot].setImageURI(Uri.parse(uri))
+                }
+            }
+        }
+        charSlots.forEachIndexed { idx, btn ->
+            btn.setOnClickListener {
+                currentCharSlot = idx
+                val intent = Intent(this, CharacterSelectionActivity::class.java)
+                // pre-select existing if any
+                selectedCharIds[idx]?.let {
+                    intent.putStringArrayListExtra(
+                        "PRESELECTED_CHARS", arrayListOf(it)
+                    )
+                }
+                charSelectLauncher.launch(intent)
+            }
+        }
+        fun saveAndLaunchChat() {
+            // 6.1) Read all your inputs
+            val chatId = System.currentTimeMillis().toString()
+            val title = titleEt.text.toString().trim().takeIf { it.isNotEmpty() } ?: run {
+                titleEt.error = "Required"; return
+            }
+            val desc = descEt.text.toString().trim()
+            val firstMsg = firstMsgEt.text.toString().trim()
+            val tags = tagsEt.text.toString()
+                .split(",").map(String::trim).filter(String::isNotEmpty)
+            val sfwOnly = sfwSwitch.isChecked
             val modeLabel = modeSpinner.selectedItem as String
-            val mode      = parseChatMode(modeLabel)
-            val bgUri = selectedBgUri
+            val mode = ChatMode.valueOf(modeLabel.uppercase().replace(' ', '_'))
+
+            // 6.2) Pick your background‐URI string
+            val bgUriString = selectedBackgroundUri?.toString()
+                ?: selectedBackgroundResId?.let { resId ->
+                    // encode it as an android.resource URI the loader can understand:
+                    "android.resource://${packageName}/$resId"
+                }
+
+            // 6.3) Pull only non-null character IDs
             val chars = selectedCharIds.filterNotNull()
 
-            // build profile
+            val bgResId = selectedBackgroundResId
+
+            // 6.4) Build your profile
             val profile = ChatProfile(
-                id            = chatId,
-                title         = title,
-                description   = desc,
-                tags          = tags,
-                mode          = mode,
-                backgroundUri = bgUri,
-                sfwOnly       = sfw,
-                characterIds  = chars,
-                rating        = 0f,
-                timestamp     = System.currentTimeMillis(),
-                author        = getCurrentUserId()
+                id = chatId,
+                title = title,
+                description = desc,
+                tags = tags,
+                mode = mode,
+                backgroundUri   = bgUriString,
+                backgroundResId = bgResId,
+                sfwOnly = sfwOnly,
+                characterIds = chars,
+                rating = 0f,
+                timestamp = System.currentTimeMillis(),
+                author = getSharedPreferences("user", Context.MODE_PRIVATE)
+                    .getString("userId", "")!!
             )
 
+            // 6.5) Persist to prefs
+            getSharedPreferences("chats", Context.MODE_PRIVATE)
+                .edit()
+                .putString(chatId, Gson().toJson(profile))
+                .apply()
 
-            // launch main
-            Intent(this, MainActivity::class.java).apply {
-                putExtra("CHAT_PROFILE_JSON", Gson().toJson(profile))
-                putExtra("FIRST_MESSAGE", firstMsg)
-                putExtra("CHAT_AUTHOR", profile.author)
-            }.also(::startActivity)
-
+            // 6.6) Fire up the chat screen
+            Intent(this, MainActivity::class.java).also {
+                it.putExtra("CHAT_PROFILE_JSON", Gson().toJson(profile))
+                it.putExtra("FIRST_MESSAGE", firstMsg)
+                startActivity(it)
+            }
             finish()
         }
+
+
+        // 6) Finally: “Create Chat” button
+        createBtn.setOnClickListener {
+            // 1) Gather your inputs
+            val title = titleEt.text.toString().trim()
+            val desc = descEt.text.toString().trim()
+            val firstMsg = firstMsgEt.text.toString().trim()
+            val chars = selectedCharIds.filterNotNull()
+            val bgUri = selectedBackgroundUri?.toString()
+            val bgResId = selectedBackgroundResId
+
+            // 2) Early‐return validation
+            when {
+                title.isEmpty() -> {
+                    Toast.makeText(this, "Chat title is required", Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
+
+                desc.isEmpty() -> {
+                    Toast.makeText(this, "Please enter a description", Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
+
+                firstMsg.isEmpty() -> {
+                    Toast.makeText(this, "You must supply an opening message", Toast.LENGTH_SHORT)
+                        .show()
+                    return@setOnClickListener
+                }
+
+                chars.isEmpty() -> {
+                    Toast.makeText(this, "Please select at least one character", Toast.LENGTH_SHORT)
+                        .show()
+                    return@setOnClickListener
+                }
+                // **THIS** is now a proper when‐branch, not an `if` inside your `when`
+                (bgUri == null && bgResId == null) -> {
+                    Toast.makeText(this, "Please select a background", Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
+
+                else -> {
+                    // all validations passed, fall through to saving
+                }
+            }
+
+            // 3) Everything’s good – now save & launch
+            saveAndLaunchChat()
+        }
+
     }
 
-    private fun parseChatMode(label: String): ChatMode = when(label) {
-        "Sandbox"        -> ChatMode.SANDBOX
-        "RPG Mode"       -> ChatMode.RPG
-        "Slow-Burn Mode" -> ChatMode.SLOW_BURN
-        "God Mode"       -> ChatMode.GOD
-        "Visual Novel"   -> ChatMode.VISUAL_NOVEL
-        else             -> ChatMode.SANDBOX
+    /** Helper to pull the saved avatarUri from a Character’s prefs entry */
+    fun loadAvatarUriForCharacter(charId: String): String {
+        val prefs = getSharedPreferences("characters", Context.MODE_PRIVATE)
+        val json  = prefs.getString(charId, null) ?: return ""
+        return JSONObject(json).optString("avatarUri","")
     }
-
-    private fun getCurrentUserId(): String =
-        getSharedPreferences("user", Context.MODE_PRIVATE)
-            .getString("userId","")!!
 }

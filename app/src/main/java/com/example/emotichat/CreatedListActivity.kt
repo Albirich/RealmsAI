@@ -8,15 +8,17 @@ import android.view.View
 import android.widget.AdapterView
 import android.widget.ArrayAdapter
 import android.widget.Spinner
+import android.widget.Toast
 import androidx.recyclerview.widget.RecyclerView
 import androidx.recyclerview.widget.GridLayoutManager
+import com.google.gson.Gson
+import org.json.JSONArray
+import org.json.JSONObject
 
 class CreatedListActivity : BaseActivity() {
-
-    // ← Add this
-    private val currentUserId: String by lazy {
-        getSharedPreferences("user", Context.MODE_PRIVATE)
-            .getString("userId", "")!!
+    private val currentUserId by lazy {
+        getSharedPreferences("user", MODE_PRIVATE)
+            .getString("userId","")!!
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -46,25 +48,43 @@ class CreatedListActivity : BaseActivity() {
 
     }
 
+
     private fun showChats(rv: RecyclerView) {
+        // 1) two‐column grid
         rv.layoutManager = GridLayoutManager(this, 2)
 
-        val prefs = getSharedPreferences("chats", MODE_PRIVATE)
-        Log.d("DEBUG", "chat‐prefs keys = ${prefs.all.keys}")  // ← should show keys!
+        // 2) open the same prefs we saved into when creating a chat
+        val prefs = getSharedPreferences("chats", Context.MODE_PRIVATE)
 
-        val previews = loadAllChatPreviews()
-        Log.d("DEBUG", "loaded ${previews.size} chat previews")
+        // 3) only your own chat previews
+        val mine = loadAllChatPreviews()
+            .filter { it.author == currentUserId }
 
-        rv.adapter = ChatPreviewAdapter(previews) { preview ->
-            // …
+        // 4) wire up the RecyclerView
+        rv.adapter = ChatPreviewAdapter(mine) { preview ->
+            // 1) Read the raw JSON you originally saved under this preview’s ID
+            val rawJson = getSharedPreferences("sessions", Context.MODE_PRIVATE)
+                .getString(preview.id, null)
+                ?: run {
+                    Toast.makeText(this,
+                        "Couldn’t find chat data for ${preview.title}",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                    return@ChatPreviewAdapter
+                }
+
+            // 2) Build and launch your Intent with that JSON
+            Intent(this, MainActivity::class.java)
+                .putExtra("CHAT_PROFILE_JSON", rawJson)
+                .also { startActivity(it) }
         }
     }
 
-
     private fun showCharacters(rv: RecyclerView) {
         rv.layoutManager = GridLayoutManager(this, 2)
-        val chars = loadAllCharacterProfiles()  // all profiles, each has avatarResId + summary
-        rv.adapter = CharacterPreviewAdapter(chars) { ch ->
+        val mineChars = loadAllCharacterProfiles()  // all profiles, each has avatarResId + summary
+            .filter { it.author == currentUserId }
+        rv.adapter = CharacterPreviewAdapter(mineChars) { ch ->
             startActivity(
                 Intent(this, CharacterCreationActivity::class.java)
                     .putExtra("CHAR_EDIT_ID", ch.id)

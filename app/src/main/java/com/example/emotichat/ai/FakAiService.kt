@@ -6,7 +6,7 @@ object FakeAiService {
 
     // A few canned replies with different bots/emotions
     private val responses = listOf(
-        "[B1,normal][happy] \"Hi, nice to meet you!\" [B2,happy][normal] \"Hey...\"",
+        "[B1,happy][normal] \"Hi, nice to meet you!\" [B2,happy][normal] \"Hey...\"",
         "[B1,thinking][delayed] \"Oh I'm sorry, I'm just a demo. I can't actually respond\" [B2,angry][interrupt] \"Whoa, you're not suppose to break the fourth wall idiot!\"",
         "[B2,flirty][normal] \"Now they're gonna have to close it.\" [B1,embarrassed][normal] \"My bad, heh.\""
     )

@@ -1,23 +1,19 @@
 package com.example.emotichat
 
+
 data class ChatProfile(
     val id: String,
     val title: String,
     val description: String,
     val tags: List<String>,
     val mode: ChatMode,
-    val backgroundUri: String?,     // e.g. "android.resource://…"/custom URI
+    val backgroundUri: String? = null,
+    val backgroundResId: Int?  = null,
     val sfwOnly: Boolean,
-    val characterIds: List<String>, // IDs of the characters in this chat
+    val characterIds: List<String>,
     val rating: Float,
     val timestamp: Long,
-    val author: String
+    val author: String,
+    val createdAt: Long = System.currentTimeMillis()
 )
 
-enum class ChatMode {
-    SANDBOX,
-    RPG,
-    SLOW_BURN,
-    GOD,
-    VISUAL_NOVEL
-}
