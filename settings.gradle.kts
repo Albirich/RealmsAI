@@ -19,5 +19,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "Emotichat"
+rootProject.name = "RealmsAI"
 include(":app")

@@ -8,10 +8,10 @@
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:supportsRtl="true"
-        android:theme="@style/Theme.Emotichat">
+        android:theme="@style/Theme.RealmsAI">
 
 
-        <activity android:name=".ChatHubActivity"
+        <activity android:name=".LoginActivity"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -27,6 +27,7 @@
         <activity android:name=".ChatCreationActivity"/>
         <activity android:name=".CharacterSelectionActivity"/>
         <activity android:name=".CreatedListActivity"/>
+        <activity android:name=".ChatHubActivity"/>
 
 
     </application>

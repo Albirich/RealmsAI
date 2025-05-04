@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical"
+    android:background="#0B0C10"
+    android:gravity="center"
+    android:padding="32dp"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <LinearLayout
+        android:orientation="vertical"
+        android:background="#1C1F24"
+        android:padding="24dp"
+        android:elevation="4dp"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="24dp"
+        android:clipToOutline="true">
+
+        <EditText
+            android:id="@+id/emailInput"
+            android:hint="Email"
+            android:textColorHint="#AAAAAA"
+            android:textColor="#FFFFFF"
+            android:inputType="textEmailAddress"
+            android:backgroundTint="#00AEEF"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+
+        <EditText
+            android:id="@+id/passwordInput"
+            android:hint="Password"
+            android:textColorHint="#AAAAAA"
+            android:textColor="#FFFFFF"
+            android:inputType="textPassword"
+            android:backgroundTint="#00AEEF"
+            android:layout_marginTop="16dp"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+    </LinearLayout>
+
+    <Button
+        android:id="@+id/loginButton"
+        android:text="Log In"
+        android:textColor="#FFFFFF"
+        android:backgroundTint="#00AEEF"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content" />
+
+    <Button
+        android:id="@+id/signupButton"
+        android:text="Sign Up"
+        android:textColor="#00AEEF"
+        android:backgroundTint="#1C1F24"
+        android:layout_marginTop="12dp"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content" />
+
+</LinearLayout>

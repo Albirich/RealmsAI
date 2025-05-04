@@ -7,4 +7,9 @@
     <color name="teal_700">#FF018786</color>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+    <color name="realms_blue">#00AEEF</color>
+    <color name="realms_blue_dark">#006E9E</color>
+    <color name="realms_charcoal">#212121</color>
+    <color name="realms_background">#7099c4</color>
+
 </resources>

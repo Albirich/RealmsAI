@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Emotichat</string>
+    <string name="app_name">RealmsAI</string>
     <string name="user_message_default">Your message will appear here</string>
     <string name="title_default">Title will appear here</string>
     <string name="text_prompt">Type your message here</string>
@@ -14,7 +14,7 @@
     <string name="emotion_Embarrassed">Embarrassed</string>
     <string name="emotion_placeholder">emotion_placeholder</string>
     <string name="avatar">Avatar</string>
-    <string-array name="created_filter_options">
+    <string-array name="createdListFilterSpinner">
         <item>All</item>
         <item>Chats</item>
         <item>Characters</item>
