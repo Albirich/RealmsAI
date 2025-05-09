@@ -1,6 +1,7 @@
 package com.example.RealmsAI
 
 import android.content.Context
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.drawable.BitmapDrawable
 import android.net.Uri
@@ -10,12 +11,21 @@ import android.view.MenuItem
 import android.view.View
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.example.RealmsAI.network.Message
+import com.example.RealmsAI.network.MixtralChatRequest
 import com.example.RealmsAI.ai.AIResponseParser
-import com.example.RealmsAI.ai.FakeAiService
+import com.example.RealmsAI.ai.buildFacilitatorPrompt
+import com.example.RealmsAI.ai.buildAiPrompt
+import com.example.RealmsAI.network.ApiClients
+import com.example.RealmsAI.network.OpenAiChatRequest
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import retrofit2.HttpException
 import org.json.JSONObject
 import java.io.File
 
@@ -27,6 +37,10 @@ class MainActivity : AppCompatActivity() {
     private lateinit var parser: AIResponseParser
     private lateinit var chatId: String
 
+    // Real AI clients
+    private val mixtralService = ApiClients.mixtral
+    private val openAiService  = ApiClients.openai
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
@@ -37,16 +51,16 @@ class MainActivity : AppCompatActivity() {
             ?: throw IllegalStateException("No chat profile passed!")
         profile = Gson().fromJson(json, ChatProfile::class.java)
 
-        // 2) Set up RecyclerView & adapter
+        // 2) RecyclerView setup
+        val recyclerView = findViewById<RecyclerView>(R.id.chatRecyclerView)
+        recyclerView.layoutManager = LinearLayoutManager(this)
         messageEditText = findViewById(R.id.messageEditText)
-        chatAdapter = ChatAdapter(mutableListOf()).apply {
-            onNewMessage = { saveLocalHistory() }
+        chatAdapter = ChatAdapter(mutableListOf()) {
+            saveLocalHistory()
         }
-        val recycler = findViewById<RecyclerView>(R.id.chatRecyclerView)
-        recycler.layoutManager = LinearLayoutManager(this)
-        recycler.adapter = chatAdapter
+        recyclerView.adapter = chatAdapter
 
-        // 3) Load any saved history
+        // 3) Load saved history
         loadLocalHistory().forEach { chatAdapter.addMessage(it) }
 
         // 4) Finish UI wiring
@@ -54,83 +68,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupUI() {
-        // Header
-        findViewById<TextView>(R.id.chatTitle).text = profile.title
-        val chatDesc = findViewById<TextView>(R.id.chatDescription).apply {
-            text = profile.description
-        }
-        findViewById<LinearLayout>(R.id.descriptionHeader)
-            .setOnClickListener {
-                val toggle = findViewById<ImageView>(R.id.descriptionToggle)
-                if (chatDesc.visibility == View.GONE) {
-                    chatDesc.visibility = View.VISIBLE
-                    toggle.setImageResource(R.drawable.ic_expand_less)
-                } else {
-                    chatDesc.visibility = View.GONE
-                    toggle.setImageResource(R.drawable.ic_expand_more)
-                }
-            }
+        // … your existing header, background, parser setup …
 
-        // Background
-        val chatRoot = findViewById<View>(R.id.chatRoot)
-        profile.backgroundUri
-            ?.takeIf { it.isNotBlank() }
-            ?.let { uriStr ->
-                val uri = Uri.parse(uriStr)
-                when (uri.scheme) {
-                    "file" -> uri.path?.let {
-                        BitmapFactory.decodeFile(it)
-                    }?.let { bmp ->
-                        chatRoot.background = BitmapDrawable(resources, bmp)
-                    }
-                    "content" -> contentResolver.openInputStream(uri)?.use {
-                        BitmapFactory.decodeStream(it)
-                    }?.let { bmp ->
-                        chatRoot.background = BitmapDrawable(resources, bmp)
-                    }
-                    "android.resource" -> uri.lastPathSegment
-                        ?.toIntOrNull()
-                        ?.let { chatRoot.setBackgroundResource(it) }
-                }
-            }
-            ?: profile.backgroundResId?.let { chatRoot.setBackgroundResource(it) }
-
-        // Clear placeholders
-        findViewById<ImageView>(R.id.botAvatar1ImageView).setImageDrawable(null)
-        findViewById<ImageView>(R.id.botAvatar2ImageView).setImageDrawable(null)
-
-        // AI parser
-        val speakerTokens = listOf("B1","B2","B3","B4","B5","B6")
-        parser = AIResponseParser(
-            chatAdapter  = chatAdapter,
-            chatRecycler = findViewById(R.id.chatRecyclerView),
-            updateAvatar = { token, emotion ->
-                val idx = speakerTokens.indexOf(token)
-                val charId = profile.characterIds.getOrNull(idx) ?: return@AIResponseParser
-                val file = File(filesDir, "${emotion}_$charId.png")
-                if (file.exists()) {
-                    BitmapFactory.decodeFile(file.absolutePath)
-                        ?.let { bmp ->
-                            val iv = when (idx) {
-                                0 -> findViewById<ImageView>(R.id.botAvatar1ImageView)
-                                1 -> findViewById<ImageView>(R.id.botAvatar2ImageView)
-                                else -> null
-                            }
-                            iv?.setImageDrawable(BitmapDrawable(resources, bmp))
-                        }
-                }
-            },
-            loadName = { token ->
-                val idx = speakerTokens.indexOf(token)
-                val charId = profile.characterIds.getOrNull(idx) ?: return@AIResponseParser token
-                getSharedPreferences("characters", Context.MODE_PRIVATE)
-                    .getString(charId, null)
-                    ?.let { JSONObject(it).optString("name", token) }
-                    ?: token
-            }
-        )
-
-        // Send button
         findViewById<Button>(R.id.sendButton).setOnClickListener {
             onSendClicked()
         }
@@ -140,18 +79,132 @@ class MainActivity : AppCompatActivity() {
         val text = messageEditText.text.toString().trim()
         if (text.isEmpty()) return
 
-        // 1) Add user message
+        // 1) Show user message
         chatAdapter.addMessage(ChatMessage(sender = "You", messageText = text))
         messageEditText.text.clear()
 
-        // 2) AI reply
-        val rawAi = FakeAiService.getResponse(text)
-        parser.handle(rawAi)
+        // 2) Real AI sequence, with rate-limit-safe calls
+        lifecycleScope.launch {
+            try {
+                // build history
+                val historyStr = chatAdapter.getMessages()
+                    .joinToString("\n") { "${it.sender}: ${it.messageText}" }
 
-        // 3) Scroll
-        findViewById<RecyclerView>(R.id.chatRecyclerView)
-            .smoothScrollToPosition(chatAdapter.itemCount - 1)
+                // a) Facilitator (OpenAI) with retry-on-429
+                val facPrompt = buildFacilitatorPrompt(
+                    userInput        = text,
+                    history          = historyStr,
+                    facilitatorState = ""
+                )
+                val facReq = OpenAiChatRequest(
+                    model    = "gpt-4o-mini",
+                    messages = listOf(Message(role = "user", content = facPrompt))
+                )
+                val facResp = retryOn429 { openAiService.getFacilitatorNotes(facReq) }
+                val facJson = facResp.choices
+                    .firstOrNull()
+                    ?.message
+                    ?.content
+                    .orEmpty()
+                val (facNotes, activeBots) = parseFacilitatorJson(facJson)
+
+                // b) Character bots (Mixtral) with retry-on-429
+                val aiPrompt = buildAiPrompt(
+                    userInput        = text,
+                    history          = historyStr,
+                    fullProfilesJson = "{}",
+                    summariesJson    = "[]",
+                    facilitatorNotes = facNotes,
+                    chatDescription  = profile.description
+                )
+                val mixReq = MixtralChatRequest(
+                    model    = "mixtral-8x7b",
+                    messages = listOf(
+                        Message(role = "system", content = aiPrompt)
+                    )
+                )
+
+                val mixResp = retryOn429 { mixtralService.getBotResponses(mixReq) }
+                val rawBotOutput = mixResp.choices
+                    .firstOrNull()
+                    ?.message
+                    ?.content
+                    .orEmpty()
+
+                // c) Parse & render
+                parser.activeTokens = activeBots
+                parser.handle(rawBotOutput)
+
+                // d) Scroll to bottom
+                findViewById<RecyclerView>(R.id.chatRecyclerView)
+                    .smoothScrollToPosition(chatAdapter.itemCount - 1)
+
+            } catch (e: HttpException) {
+                // final failure: show a toast instead of crashing
+                when (e.code()) {
+                    429 -> Toast.makeText(
+                        this@MainActivity,
+                        "Rate limit hit—please wait a moment and try again.",
+                        Toast.LENGTH_LONG
+                    ).show()
+                    else -> Toast.makeText(
+                        this@MainActivity,
+                        "Server error ${e.code()}",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+            }
+        }
     }
+
+    /**
+     * Retry the given [block] up to [times] when we get a 429,
+     * with exponential backoff starting at [initialDelayMs].
+     */
+    private suspend fun <T> retryOn429(
+        times: Int = 3,
+        initialDelayMs: Long = 1_000,
+        block: suspend () -> T
+    ): T {
+        var currentDelay = initialDelayMs
+        repeat(times - 1) {
+            try {
+                return block()
+            } catch (e: HttpException) {
+                if (e.code() != 429) throw e
+                delay(currentDelay)
+                currentDelay *= 2
+            }
+        }
+        return block() // last attempt
+    }
+
+    private fun parseFacilitatorJson(rawJson: String): Pair<String, List<String>> {
+        // 1) Trim and remove any Markdown code-fence markers
+        val cleaned = rawJson
+            .trim()
+            .removePrefix("```json")
+            .removePrefix("```")
+            .removeSuffix("```")
+            .trim()
+
+        // 2) Parse into a JSONObject
+        val obj = JSONObject(cleaned)
+
+        // 3) Pull out the "notes" field
+        val notes = obj.optString("notes", "")
+
+        // 4) Pull out the array of activeBots, if present
+        val bots = mutableListOf<String>()
+        obj.optJSONArray("activeBots")?.let { arr ->
+            for (i in 0 until arr.length()) {
+                arr.optString(i)?.let { bots.add(it) }
+            }
+        }
+
+        return notes to bots
+    }
+
 
     override fun onPause() {
         super.onPause()
@@ -162,10 +215,6 @@ class MainActivity : AppCompatActivity() {
         super.onStop()
         saveLocalHistory()
     }
-
-    // ────────────────────────────────────
-    // Local SharedPreferences persistence
-    // ────────────────────────────────────
 
     private fun prefs() =
         getSharedPreferences("chat_sessions", Context.MODE_PRIVATE)
@@ -190,7 +239,6 @@ class MainActivity : AppCompatActivity() {
     override fun onOptionsItemSelected(item: MenuItem) =
         when (item.itemId) {
             R.id.clear_chat -> {
-                // Clear UI + remove prefs
                 chatAdapter.clearMessages()
                 prefs().edit().remove("chat_$chatId").apply()
                 true

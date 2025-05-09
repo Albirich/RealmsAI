@@ -1,6 +1,7 @@
 package com.example.RealmsAI
 
 
+import android.app.Application
 import android.content.Intent
 import android.os.Bundle
 import android.util.Log
@@ -8,8 +9,17 @@ import android.widget.Button
 import android.widget.EditText
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import com.google.firebase.FirebaseApp
 import com.google.firebase.auth.FirebaseAuth
 import java.security.MessageDigest
+
+
+class RealmsAiApp : Application() {
+    override fun onCreate() {
+        super.onCreate()
+        FirebaseApp.initializeApp(this)
+    }
+}
 
 
 class LoginActivity : AppCompatActivity() {
@@ -20,14 +30,19 @@ class LoginActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
 
 
-        auth = FirebaseAuth.getInstance()
+        // ← initialize Firebase
+        FirebaseApp.initializeApp(this)
+
+
+        setContentView(R.layout.activity_login)
+
+        // now it’s safe to call
+        val auth = FirebaseAuth.getInstance()
 
         if (auth.currentUser != null) {
             goToMain()
             return
         }
-
-        setContentView(R.layout.activity_login)
 
 
         val emailInput = findViewById<EditText>(R.id.emailInput)

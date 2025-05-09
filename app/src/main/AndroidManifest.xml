@@ -8,7 +8,8 @@
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:supportsRtl="true"
-        android:theme="@style/Theme.RealmsAI">
+        android:theme="@style/Theme.RealmsAI"
+        android:name=".RealmsAiApp">
 
 
         <activity android:name=".LoginActivity"
@@ -28,7 +29,6 @@
         <activity android:name=".CharacterSelectionActivity"/>
         <activity android:name=".CreatedListActivity"/>
         <activity android:name=".ChatHubActivity"/>
-
-
     </application>
+    <uses-permission android:name="android.permission.INTERNET"/>
 </manifest>

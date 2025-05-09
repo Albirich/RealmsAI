@@ -20,6 +20,7 @@ class AIResponseParser(
     private val loadName: (speakerId: String) -> String
 ) {
     private val handler = Handler(Looper.getMainLooper())
+    var activeTokens: List<String> = emptyList()
 
     /** Public API: hand it the full raw AI response text. */
     fun handle(raw: String) {
@@ -94,3 +95,4 @@ class AIResponseParser(
         }.toList()
     }
 }
+

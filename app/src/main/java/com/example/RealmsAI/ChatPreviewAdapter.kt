@@ -15,56 +15,46 @@ import com.google.gson.Gson
 class ChatPreviewAdapter(
     private val context: Context,
     private var chatList: List<ChatPreview>,
-    private val onClick: (ChatPreview) -> Unit
+    private val onClick: (ChatPreview) -> Unit,
+    private val onLongClick: (ChatPreview) -> Unit = {}
 ) : RecyclerView.Adapter<ChatPreviewAdapter.PreviewViewHolder>() {
 
     inner class PreviewViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
-        val title: TextView = itemView.findViewById(R.id.chatTitle)
-        val description: TextView = itemView.findViewById(R.id.chatPreview)
-        val avatar1: ImageView = itemView.findViewById(R.id.chatAvatar1)
-        val avatar2: ImageView = itemView.findViewById(R.id.chatAvatar2)
-        val ratingText: TextView = itemView.findViewById(R.id.chatRating)
-        val badge         : TextView = itemView.findViewById(R.id.previewTypeBadge)
+        private val title       : TextView    = itemView.findViewById(R.id.chatTitle)
+        private val description : TextView    = itemView.findViewById(R.id.chatPreview)
+        private val avatar1     : ImageView   = itemView.findViewById(R.id.chatAvatar1)
+        private val avatar2     : ImageView   = itemView.findViewById(R.id.chatAvatar2)
+        private val badge       : TextView    = itemView.findViewById(R.id.previewTypeBadge)
+        private val ratingText  : TextView    = itemView.findViewById(R.id.chatRating)
 
+        fun bind(preview: ChatPreview) {
+            title.text       = preview.title
+            description.text = preview.description
+            ratingText.text  = "★ %.1f".format(preview.rating)
+            badge.text       = preview.mode.name
 
-
-        fun bind(chat: ChatPreview) {
-            title.text = chat.title
-            description.text = chat.description
-            chat.avatar1Uri
+            // Avatar #1
+            preview.avatar1Uri
                 ?.takeIf { it.isNotBlank() }
                 ?.let { avatar1.setImageURI(Uri.parse(it)) }
-                ?: avatar1.setImageResource(chat.avatar1ResId)
+                ?: avatar1.setImageResource(preview.avatar1ResId)
 
-            // Avatar #2: same
-            chat.avatar2Uri
+            // Avatar #2
+            preview.avatar2Uri
                 ?.takeIf { it.isNotBlank() }
                 ?.let { avatar2.setImageURI(Uri.parse(it)) }
-                ?: avatar2.setImageResource(chat.avatar2ResId)
-            ratingText.text = "★ %.1f".format(chat.rating)
-            badge.text = when(chat.mode) {
-                ChatMode.SANDBOX     -> "SANDBOX"
-                ChatMode.RPG         -> "RPG"
-                ChatMode.SLOW_BURN   -> "SLOW-BURN"
-                ChatMode.VISUAL_NOVEL-> "VN"
-                ChatMode.GOD         -> "GOD"
-            }
-            badge.visibility = View.VISIBLE
-
-            val df = android.text.format.DateFormat.getDateFormat(itemView.context)
+                ?: avatar2.setImageResource(preview.avatar2ResId)
 
             itemView.setOnClickListener {
-                val intent = Intent(context, MainActivity::class.java)
-                intent.putExtra("chatId", chat.id)
-                intent.putExtra("CHAT_PROFILE_JSON", Gson().toJson(chat.chatProfile))
-                context.startActivity(intent)
+                onClick(preview)
             }
 
-
-
+            // only attach if caller supplied one
+            itemView.setOnLongClickListener {
+                onLongClick?.invoke(preview)
+                true
+            }
         }
-
-
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): PreviewViewHolder {
@@ -77,10 +67,11 @@ class ChatPreviewAdapter(
         holder.bind(chatList[position])
     }
 
+    override fun getItemCount(): Int = chatList.size
+
     fun updateList(newList: List<ChatPreview>) {
         chatList = newList
         notifyDataSetChanged()
     }
-    override fun getItemCount(): Int = chatList.size
-
 }
+

@@ -1,32 +1,54 @@
 package com.example.RealmsAI
 
+import android.app.AlertDialog
 import android.content.Intent
 import android.os.Bundle
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.google.gson.Gson
 import org.json.JSONObject
 
 class ChatListActivity : BaseActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_character_hub)
+        setContentView(R.layout.activity_chat_hub)
         setupBottomNav()
 
-        // 1) Load both character‐only and sandbox chat previews
+        // 1) Load both character-only and sandbox chat previews
         val previews = loadAllPreviews()
 
         // 2) Wire up RecyclerView
         val recyclerView = findViewById<RecyclerView>(R.id.createdRecycler)
         recyclerView.layoutManager = GridLayoutManager(this, 2)
-        recyclerView.adapter = ChatPreviewAdapter(this,previews,) { preview ->
-            // Launch MainActivity, passing along ID / title / description
-            Intent(this, MainActivity::class.java).apply {
-                putExtra("CHAT_ID",          preview.id)
-                putExtra("CHAT_TITLE",       preview.title)
-                putExtra("CHAT_DESCRIPTION", preview.description)
-            }.also(::startActivity)
-        }
+
+        // 3) Attach your adapter — note: NO comma after `previews`, so your lambda is consumed as 'onClick'
+        recyclerView.adapter = ChatPreviewAdapter(
+            context     = this,
+            chatList    = previews,
+            onClick     = { preview ->
+                // normal tap
+                Intent(this, MainActivity::class.java)
+                    .putExtra("chatId", preview.id)
+                    .putExtra("CHAT_PROFILE_JSON", Gson().toJson(preview.chatProfile))
+                    .also(::startActivity)
+            },
+            onLongClick = { preview ->
+                // long-press behavior (e.g. delete)
+                AlertDialog.Builder(this)
+                    .setTitle("Delete chat “${preview.title}”?")
+                    .setPositiveButton("Delete") { _, _ ->
+                        getSharedPreferences("chats", MODE_PRIVATE)
+                            .edit()
+                            .remove(preview.id)
+                            .apply()
+                        // refresh your list here…
+                    }
+                    .setNegativeButton("Cancel", null)
+                    .show()
+            }
+        )
+
     }
 
 

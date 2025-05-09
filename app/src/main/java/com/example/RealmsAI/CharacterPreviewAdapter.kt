@@ -1,5 +1,6 @@
 package com.example.RealmsAI
 
+import android.content.Context
 import android.net.Uri
 import android.view.LayoutInflater
 import android.view.View
@@ -10,8 +11,10 @@ import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 
 class CharacterPreviewAdapter(
-    private var items: List<CharacterProfile>,
-    private val onClick: (CharacterProfile) -> Unit
+    private val context: Context,
+    private var items: List<CharacterPreview>,
+    private val onClick:    (CharacterPreview) -> Unit,
+    private val onLongClick: (CharacterPreview) -> Unit = {}
 ) : RecyclerView.Adapter<CharacterPreviewAdapter.VH>() {
 
     inner class VH(view: View) : RecyclerView.ViewHolder(view) {
@@ -19,35 +22,38 @@ class CharacterPreviewAdapter(
         private val title   : TextView  = view.findViewById(R.id.chatTitle)
         private val summary : TextView  = view.findViewById(R.id.chatPreview)
 
-        fun bind(ch: CharacterProfile) {
+        fun bind(preview: CharacterPreview) {
             // 1) Name
-            title.text = ch.name
+            title.text = preview.name
 
             // 2) Summary (hide if blank)
-            val txt = ch.summary.orEmpty()
-            summary.text = txt
-            summary.visibility = if (txt.isBlank()) View.GONE else View.VISIBLE
+            summary.text = preview.summary
+            summary.visibility = if (preview.summary.isBlank()) View.GONE else View.VISIBLE
 
-            // 3) Avatar: prefer saved URI, else resource ID, else default
+            // 3) Avatar: URI -> resId -> default
             when {
-                !ch.avatarUri.isNullOrBlank() -> {
+                !preview.avatarUri.isNullOrBlank() -> {
                     Glide.with(itemView)
-                        .load(Uri.parse(ch.avatarUri))
+                        .load(Uri.parse(preview.avatarUri))
                         .centerCrop()
                         .placeholder(R.drawable.icon_01)
                         .error(R.drawable.icon_01)
                         .into(avatar)
                 }
-                ch.avatarResId != 0 -> {
-                    avatar.setImageResource(ch.avatarResId)
+                preview.avatarResId != 0 -> {
+                    avatar.setImageResource(preview.avatarResId)
                 }
                 else -> {
                     avatar.setImageResource(R.drawable.icon_01)
                 }
             }
 
-            // 4) Click
-            itemView.setOnClickListener { onClick(ch) }
+            // 4) Click & long‑click
+            itemView.setOnClickListener  { onClick(preview) }
+            itemView.setOnLongClickListener {
+                onLongClick(preview)
+                true
+            }
         }
     }
 
@@ -63,7 +69,7 @@ class CharacterPreviewAdapter(
 
     override fun getItemCount(): Int = items.size
 
-    fun updateList(newItems: List<CharacterProfile>) {
+    fun updateList(newItems: List<CharacterPreview>) {
         items = newItems
         notifyDataSetChanged()
     }

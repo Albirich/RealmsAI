@@ -10,66 +10,63 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 
-class ChatAdapter(private val messages: MutableList<ChatMessage>) :
-    RecyclerView.Adapter<ChatAdapter.ChatViewHolder>() {
+class ChatAdapter(
+    private val messages: MutableList<ChatMessage>,
+    private val onNewMessage: (() -> Unit)? = null    // ← new optional callback
+) : RecyclerView.Adapter<ChatAdapter.ChatViewHolder>() {
 
+    data class MessageStyle(val backgroundColor: Int, val textColor: Int)
 
-
-    data class MessageStyle(
-        val backgroundColor: Int,
-        val textColor: Int,
-    )
-
-    fun getSenderStyle(sender: String): MessageStyle {
+    private fun getSenderStyle(sender: String): MessageStyle {
         return when (sender) {
-            "User" -> MessageStyle(0xaa0000FF.toInt(), 0xaaFFFFFF.toInt())
+            "You"   -> MessageStyle(0xaa0000FF.toInt(), 0xaaFFFFFF.toInt())
             "Bot 1" -> MessageStyle(0xaaFFA500.toInt(), 0xaa008000.toInt())
             "Bot 2" -> MessageStyle(0xaa800080.toInt(), 0xaaFFC0CB.toInt())
-            else -> MessageStyle(0xaaCCCCCC.toInt(), 0xaa000000.toInt())
+            else    -> MessageStyle(0xaaCCCCCC.toInt(), 0xaa000000.toInt())
         }
     }
-    inner class ChatViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
-        val messageTextView: TextView = itemView.findViewById(R.id.messageTextView)
+
+    inner class ChatViewHolder(view: View) : RecyclerView.ViewHolder(view) {
+        val messageTextView: TextView = view.findViewById(R.id.messageTextView)
+        val messageContainer: LinearLayout = view.findViewById(R.id.messageContainer)
     }
+
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ChatViewHolder {
-        val view = LayoutInflater.from(parent.context)
+        val v = LayoutInflater.from(parent.context)
             .inflate(R.layout.chat_item, parent, false)
-        return ChatViewHolder(view)
+        return ChatViewHolder(v)
     }
+
+    override fun getItemCount(): Int = messages.size
 
     override fun onBindViewHolder(holder: ChatViewHolder, position: Int) {
-        val chatMessage = messages[position]
-        holder.messageTextView.text = "${chatMessage.sender}: ${chatMessage.messageText}"
-        val style = getSenderStyle(chatMessage.sender)
+        val msg = messages[position]
+        holder.messageTextView.text = "${msg.sender}: ${msg.messageText}"
+
+        // alignment & colors
+        val style = getSenderStyle(msg.sender)
         holder.messageTextView.setTextColor(style.textColor)
-        val messageContainer = holder.itemView.findViewById<LinearLayout>(R.id.messageContainer)
+        val bias = if (msg.sender == "You") 1f else 0f
+        (holder.messageContainer.layoutParams as? androidx.constraintlayout.widget.ConstraintLayout.LayoutParams)
+            ?.let { lp ->
+                lp.horizontalBias = bias
+                holder.messageContainer.layoutParams = lp
+            }
 
-        val params = messageContainer.layoutParams as androidx.constraintlayout.widget.ConstraintLayout.LayoutParams
-        if (chatMessage.sender == "You") {
-            params.horizontalBias = 1f
-        } else {
-            params.horizontalBias = 0f
-        }
-        messageContainer.layoutParams = params
 
-        val drawable = holder.itemView.context.getDrawable(R.drawable.bubble_shape)?.mutate() as? GradientDrawable
-        drawable?.setColor(style.backgroundColor)
-        holder.messageTextView.background = drawable
-
+        // long‐press to edit/delete
         holder.itemView.setOnLongClickListener {
-            val context = holder.itemView.context
-            val editText = EditText(context)
-            editText.setText(chatMessage.messageText)
-            AlertDialog.Builder(context)
+            val ctx = holder.itemView.context
+            val edit = EditText(ctx).apply { setText(msg.messageText) }
+            AlertDialog.Builder(ctx)
                 .setTitle("Edit Message")
-                .setView(editText)
+                .setView(edit)
                 .setPositiveButton("Save") { _, _ ->
-                    chatMessage.messageText = editText.text.toString()
-                    notifyItemChanged(holder.adapterPosition)
+                    msg.messageText = edit.text.toString()
+                    notifyItemChanged(position)
                 }
-                .setNeutralButton("Delete this and following") { _, _ ->
-                    val pos = holder.adapterPosition
-                    for (i in messages.size - 1 downTo pos) {
+                .setNeutralButton("Delete this + following") { _, _ ->
+                    for (i in messages.size - 1 downTo position) {
                         messages.removeAt(i)
                         notifyItemRemoved(i)
                     }
@@ -80,26 +77,19 @@ class ChatAdapter(private val messages: MutableList<ChatMessage>) :
         }
     }
 
-    override fun getItemCount(): Int = messages.size
-
+    /** Adds one, notifies the list, then fires your hook. */
     fun addMessage(msg: ChatMessage) {
-        messages.add(msg)
+        messages += msg
         notifyItemInserted(messages.size - 1)
-        // trigger save
         onNewMessage?.invoke()
     }
 
-    fun getMessages(): List<ChatMessage> = messages
+    /** Just for your MainActivity to pull & re‐save. */
+    fun getMessages(): List<ChatMessage> = messages.toList()
 
+    /** Clear both list and view. */
     fun clearMessages() {
         messages.clear()
         notifyDataSetChanged()
     }
-
-    companion object {
-        fun clearMessages() {
-            TODO("Not yet implemented")
-        }
-    }
-
 }

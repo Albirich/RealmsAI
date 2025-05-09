@@ -7,10 +7,9 @@ import android.view.View
 import android.widget.AdapterView
 import android.widget.ArrayAdapter
 import android.widget.Spinner
-import android.widget.Toast
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import org.json.JSONObject
+import com.google.gson.Gson
 
 class ChatHubActivity : BaseActivity() {
 
@@ -38,27 +37,19 @@ class ChatHubActivity : BaseActivity() {
 
         // 2a) Load your initial list of previews
         val initialList = loadAllChatPreviews()
-        adapter = ChatPreviewAdapter(
-            this,             // 👈 this = context
-            initialList,
-        ) { preview ->
-            // when the user taps one preview, pull its raw JSON back out of prefs
-            val prefs      = getSharedPreferences("chat_sessions", Context.MODE_PRIVATE)
-            val allChatsStr= prefs.getString("all_chats", "{}") ?: "{}"
-            val allChats   = JSONObject(allChatsStr)
-            if (!allChats.has(preview.id)) {
-                Toast.makeText(this, "Couldn’t find chat: ${preview.title}", Toast.LENGTH_SHORT).show()
-                return@ChatPreviewAdapter
-            }
-            // grab the stored session object and re‐serialize it to JSON
-            val chatObj    = allChats.getJSONObject(preview.id)
-            val rawJson    = chatObj.toString()
 
-            // launch MainActivity with that JSON
-            Intent(this, MainActivity::class.java)
-                .putExtra("CHAT_PROFILE_JSON", rawJson)
-                .also { startActivity(it) }
-        }
+        // --- FIXED: pass `this` then the list, then the click‐lambda ---
+        adapter = ChatPreviewAdapter(
+            context = this,
+            chatList = initialList,
+            onClick  = { preview ->
+                // launch MainActivity directly with the ChatProfile we already loaded
+                Intent(this, MainActivity::class.java).apply {
+                    putExtra("chatId", preview.id)
+                    putExtra("CHAT_PROFILE_JSON", Gson().toJson(preview.chatProfile))
+                }.also(::startActivity)
+            }
+        )
         rv.adapter = adapter
 
         // 3) Wire up sorting
