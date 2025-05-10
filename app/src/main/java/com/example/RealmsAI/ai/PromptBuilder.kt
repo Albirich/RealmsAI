@@ -37,6 +37,13 @@ fun buildAiPrompt(
   $facilitatorNotes
   User said: "$userInput"
 
-  Respond with one line per active character:
-  [B<slot>,<emotion>][<speed>] "Their reply here"
+Valid poses: happy, sad, angry, shy, surprised, flirty, thinking, fighting
+
+Respond *strictly* as:
+  [B<slot>,<pose>,<speed>] "Your reply here"
+
+  • `<slot>`  = the bot’s slot number, e.g. B1  
+  • `<pose>`  = one of the valid poses  
+  • `<speed>` = an integer speed code (0 = normal, 1 = interrupt, 2 = delayed)  
+  • **Do not** include any extra brackets or text outside of that single bracket.
 """.trimIndent()

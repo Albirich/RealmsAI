@@ -1,18 +1,19 @@
+// MixtralApiService.kt
 package com.example.RealmsAI.network
 
 import retrofit2.http.Body
 import retrofit2.http.POST
 
 interface MixtralApiService {
-    @POST("v1/chat/completions")
+    @POST("chat/completions")  // ← drop the leading "v1/"
     suspend fun getBotResponses(
         @Body body: MixtralChatRequest
     ): MixtralChatResponse
 }
 
 data class MixtralChatRequest(
-    val model: String = "mixtral-8x7b",
-    val messages: List<Message>    // <-- uses the same shared Message
+    val model: String = "mistralai/mixtral-8x7b-instruct",
+    val messages: List<Message>
 )
 
 data class MixtralChatResponse(

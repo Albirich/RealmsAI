@@ -4,10 +4,8 @@ import retrofit2.http.Body
 import retrofit2.http.POST
 
 interface OpenAiService {
-    @POST("v1/chat/completions")
-    suspend fun getFacilitatorNotes(
-        @Body body: OpenAiChatRequest
-    ): OpenAiChatResponse
+    @POST("chat/completions")
+    suspend fun getFacilitatorNotes(@Body body: OpenAiChatRequest): OpenAiChatResponse
 }
 
 data class OpenAiChatRequest(

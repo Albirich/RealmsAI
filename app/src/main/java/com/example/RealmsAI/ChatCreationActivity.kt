@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.util.Log
 import android.view.ViewGroup
 import android.widget.*
 import androidx.activity.result.ActivityResultLauncher
@@ -151,6 +152,7 @@ class ChatCreationActivity : AppCompatActivity() {
                 charSelectLauncher.launch(intent)
             }
         }
+
         fun saveAndLaunchChat() {
             // 6.1) Read all your inputs
             val chatId = System.currentTimeMillis().toString()
@@ -178,6 +180,9 @@ class ChatCreationActivity : AppCompatActivity() {
             val bgResId = selectedBackgroundResId
 
             // 6.4) Build your profile
+            Log.d("ChatCreation", "DEBUG: title=$title, desc=$desc")
+            Log.d("ChatCreation", "Creating chat with title=$title")
+
             val profile = ChatProfile(
                 id = chatId,
                 title = title,
@@ -199,9 +204,11 @@ class ChatCreationActivity : AppCompatActivity() {
                 .edit()
                 .putString(chatId, Gson().toJson(profile))
                 .apply()
+            Log.d("ChatCreation", "Saved profile for $chatId:\n${Gson().toJson(profile)}")
 
             // 6.6) Fire up the chat screen
             Intent(this, MainActivity::class.java).also {
+                it.putExtra("chatId", chatId)  // ✅ FIXED
                 it.putExtra("CHAT_PROFILE_JSON", Gson().toJson(profile))
                 it.putExtra("FIRST_MESSAGE", firstMsg)
                 startActivity(it)

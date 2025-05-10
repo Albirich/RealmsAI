@@ -6,13 +6,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.example.RealmsAI.ChatAdapter
 import com.example.RealmsAI.ChatMessage
 import com.example.RealmsAI.models.ParsedMessage
-import com.example.RealmsAI.models.Timing
 
-/**
- * Takes a raw AI output string (with bracketed tags)
- * and feeds parsed messages into the given ChatAdapter,
- * scheduling each line with its proper delay & emotion update.
- */
 class AIResponseParser(
     private val chatAdapter: ChatAdapter,
     private val chatRecycler: RecyclerView,
@@ -22,77 +16,48 @@ class AIResponseParser(
     private val handler = Handler(Looper.getMainLooper())
     var activeTokens: List<String> = emptyList()
 
-    /** Public API: hand it the full raw AI response text. */
     fun handle(raw: String) {
-        // 1) Parse everything out
-        val allParsed = parseAIOutput(raw)
+        val parsed = parseAIOutput(raw)
+        var delaySoFar = 0L
 
-        // 2) Only keep the first two (if there are more)
-        val parsed = allParsed.take(2)
-
-        // 3) Schedule them back‐to‐back
-        var cumulativeDelay = 0L
         parsed.forEach { pm ->
-            // compute this message’s delay
-            val thisDelay = when(pm.timing) {
-                Timing.INTERRUPT -> 200L
-                Timing.NORMAL    -> 800L
-                Timing.DELAYED   -> 2500L
+            // map speed code → ms
+            val thisDelay = when (pm.speed) {
+                1    -> 200L
+                2    -> 2500L
+                else -> 800L
             }
-            cumulativeDelay += thisDelay
+            delaySoFar += thisDelay
 
             handler.postDelayed({
-                // show the message
                 chatAdapter.addMessage(
                     ChatMessage(loadName(pm.speakerId), pm.text)
                 )
-                // update that avatar’s emotion
                 updateAvatar(pm.speakerId, pm.emotion)
-            }, cumulativeDelay)
+            }, delaySoFar)
         }
 
-        // 4) finally, scroll into view after the last one
         handler.postDelayed({
             chatRecycler.smoothScrollToPosition(chatAdapter.itemCount - 1)
-        }, cumulativeDelay + 100)
+        }, delaySoFar + 100)
     }
 
-
-    /** Breaks the raw string into a list of ParsedMessage data objects. */
     private fun parseAIOutput(raw: String): List<ParsedMessage> {
-        // Regex grabs segments like [B1,angry][normal] "Text…"
-        val re = Regex("""(\[[^\]]+\]\[[^\]]+\](?:\[[^\]]+\])?)\s*"([^"]+)"""")
-        return re.findAll(raw).map { match ->
-            val tags = match.groupValues[1]        // "[B1,angry][normal]" or with extra "[B2,sad]"
-            val text = match.groupValues[2]        // the quoted message
+        // Matches: [B1,thinking,0] Hello there!
+        val lineRe = Regex("""\[(\w+\d?),(\w+),(\d+)\]\s*(.+)""")
 
-            val parts = tags
-                .removePrefix("[")
-                .removeSuffix("]")
-                .split("][")
-
-            // first bracket: speaker & emotion
-            val (speaker, emotion) = parts[0]
-                .split(",")
-                .map(String::trim)
-                .let { it[0] to it[1] }
-
-            // second bracket: timing
-            val timing = when (parts[1].lowercase()) {
-                "interrupt" -> Timing.INTERRUPT
-                "delayed"   -> Timing.DELAYED
-                else        -> Timing.NORMAL
+        return raw.lineSequence()
+            .mapNotNull { line ->
+                lineRe.matchEntire(line.trim())?.destructured?.let { (slot, pose, speed, txt) ->
+                    ParsedMessage(
+                        speakerId = slot,
+                        emotion   = pose,
+                        speed     = speed.toInt(),
+                        text      = txt.trim().trim('"')
+                    )
+                }
             }
-
-            // optional third bracket: a target for ripple effects
-            val target = if (parts.size > 2) {
-                parts[2].split(",").map(String::trim).let { it[0] to it[1] }
-            } else {
-                null
-            }
-
-            ParsedMessage(speaker, emotion, timing, text, target)
-        }.toList()
+            .toList()
     }
-}
 
+}

@@ -26,7 +26,16 @@ class CharacterHubActivity : BaseActivity() {
         // 2) Recycler + adapter…
         val recycler = findViewById<RecyclerView>(R.id.characterHubRecyclerView)
         recycler.layoutManager = GridLayoutManager(this, 2)
-        adapter = CharacterPreviewAdapter(this, emptyList(), onClick = { /*…*/ })
+        adapter = CharacterPreviewAdapter(this, emptyList(), onClick = { preview ->
+            val fullJson = preview.toFullProfileJson()
+
+            val intent = Intent(this, MainActivity::class.java).apply {
+                putExtra("chatId", preview.id)
+                putExtra("CHAT_PROFILE_JSON", fullJson)
+            }
+
+            startActivity(intent)
+        })
         recycler.adapter = adapter
 
         // 3) Sort spinner—declare it before your search listener!

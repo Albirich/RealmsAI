@@ -12,7 +12,11 @@ import androidx.recyclerview.widget.RecyclerView
 
 class ChatAdapter(
     private val messages: MutableList<ChatMessage>,
-    private val onNewMessage: (() -> Unit)? = null    // ← new optional callback
+    /**
+     * Called with the new item’s position whenever addMessage() is used.
+     * In MainActivity you’ll hook this up to RecyclerView.smoothScrollToPosition().
+     */
+    private val onNewMessage: (position: Int) -> Unit
 ) : RecyclerView.Adapter<ChatAdapter.ChatViewHolder>() {
 
     data class MessageStyle(val backgroundColor: Int, val textColor: Int)
@@ -27,7 +31,7 @@ class ChatAdapter(
     }
 
     inner class ChatViewHolder(view: View) : RecyclerView.ViewHolder(view) {
-        val messageTextView: TextView = view.findViewById(R.id.messageTextView)
+        val messageTextView: TextView      = view.findViewById(R.id.messageTextView)
         val messageContainer: LinearLayout = view.findViewById(R.id.messageContainer)
     }
 
@@ -45,16 +49,15 @@ class ChatAdapter(
 
         // alignment & colors
         val style = getSenderStyle(msg.sender)
+        // holder.messageContainer is your bubble’s parent layout
+        holder.messageContainer.setBackgroundColor(style.backgroundColor)
+        // and you already had:
         holder.messageTextView.setTextColor(style.textColor)
-        val bias = if (msg.sender == "You") 1f else 0f
         (holder.messageContainer.layoutParams as? androidx.constraintlayout.widget.ConstraintLayout.LayoutParams)
-            ?.let { lp ->
-                lp.horizontalBias = bias
-                holder.messageContainer.layoutParams = lp
-            }
+            ?.apply { horizontalBias = if (msg.sender == "You") 1f else 0f }
+            ?.also { holder.messageContainer.layoutParams = it }
 
-
-        // long‐press to edit/delete
+        // long-press to edit/delete
         holder.itemView.setOnLongClickListener {
             val ctx = holder.itemView.context
             val edit = EditText(ctx).apply { setText(msg.messageText) }
@@ -77,19 +80,21 @@ class ChatAdapter(
         }
     }
 
-    /** Adds one, notifies the list, then fires your hook. */
+    /** Add a message, notify the insertion, then fire your scroll hook. */
     fun addMessage(msg: ChatMessage) {
         messages += msg
-        notifyItemInserted(messages.size - 1)
-        onNewMessage?.invoke()
+        val pos = messages.size - 1
+        notifyItemInserted(pos)
+        onNewMessage(pos)
     }
-
-    /** Just for your MainActivity to pull & re‐save. */
-    fun getMessages(): List<ChatMessage> = messages.toList()
 
     /** Clear both list and view. */
     fun clearMessages() {
+        val count = messages.size
         messages.clear()
-        notifyDataSetChanged()
+        notifyItemRangeRemoved(0, count)
     }
+
+
+    fun getMessages(): List<ChatMessage> = messages.toList()
 }
