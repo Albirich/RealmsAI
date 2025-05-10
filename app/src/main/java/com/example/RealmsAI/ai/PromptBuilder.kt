@@ -4,18 +4,25 @@ package com.example.RealmsAI.ai
 fun buildFacilitatorPrompt(
     userInput: String,
     history: String,
-    facilitatorState: String
+    facilitatorState: String,
+    availableSlots: List<String>        // ← now you pass this in
 ): String = """
   You are the game facilitator. Do not role-play.
+  • Available slots: ${availableSlots.joinToString(", ")}
   • New user message: "$userInput"
   • Recent history:
   $history
   • Facilitator state (locations & volumes):
   $facilitatorState
 
-  Return a JSON object:
-  { "notes": "...", "activeBots": ["B1","B3"] }
+Return a JSON object with exactly two fields:
+  {
+    "notes":     "...",
+    "activeBots": ["B1","B2"]      # slots you choose to activate
+  }
 """.trimIndent()
+
+
 
 /** Builds the full AI prompt (2nd API call). */
 fun buildAiPrompt(

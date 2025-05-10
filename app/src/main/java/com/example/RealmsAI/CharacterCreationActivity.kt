@@ -23,14 +23,14 @@ import java.io.FileOutputStream
 
 class CharacterCreationActivity : AppCompatActivity() {
 
-    // ──────── state for avatar + emotion slots ────────
+    // ──────── state for avatar + pose slots ────────
     private var avatarUri: Uri? = null
     private lateinit var avatarPicker: ActivityResultLauncher<String>
 
-    private val emotionKeys = listOf(
+    private val poseKeys = listOf(
         "happy","sad","angry","surprised","flirty","fight","thinking","embarrassed"
     )
-    private val emotionSlots = emotionKeys.map { EmotionSlot(it) }.toMutableList()
+    private val poseSlots = poseKeys.map { PoseSlot(it) }.toMutableList()
     private var currentSlotIndex = 0
     private lateinit var imagePicker: ActivityResultLauncher<String>
 
@@ -50,23 +50,23 @@ class CharacterCreationActivity : AppCompatActivity() {
             avatarPicker.launch("image/*")
         }
 
-        // ── 2) Emotion‐slot picker via RecyclerView ──
-        // 2a) single gallery picker for any emotion‐slot
+        // ── 2) Pose‐slot picker via RecyclerView ──
+        // 2a) single gallery picker for any Pose‐slot
         imagePicker = registerForActivityResult(GetContent()) { uri: Uri? ->
             uri?.let {
-                emotionSlots[currentSlotIndex].uri = it
+                poseSlots[currentSlotIndex].uri = it
                 // redraw only that one cell
-                (findViewById<RecyclerView>(R.id.emotionRecycler)
-                    .adapter as? EmotionAdapter)
+                (findViewById<RecyclerView>(R.id.poseRecycler)
+                    .adapter as? PoseAdapter)
                     ?.notifyItemChanged(currentSlotIndex)
             }
         }
 
         // 2b) wire up RecyclerView
-        val emotionRecycler = findViewById<RecyclerView>(R.id.emotionRecycler)
-        emotionRecycler.layoutManager =
+        val poseRecycler = findViewById<RecyclerView>(R.id.poseRecycler)
+        poseRecycler.layoutManager =
             LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
-        emotionRecycler.adapter = EmotionAdapter(emotionSlots) { slotIndex ->
+        poseRecycler.adapter = PoseAdapter(poseSlots) { slotIndex ->
             currentSlotIndex = slotIndex
             imagePicker.launch("image/*")
         }
@@ -137,9 +137,9 @@ class CharacterCreationActivity : AppCompatActivity() {
                     put("avatarUri", Uri.fromFile(outFile).toString())
                 }
 
-                // 5.3b) emotion slots → save files and map keys
+                // 5.3b) pose slots → save files and map keys
                 val emoObj = JSONObject()
-                emotionSlots.forEach { slot ->
+                poseSlots.forEach { slot ->
                     slot.uri?.let { uri ->
                         try {
                             val outFile = File(filesDir, "${slot.key}_$charId.png")
@@ -149,13 +149,13 @@ class CharacterCreationActivity : AppCompatActivity() {
                                 }
                             }
                             emoObj.put(slot.key, Uri.fromFile(outFile).toString())
-                            Log.d("CHAR_SAVE", "Saved emotion ${slot.key} → $outFile")
+                            Log.d("CHAR_SAVE", "Saved pose ${slot.key} → $outFile")
                         } catch (e: Exception) {
-                            Log.w("CHAR_SAVE", "Failed to save emotion ${slot.key}", e)
+                            Log.w("CHAR_SAVE", "Failed to save pose ${slot.key}", e)
                         }
                     }
                 }
-                put("emotionUris", emoObj)
+                put("poseUris", emoObj)
 
 
                 // 5.3c) author stamp
@@ -183,7 +183,7 @@ class CharacterCreationActivity : AppCompatActivity() {
             val name = nameEt.text.toString().trim()
             val personality = personalityEt.text.toString().trim()
             val hasAvatar = avatarUri != null
-            val hasAtLeastOneEmotion = emotionSlots.any { it.uri != null }
+            val hasAtLeastOnePose = poseSlots.any { it.uri != null }
 
             when {
                 name.isEmpty() -> {
@@ -204,9 +204,9 @@ class CharacterCreationActivity : AppCompatActivity() {
                         .show()
                     return@setOnClickListener
                 }
-                !hasAtLeastOneEmotion -> {
+                !hasAtLeastOnePose -> {
                     Toast
-                        .makeText(this, "Please pick at least one emotion image", Toast.LENGTH_SHORT)
+                        .makeText(this, "Please pick at least one pose image", Toast.LENGTH_SHORT)
                         .show()
                     return@setOnClickListener
                 }

@@ -79,6 +79,7 @@
             app:layout_constraintStart_toStartOf="parent"
             android:translationX="0dp"
             android:scaleType="fitCenter"
+            android:scaleX="-1"
             android:adjustViewBounds="true" />
         <!-- Bot2 Avatar, overlapping Bot12-->
         <ImageView
@@ -91,7 +92,6 @@
             app:layout_constraintEnd_toEndOf="parent"
             android:translationX="-1dp"
             android:scaleType="fitCenter"
-            android:scaleX="-1"
             android:adjustViewBounds="true" />
     </androidx.constraintlayout.widget.ConstraintLayout>
 

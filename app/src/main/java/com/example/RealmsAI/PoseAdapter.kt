@@ -7,19 +7,19 @@ import android.widget.ImageButton
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 
-class EmotionAdapter(
-    private val slots: List<EmotionSlot>,
+class PoseAdapter(
+    private val slots: List<PoseSlot>,
     private val onPick: (position: Int) -> Unit
-) : RecyclerView.Adapter<EmotionAdapter.VH>() {
+) : RecyclerView.Adapter<PoseAdapter.VH>() {
 
     inner class VH(itemView: View) : RecyclerView.ViewHolder(itemView) {
-        val img   = itemView.findViewById<ImageButton>(R.id.emotionImg)
-        val label = itemView.findViewById<TextView>(R.id.emotionLabel)
+        val img   = itemView.findViewById<ImageButton>(R.id.poseImg)
+        val label = itemView.findViewById<TextView>(R.id.poseLabel)
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
         val view = LayoutInflater.from(parent.context)
-            .inflate(R.layout.item_emotion, parent, false)
+            .inflate(R.layout.item_pose, parent, false)
         return VH(view)
     }
 

@@ -1,15 +1,15 @@
-package com.example.RealmsAI.ai
+package com.example.RealmsAI.network
 
-import com.example.RealmsAI.network.Message
-import com.example.RealmsAI.network.MixtralApiService
-import com.example.RealmsAI.network.MixtralChatRequest
 
 class MixtralEngine(
     private val mixtral: MixtralApiService
 ) {
+    /**
+     * Send a single‐system‐message prompt to Mixtral and return the assistant’s reply.
+     */
     suspend fun getBotOutput(prompt: String): String {
         val req = MixtralChatRequest(
-            model    = "mixtral-8x7b",
+            model    = "mistralai/mixtral-8x7b-instruct",
             messages = listOf(
                 Message(role = "system", content = prompt)
             )

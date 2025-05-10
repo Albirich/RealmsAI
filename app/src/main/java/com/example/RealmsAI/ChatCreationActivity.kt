@@ -71,10 +71,10 @@ class ChatCreationActivity : AppCompatActivity() {
         charSlots = listOf(
             findViewById(R.id.charButton1),
             findViewById(R.id.charButton2),
-            findViewById(R.id.charButton3),
-            findViewById(R.id.charButton4),
-            findViewById(R.id.charButton5),
-            findViewById(R.id.charButton6)
+          //  findViewById(R.id.charButton3),
+          //  findViewById(R.id.charButton4),
+          //  findViewById(R.id.charButton5),
+          //  findViewById(R.id.charButton6)
         )
 
         // 2) Spinner: load your array from resources

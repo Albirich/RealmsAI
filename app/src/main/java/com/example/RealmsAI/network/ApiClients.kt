@@ -23,9 +23,8 @@ object ApiClients {
         .addConverterFactory(MoshiConverterFactory.create(moshi))
         .build()
 
-    // 3) OpenAI client (with logging)
     private val openAiClient = OkHttpClient.Builder()
-        // <-- Add this logging interceptor -->
+        // Add a logging interceptor for facilitator calls
         .addInterceptor(
             HttpLoggingInterceptor { message -> Log.d("HTTP-OpenAI", message) }
                 .apply { level = HttpLoggingInterceptor.Level.BODY }
@@ -38,7 +37,6 @@ object ApiClients {
             chain.proceed(req)
         }
         .build()
-
 
     val openai: OpenAiService by lazy {
         retrofit("https://api.openai.com/v1/", openAiClient)
