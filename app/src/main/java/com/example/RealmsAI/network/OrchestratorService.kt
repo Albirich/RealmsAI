@@ -1,19 +1,13 @@
 package com.example.RealmsAI.network
 
-import android.util.Log
-import com.example.RealmsAI.network.MixtralEngine
 import com.example.RealmsAI.ai.buildAiPrompt
 import com.example.RealmsAI.ai.buildFacilitatorPrompt
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import org.json.JSONArray
-import org.json.JSONObject
 
+/**
+ * A simple interface for sending a user prompt through the facilitator → Mixtral pipeline.
+ * Returns a Pair of (Mixtral-generated text, list of active slot IDs).
+ */
 interface AiService {
-    /**
-     * Sends the two-step prompt, returning the Mixtral output
-     * and the list of slots the facilitator activated.
-     */
     suspend fun sendPrompt(
         userInput: String,
         history:   String,
@@ -23,71 +17,41 @@ interface AiService {
 
 class OrchestratorService(
     private val facilitator: ChatGptFacilitator,
-    private val engine:      MixtralEngine,
-    private val fullProfilesJson: String,
-    private val summariesJson:    String = "[]"
+    private val engine:      MixtralEngine
 ) : AiService {
-
-    private var facilitatorNotes: String = ""
-    companion object {
-        private const val TAG = "OrchestratorSvc"
-    }
 
     override suspend fun sendPrompt(
         userInput: String,
         history:   String,
         chatDesc:  String
     ): Pair<String, List<String>> {
-        // 1) figure out slots
-        val availableSlots = extractAvailableSlots(fullProfilesJson)
-        Log.d(TAG, "Available slots: $availableSlots")
+        // 1) Build the facilitator prompt. Pass in the list of slots that could speak.
+        //    (Replace this stub list with one derived from your chat profile.)
+        val availableSlots = listOf("B1", "B2")  // TODO: compute from your fullProfilesJson
 
-        // 2) build facilitator prompt
         val facPrompt = buildFacilitatorPrompt(
-            userInput        = userInput,
-            history          = history,
-            facilitatorState = facilitatorNotes,
-            availableSlots   = availableSlots  // ← here!
+            userInput         = userInput,
+            history           = history,
+            facilitatorState  = "",            // e.g. volumes/locations JSON if you have it
+            availableSlots    = availableSlots
         )
 
-        val (notes, activeBots) = facilitator.getFacilitatorNotes(facPrompt)
+        // 2) Call the facilitator and unpack notes + chosen activeBots
+        val (notes, activeSlots) = facilitator.getFacilitatorNotes(facPrompt)
 
-    facilitatorNotes = notes
-
-        // 4) Build the AI (Mixtral) prompt with the fresh notes
+        // 3) Build the Mixtral prompt, now passing in the activeSlots returned above
         val aiPrompt = buildAiPrompt(
-            userInput        = userInput,
-            history          = history,
-            fullProfilesJson = fullProfilesJson,
-            summariesJson    = summariesJson,
-            facilitatorNotes = notes,
-            chatDescription  = chatDesc
+            userInput           = userInput,
+            history             = history,
+            activeProfilesJson  = "{}",       // TODO: your actual fullProfilesJson
+            summariesJson       = "[]",       // TODO: your inactive summaries JSON
+            facilitatorNotes    = notes,
+            chatDescription     = chatDesc,
+            activeSlots         = activeSlots
         )
 
-        // 5) Finally call Mixtral
+        // 4) Call Mixtral and return its output along with the active slot list
         val mixtralOutput = engine.getBotOutput(aiPrompt)
-
-        // Return the generated text *and* which slots to show
-        return mixtralOutput to activeBots
-    }
-
-    /**
-     * Reads either an object or array form of fullProfilesJson
-     * and returns a List of all "slot" IDs, e.g. ["B1","B2",...].
-     */
-    private fun extractAvailableSlots(json: String): List<String> {
-        // Try object form: { "B1": {...}, "B2": {...} }
-        runCatching {
-            val obj = JSONObject(json)
-            return obj.keys().asSequence().toList()
-        }
-        // Fallback to array form: [ {"slot":"B1",...}, {"slot":"B2",...} ]
-        runCatching {
-            val arr = JSONArray(json)
-            return (0 until arr.length()).mapNotNull { i ->
-                arr.optJSONObject(i)?.optString("slot")
-            }
-        }
-        return emptyList()
+        return mixtralOutput to activeSlots
     }
 }

@@ -45,7 +45,7 @@ class ChatHubActivity : BaseActivity() {
             onClick  = { preview ->
                 // launch MainActivity directly with the ChatProfile we already loaded
                 Intent(this, MainActivity::class.java).apply {
-                    putExtra("chatId", preview.id)
+                    putExtra("CHAT_ID", preview.id)
                     putExtra("CHAT_PROFILE_JSON", Gson().toJson(preview.chatProfile)) // optional but helps with speed
                 }
                     .also(::startActivity)

@@ -28,13 +28,14 @@ Return a JSON object with exactly two fields:
 fun buildAiPrompt(
     userInput: String,
     history: String,
-    fullProfilesJson: String,
+    activeProfilesJson: String,
     summariesJson: String,
     facilitatorNotes: String,
-    chatDescription: String
+    chatDescription: String,
+    activeSlots: List<String>            // <— new param
 ): String = """
   Now you are one of the active characters. Do not break format.
-  Active profiles (full JSON): $fullProfilesJson
+  Active profiles (full JSON): $activeProfilesJson
   Chat description (personality & relationships):
   $chatDescription
   Inactive summaries (JSON): $summariesJson
@@ -44,13 +45,20 @@ fun buildAiPrompt(
   $facilitatorNotes
   User said: "$userInput"
 
-Valid poses: happy, sad, angry, shy, surprised, flirty, thinking, fighting
+  Valid poses: happy, sad, angry, shy, surprised, flirty, thinking, fighting
 
-Respond *strictly* as:
-  [B<slot>,<pose>,<speed>] "Your reply here"
+  You have ${activeSlots.size} active character(s): ${activeSlots.joinToString(", ")}.
+  **Please produce exactly ${activeSlots.size} lines, one per slot in the order above.**
 
-  • `<slot>`  = the bot’s slot number, e.g. B1  
-  • `<pose>`  = one of the valid poses  
-  • `<speed>` = an integer speed code (0 = normal, 1 = interrupt, 2 = delayed)  
-  • **Do not** include any extra brackets or text outside of that single bracket.
+  Each line must be:
+    [B<slot>,<pose>,<speed>] "Your reply here"
+    
+ Make sure each line *starts* with a bracket, the slot, pose, and a numeric speed code, *enclosed* in square brackets. For example:
+
+   [B1,happy,0] "Hey there!"
+   [B2,thinking,0] "How can I help?"
+
+ Do NOT omit any brackets, and DO use numbers (0/1/2) instead of words.
+
+  Do not output anything else.
 """.trimIndent()

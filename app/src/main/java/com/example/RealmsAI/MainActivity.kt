@@ -7,9 +7,11 @@ import android.os.Bundle
 import android.util.Log
 import android.view.Menu
 import android.view.MenuItem
+import android.view.View
 import android.widget.Button
 import android.widget.EditText
 import android.widget.ImageView
+import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -40,9 +42,11 @@ class MainActivity : AppCompatActivity() {
     private lateinit var fullProfilesJson: String
     private var facilitatorNotes = ""
     private var summariesJson = "[]"
-    private var chatDescription = ""
+    private lateinit var chatTitle: String
+    private var chatDescription: String = ""
     private lateinit var avatarViews: List<ImageView>
-
+    private lateinit var chatTitleView:    TextView
+    private lateinit var chatDescriptionView: TextView
     private lateinit var chatRecycler: RecyclerView
     private lateinit var messageEditText: EditText
     private lateinit var sendButton: Button
@@ -61,76 +65,87 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
+        // 1) Bind your views
+        chatTitleView       = findViewById(R.id.chatTitle)
+        chatDescriptionView = findViewById(R.id.chatDescription)
+        chatRecycler        = findViewById(R.id.chatRecyclerView)
+        messageEditText     = findViewById(R.id.messageEditText)
+        sendButton          = findViewById(R.id.sendButton)
+
+        // 2) Load prefs & intent extras
         prefs = getSharedPreferences("RealmsAI", Context.MODE_PRIVATE)
         chatId = intent.getStringExtra("CHAT_ID") ?: "default_chat"
-        fullProfilesJson = intent.getStringExtra("CHAT_PROFILE_JSON") ?: "{}"
-        chatDescription = intent.getStringExtra("CHAT_DESCRIPTION") ?: ""
 
+        fullProfilesJson = intent
+            .getStringExtra("CHAT_PROFILE_JSON")
+            ?.takeIf { it.isNotBlank() }
+            ?: "{}"
+
+        // 3) Parse your ChatProfile JSON and pull out title/description
+        val profileObj = try {
+            JSONObject(fullProfilesJson)
+        } catch (_: Exception) {
+            JSONObject()
+        }
+
+        chatTitle       = profileObj.optString("title",       "Untitled")
+        chatDescription = profileObj.optString("description", "")
+
+        // 4) Populate your header TextViews
+        chatTitleView.text = chatTitle
+        if (chatDescription.isNotBlank()) {
+            chatDescriptionView.text = chatDescription
+            chatDescriptionView.visibility = View.VISIBLE
+        } else {
+            chatDescriptionView.visibility = View.GONE
+        }
+
+        // 5) Avatar slots (we’re only using 2 for now)
         avatarViews = listOf(
-             findViewById(R.id.botAvatar1ImageView),
-             findViewById(R.id.botAvatar2ImageView),
-            // findViewById(R.id.botAvatar3ImageView),
-            // findViewById(R.id.botAvatar4ImageView),
-            // findViewById(R.id.botAvatar5ImageView),
-            // findViewById(R.id.botAvatar6ImageView),
+            findViewById(R.id.botAvatar1ImageView),
+            findViewById(R.id.botAvatar2ImageView)
+            // …you can un‐comment the rest later
         )
 
-        // RecyclerView & adapter setup
-        chatRecycler = findViewById(R.id.chatRecyclerView)
+        // 6) RecyclerView & adapter
         chatRecycler.layoutManager = LinearLayoutManager(this)
-        messageEditText = findViewById(R.id.messageEditText)
-        sendButton = findViewById(R.id.sendButton)
-
-        chatAdapter = ChatAdapter(mutableListOf()) { newPos ->
-            chatRecycler.smoothScrollToPosition(newPos)
+        chatAdapter = ChatAdapter(mutableListOf()) { pos ->
+            chatRecycler.smoothScrollToPosition(pos)
             saveLocalHistory()
         }
         chatRecycler.adapter = chatAdapter
 
-        // Parser wiring
+        // 7) Wire up your AIResponseParser
         parser = AIResponseParser(
             chatAdapter   = chatAdapter,
             chatRecycler  = chatRecycler,
             updateAvatar  = { slot, pose ->
-                // slot: "B1", "B2", …   pose: "thinking", "happy", …
+                // slot = "B1" → index 0, etc.
                 val idx = slot.removePrefix("B").toIntOrNull()?.minus(1) ?: return@AIResponseParser
                 if (idx !in avatarViews.indices) return@AIResponseParser
 
-                // Pull out the characterIds array from your profile JSON
-                val charIds = JSONObject(fullProfilesJson).optJSONArray("characterIds")
-                val charId  = charIds?.optString(idx) ?: return@AIResponseParser
+                // pull the charId from profile JSON
+                val charArr = JSONObject(fullProfilesJson).optJSONArray("characterIds")
+                val charId  = charArr?.optString(idx) ?: return@AIResponseParser
 
-                // Load that character’s saved avatar URI
-                val uriString = loadAvatarUriForCharacter(charId)
-                avatarViews[idx].setImageURI(Uri.parse(uriString))
-
-                // (Optional) you could switch an overlay or tint based on `pose`
-                Log.d(TAG, "Swapped $slot → character $charId (pose=$pose)")
+                // load & set that avatar URI
+                val uri = Uri.parse(loadAvatarUriForCharacter(charId))
+                avatarViews[idx].setImageURI(uri)
             },
-            loadName     = { slot ->
-                // 1) compute index from "B1","B2",… → 0,1,…
-                val idx = slot.removePrefix("B").toIntOrNull()?.minus(1)
-                    ?: return@AIResponseParser slot
-
-                // 2) pull your ChatProfile.characterIds from the JSON you passed in
-                val ids = JSONObject(fullProfilesJson)
-                    .optJSONArray("characterIds")
-                    ?: return@AIResponseParser slot
-
-                // 3) get the characterId for that slot
+            loadName = { slot ->
+                val idx = slot.removePrefix("B").toIntOrNull()?.minus(1) ?: return@AIResponseParser slot
+                val ids = JSONObject(fullProfilesJson).optJSONArray("characterIds") ?: return@AIResponseParser slot
                 val charId = ids.optString(idx, null) ?: return@AIResponseParser slot
-
-                // 4) load the character’s saved JSON from prefs and extract the "name"
                 val charJson = getSharedPreferences("characters", Context.MODE_PRIVATE)
-                    .getString(charId, null)
-                    ?: return@AIResponseParser slot
-
+                    .getString(charId, null) ?: return@AIResponseParser slot
                 JSONObject(charJson).optString("name", slot)
             }
         )
 
+        // 8) Restore any saved history
         loadLocalHistory()
 
+        // 9) Hook up your send button
         sendButton.setOnClickListener {
             val text = messageEditText.text.toString().trim()
             if (text.isNotEmpty()) {
@@ -240,12 +255,13 @@ class MainActivity : AppCompatActivity() {
 
             // 2) Build the AI prompt using only those profiles
             val aiPrompt = buildAiPrompt(
-                userInput,
-                historyStr,
-                activeProfilesJson,   // ← swapped in here
-                summariesJson,
-                facilitatorNotes,
-                chatDescription
+                userInput         = userInput,
+                history           = historyStr,
+                activeProfilesJson= activeProfilesJson,
+                summariesJson     = summariesJson,
+                facilitatorNotes  = facilitatorNotes,
+                chatDescription   = chatDescription,
+                activeSlots       = finalActiveBots    // <— pass it here
             )
             Log.d(TAG, "Mixtral prompt: $aiPrompt")
 

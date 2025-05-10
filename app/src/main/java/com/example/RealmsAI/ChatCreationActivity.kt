@@ -208,8 +208,10 @@ class ChatCreationActivity : AppCompatActivity() {
 
             // 6.6) Fire up the chat screen
             Intent(this, MainActivity::class.java).also {
-                it.putExtra("chatId", chatId)  // ✅ FIXED
+                it.putExtra("CHAT_ID", chatId)
                 it.putExtra("CHAT_PROFILE_JSON", Gson().toJson(profile))
+                it.putExtra("CHAT_TITLE", profile.title)
+                it.putExtra("CHAT_DESCRIPTION", profile.description)
                 it.putExtra("FIRST_MESSAGE", firstMsg)
                 startActivity(it)
             }
