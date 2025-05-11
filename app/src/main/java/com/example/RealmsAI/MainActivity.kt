@@ -19,6 +19,8 @@ import androidx.recyclerview.widget.RecyclerView
 import com.example.RealmsAI.ai.AIResponseParser
 import com.example.RealmsAI.ai.buildAiPrompt
 import com.example.RealmsAI.ai.buildFacilitatorPrompt
+import com.example.RealmsAI.data.SessionRepository
+import com.example.RealmsAI.models.Message
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -52,6 +54,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var sendButton: Button
     private lateinit var chatAdapter: ChatAdapter
     private lateinit var parser: AIResponseParser
+    private val repo = SessionRepository()
+    private lateinit var sessionId: String
 
     // Shared OkHttpClient with logging for facilitator calls
     private val client = OkHttpClient.Builder()
@@ -80,6 +84,18 @@ class MainActivity : AppCompatActivity() {
             .getStringExtra("CHAT_PROFILE_JSON")
             ?.takeIf { it.isNotBlank() }
             ?: "{}"
+
+        lifecycleScope.launch {
+            sessionId = repo.createSession(chatId)
+            // start listening:
+            repo.listenMessages(sessionId) { msg ->
+                runOnUiThread {
+                    chatAdapter.addMessage(
+                        ChatMessage(msg.sender, msg.text)
+                    )
+                }
+            }
+        }
 
         // 3) Parse your ChatProfile JSON and pull out title/description
         val profileObj = try {
@@ -120,11 +136,15 @@ class MainActivity : AppCompatActivity() {
             chatAdapter   = chatAdapter,
             chatRecycler  = chatRecycler,
             updateAvatar  = { slot, pose ->
-                // slot = "B1" → index 0, etc.
-                val idx = slot.removePrefix("B").toIntOrNull()?.minus(1) ?: return@AIResponseParser
+                // skip narrator slot entirely
+                if (slot == "N0") return@AIResponseParser
+
+                // slot = "B1" → index = 0, etc.
+                val idx = slot.removePrefix("B").toIntOrNull()?.minus(1)
+                    ?: return@AIResponseParser
                 if (idx !in avatarViews.indices) return@AIResponseParser
 
-                // pull the charId from profile JSON
+                // pull the charId from your ChatProfile JSON
                 val charArr = JSONObject(fullProfilesJson).optJSONArray("characterIds")
                 val charId  = charArr?.optString(idx) ?: return@AIResponseParser
 
@@ -133,14 +153,24 @@ class MainActivity : AppCompatActivity() {
                 avatarViews[idx].setImageURI(uri)
             },
             loadName = { slot ->
-                val idx = slot.removePrefix("B").toIntOrNull()?.minus(1) ?: return@AIResponseParser slot
-                val ids = JSONObject(fullProfilesJson).optJSONArray("characterIds") ?: return@AIResponseParser slot
+                // if the narrator, label it however you like:
+                if (slot == "N0") return@AIResponseParser "Narrator"
+
+                // otherwise do the same B-slot → character lookup you had
+                val idx = slot.removePrefix("B").toIntOrNull()?.minus(1)
+                    ?: return@AIResponseParser slot
+                val ids = JSONObject(fullProfilesJson)
+                    .optJSONArray("characterIds")
+                    ?: return@AIResponseParser slot
                 val charId = ids.optString(idx, null) ?: return@AIResponseParser slot
+
                 val charJson = getSharedPreferences("characters", Context.MODE_PRIVATE)
-                    .getString(charId, null) ?: return@AIResponseParser slot
+                    .getString(charId, null)
+                    ?: return@AIResponseParser slot
                 JSONObject(charJson).optString("name", slot)
             }
         )
+
 
         // 8) Restore any saved history
         loadLocalHistory()
@@ -152,6 +182,14 @@ class MainActivity : AppCompatActivity() {
                 chatAdapter.addMessage(ChatMessage("You", text))
                 messageEditText.text.clear()
                 sendToAI(text)
+            }
+            val msg = Message(
+                id       = "",  // blank → Firestore auto-ID
+                sender   = "You",
+                text     = text
+            )
+            lifecycleScope.launch {
+                repo.sendMessage(sessionId, msg)
             }
         }
     }
@@ -217,10 +255,9 @@ class MainActivity : AppCompatActivity() {
             Log.d(TAG, "Facilitator returned: $activeBots")
 
 // now FALLBACK if empty:
+            // now FALLBACK if empty:
             val finalActiveBots = activeBots.ifEmpty {
-                // pull the number of characterIds from your fullProfilesJson
-                val charIds = JSONObject(fullProfilesJson)
-                    .optJSONArray("characterIds")
+                val charIds = JSONObject(fullProfilesJson).optJSONArray("characterIds")
                 if (charIds != null && charIds.length() > 0) {
                     (1..charIds.length()).map { idx -> "B$idx" }
                 } else {
@@ -230,8 +267,13 @@ class MainActivity : AppCompatActivity() {
                 }
             }
 
-            Log.d(TAG, "Using activeBots = $finalActiveBots")
-            parser.activeTokens = finalActiveBots
+// prepend the narrator slot
+            val withNarrator = listOf("N0") + finalActiveBots
+
+// hand off to parser
+            parser.activeTokens = withNarrator
+            Log.d(TAG, "Speakers in this turn: $withNarrator")
+
 
             // —— Mixtral Call
             // 1) Build JSON of only the active character profiles
@@ -261,7 +303,7 @@ class MainActivity : AppCompatActivity() {
                 summariesJson     = summariesJson,
                 facilitatorNotes  = facilitatorNotes,
                 chatDescription   = chatDescription,
-                activeSlots       = finalActiveBots    // <— pass it here
+                availableSlots       = activeBots    // <— pass it here
             )
             Log.d(TAG, "Mixtral prompt: $aiPrompt")
 
@@ -275,6 +317,7 @@ class MainActivity : AppCompatActivity() {
             val mixJson = JSONObject().apply {
                 put("model",    "mistralai/mixtral-8x7b-instruct")
                 put("messages", msgArray)
+                put("max_tokens", 300)
             }
             val body = mixJson.toString()
                 .toRequestBody("application/json; charset=utf-8".toMediaTypeOrNull())
@@ -301,6 +344,14 @@ class MainActivity : AppCompatActivity() {
                     .getString("content")
 
                 parser.handle(content)
+
+                val aiMsg = Message(
+                    id     = "",           // blank → Firestore auto-ID
+                    sender = "Bot",        // or slot name if you prefer
+                    text   = content
+                )
+                repo.sendMessage(sessionId, aiMsg)
+
             } catch (e: Exception) {
                 Log.e(TAG, "Mixtral request failed", e)
             }

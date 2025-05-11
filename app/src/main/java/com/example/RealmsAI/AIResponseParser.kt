@@ -43,22 +43,23 @@ class AIResponseParser(
     }
 
     private fun parseAIOutput(raw: String): List<ParsedMessage> {
-        // One bracket, three comma‐separated values: slot, pose, speed
-        val re = Regex("""\[(B\d+),(\w+),(\d+)\]\s*["“]?(.+?)["”]?$""")
+        // allow either B1, B2, … or N0
+        val re = Regex("""\[(N0|B\d+),(\w+),(\d+)\]\s*["“]?(.+?)["”]?$""")
 
         return raw
             .lineSequence()
             .mapNotNull { line ->
                 re.matchEntire(line.trim())?.destructured?.let { (slot, pose, speed, text) ->
                     ParsedMessage(
-                        speakerId = slot,          // e.g. "B1"
-                        emotion   = pose,          // e.g. "thinking"
-                        speed     = speed.toInt(), // 0, 1 or 2
+                        speakerId = slot,
+                        emotion   = pose,
+                        speed     = speed.toInt(),
                         text      = text.trim()
                     )
                 }
             }
             .toList()
     }
+
 
 }

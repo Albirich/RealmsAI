@@ -1,57 +1,86 @@
 package com.example.RealmsAI.network
 
+import com.example.RealmsAI.network.MixtralEngine
 import com.example.RealmsAI.ai.buildAiPrompt
 import com.example.RealmsAI.ai.buildFacilitatorPrompt
+import android.util.Log
 
 /**
- * A simple interface for sending a user prompt through the facilitator → Mixtral pipeline.
- * Returns a Pair of (Mixtral-generated text, list of active slot IDs).
+ * Orchestrator ties together facilitator (OpenAI) and MixtralEngine, passing availableSlots,
+ * history, and chat metadata to construct prompts.
  */
-interface AiService {
-    suspend fun sendPrompt(
-        userInput: String,
-        history:   String,
-        chatDesc:  String
-    ): Pair<String, List<String>>
-}
-
 class OrchestratorService(
     private val facilitator: ChatGptFacilitator,
-    private val engine:      MixtralEngine
-) : AiService {
+    private val engine: MixtralEngine
+) {
+    companion object {
+        private const val TAG = "OrchestratorService"
+    }
 
-    override suspend fun sendPrompt(
+    /**
+     * Sends a turn to the facilitator and Mixtral: returns Mixtral response + active slots.
+     * @param userInput   the raw user message
+     * @param history     full history string ("You: ...\nB1: ...")
+     * @param chatDesc    chat description/personality blob
+     * @param facilitatorState  JSON or string state for facilitator
+     * @param availableSlots    list of slot IDs (e.g. ["B1","B2"])
+     */
+    suspend fun sendPrompt(
         userInput: String,
-        history:   String,
-        chatDesc:  String
+        history: String,
+        chatDesc: String,
+        facilitatorState: String,
+        availableSlots: List<String>
     ): Pair<String, List<String>> {
-        // 1) Build the facilitator prompt. Pass in the list of slots that could speak.
-        //    (Replace this stub list with one derived from your chat profile.)
-        val availableSlots = listOf("B1", "B2")  // TODO: compute from your fullProfilesJson
-
+        // 1) Build facilitator prompt
         val facPrompt = buildFacilitatorPrompt(
-            userInput         = userInput,
-            history           = history,
-            facilitatorState  = "",            // e.g. volumes/locations JSON if you have it
-            availableSlots    = availableSlots
+            userInput        = userInput,
+            history          = history,
+            facilitatorState = facilitatorState,
+            availableSlots   = availableSlots
         )
+        Log.d(TAG, "Facilitator prompt: $facPrompt")
 
-        // 2) Call the facilitator and unpack notes + chosen activeBots
-        val (notes, activeSlots) = facilitator.getFacilitatorNotes(facPrompt)
+        // 2) Call facilitator
+        val (notes, activeBots) = try {
+            facilitator.getFacilitatorNotes(facPrompt)
+        } catch (e: Exception) {
+            Log.e(TAG, "Facilitator call failed", e)
+            Pair("", emptyList())
+        }
+        Log.d(TAG, "Facilitator notes: $notes")
+        Log.d(TAG, "Facilitator activeBots: $activeBots")
 
-        // 3) Build the Mixtral prompt, now passing in the activeSlots returned above
+        // 3) Build AI prompt for Mixtral using only activeSlots profiles in summariesJson
         val aiPrompt = buildAiPrompt(
-            userInput           = userInput,
-            history             = history,
-            activeProfilesJson  = "{}",       // TODO: your actual fullProfilesJson
-            summariesJson       = "[]",       // TODO: your inactive summaries JSON
-            facilitatorNotes    = notes,
-            chatDescription     = chatDesc,
-            activeSlots         = activeSlots
+            userInput       = userInput,
+            history         = history,
+            activeProfilesJson= summariesJsonFromSlots(availableSlots),
+            summariesJson   = "[]",
+            facilitatorNotes= notes,
+            chatDescription = chatDesc,
+            availableSlots     = availableSlots
         )
+        Log.d(TAG, "Mixtral prompt: $aiPrompt")
 
-        // 4) Call Mixtral and return its output along with the active slot list
-        val mixtralOutput = engine.getBotOutput(aiPrompt)
-        return mixtralOutput to activeSlots
+        // 4) Call Mixtral
+        val aiResponse = try {
+            engine.getBotOutput(aiPrompt)
+        } catch (e: Exception) {
+            Log.e(TAG, "Mixtral call failed", e)
+            ""
+        }
+        Log.d(TAG, "Mixtral response: $aiResponse")
+
+        return Pair(aiResponse, activeBots)
+    }
+
+    /**
+     * Helper: given full profiles JSON and availableSlots, extract only the profiles for those slots.
+     * (stubbed here, implement per your storage schema)
+     */
+    private fun summariesJsonFromSlots(slots: List<String>): String {
+        // TODO: lookup and serialize only those profiles
+        return "[]"
     }
 }

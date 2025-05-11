@@ -1,7 +1,5 @@
 package com.example.RealmsAI
 
-
-import android.app.Application
 import android.content.Intent
 import android.os.Bundle
 import android.util.Log
@@ -9,104 +7,60 @@ import android.widget.Button
 import android.widget.EditText
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import com.google.firebase.FirebaseApp
 import com.google.firebase.auth.FirebaseAuth
-import java.security.MessageDigest
-
-
-class RealmsAiApp : Application() {
-    override fun onCreate() {
-        super.onCreate()
-        FirebaseApp.initializeApp(this)
-    }
-}
-
 
 class LoginActivity : AppCompatActivity() {
-
     private lateinit var auth: FirebaseAuth
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-
-        // ← initialize Firebase
-        FirebaseApp.initializeApp(this)
-
-
         setContentView(R.layout.activity_login)
 
-        // now it’s safe to call
-        val auth = FirebaseAuth.getInstance()
+        // FirebaseApp was initialized in your Application class
+        auth = FirebaseAuth.getInstance()
 
-        if (auth.currentUser != null) {
-            goToMain()
-            return
-        }
-
-
-        val emailInput = findViewById<EditText>(R.id.emailInput)
+        val emailInput    = findViewById<EditText>(R.id.emailInput)
         val passwordInput = findViewById<EditText>(R.id.passwordInput)
-        val loginButton = findViewById<Button>(R.id.loginButton)
-        val signupButton = findViewById<Button>(R.id.signupButton)
+        val loginButton   = findViewById<Button>(R.id.loginButton)
+        val signupButton  = findViewById<Button>(R.id.signupButton)
 
         loginButton.setOnClickListener {
             val email = emailInput.text.toString().trim()
-            val password = passwordInput.text.toString().trim()
-            login(email, password)
-            Toast.makeText(this, "Login...", Toast.LENGTH_SHORT).show()
+            val pass  = passwordInput.text.toString().trim()
+            if (email.isBlank() || pass.isBlank()) {
+                Toast.makeText(this, "Email and password required", Toast.LENGTH_SHORT).show()
+            } else {
+                login(email, pass)
+            }
         }
 
         signupButton.setOnClickListener {
             val email = emailInput.text.toString().trim()
-            val password = passwordInput.text.toString().trim()
-            signup(email, password)
-            Toast.makeText(this, "Signing up...", Toast.LENGTH_SHORT).show()
-
-        }
-
-        try {
-            val info = packageManager.getPackageInfo(
-                packageName,
-                android.content.pm.PackageManager.GET_SIGNATURES
-            )
-            val signatures = info.signatures
-            if (signatures != null) {
-                for (signature in signatures) {
-                    val md = MessageDigest.getInstance("SHA1")
-                    md.update(signature.toByteArray())
-                    val sha1 = md.digest()
-                    val hex = sha1.joinToString(":") { String.format("%02X", it) }
-                    Log.d("SHA1", "SHA1 fingerprint: $hex")
-                }
+            val pass  = passwordInput.text.toString().trim()
+            if (email.isBlank() || pass.isBlank()) {
+                Toast.makeText(this, "Email and password required", Toast.LENGTH_SHORT).show()
             } else {
-                Log.e("SHA1", "No signatures found.")
+                signup(email, pass)
             }
-        } catch (e: Exception) {
-            Log.e("SHA1", "Could not extract SHA1", e)
         }
 
+        // (Optional) print your SHA-1 once for your Google-services setup
+        printSha1Fingerprint()
     }
 
     private fun login(email: String, password: String) {
         auth.signInWithEmailAndPassword(email, password)
             .addOnCompleteListener(this) { task ->
-                if (task.isSuccessful) {
-                    goToMain()
-                } else {
-                    Toast.makeText(this, "Login failed: ${task.exception?.message}", Toast.LENGTH_SHORT).show()
-                }
+                if (task.isSuccessful) goToMain()
+                else          Toast.makeText(this, "Login failed: ${task.exception?.message}", Toast.LENGTH_LONG).show()
             }
     }
 
     private fun signup(email: String, password: String) {
         auth.createUserWithEmailAndPassword(email, password)
             .addOnCompleteListener(this) { task ->
-                if (task.isSuccessful) {
-                    goToMain()
-                } else {
-                    Toast.makeText(this, "Signup failed: ${task.exception?.message}", Toast.LENGTH_SHORT).show()
-                }
+                if (task.isSuccessful) goToMain()
+                else          Toast.makeText(this, "Signup failed: ${task.exception?.message}", Toast.LENGTH_LONG).show()
             }
     }
 
@@ -115,4 +69,18 @@ class LoginActivity : AppCompatActivity() {
         finish()
     }
 
+    private fun printSha1Fingerprint() {
+        try {
+            val info = packageManager.getPackageInfo(packageName, android.content.pm.PackageManager.GET_SIGNATURES)
+            info.signatures!!.forEach { sig ->
+            val md  = java.security.MessageDigest.getInstance("SHA1")
+                val hex = md.apply { update(sig.toByteArray()) }
+                    .digest()
+                    .joinToString(":") { byte -> "%02X".format(byte) }
+                Log.d("SHA1", hex)
+            }
+        } catch (e: Exception) {
+            Log.e("SHA1", "Unable to get SHA1", e)
+        }
+    }
 }

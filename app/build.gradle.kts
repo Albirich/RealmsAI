@@ -118,10 +118,10 @@ dependencies {
     implementation(platform("com.google.firebase:firebase-bom:33.13.0"))
     implementation("com.google.firebase:firebase-analytics-ktx")
     implementation("com.google.firebase:firebase-auth-ktx")
-    implementation("com.google.firebase:firebase-firestore-ktx")
+    implementation("com.google.firebase:firebase-firestore-ktx:24.7.1")
 
     // Coroutines
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.6.4")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.1")
 
     // Image loading
     implementation("com.github.bumptech.glide:glide:4.15.1")
