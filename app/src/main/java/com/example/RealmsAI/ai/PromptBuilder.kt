@@ -1,44 +1,19 @@
 package com.example.RealmsAI.ai
 
-/** Builds the small facilitator prompt (1st API call). */
-fun buildFacilitatorPrompt(
-    userInput: String,
-    history: String,
+import com.example.RealmsAI.CharacterProfile
+import org.json.JSONArray
+
+// --- SANDBOX / GROUP MODES ---
+
+fun buildSandboxFacilitatorPrompt(
+    userInput:        String,
+    history:          String,
+    summariesJson:    String,
     facilitatorState: String,
-    availableSlots: List<String>        // ← now you pass this in
+    availableSlots:   List<String>
 ): String = """
-  You are the game facilitator. Do not role-play.
-  • Available slots: ${availableSlots.joinToString(", ")}
-  • New user message: "$userInput"
-  • Recent history:
-  $history
-  • Facilitator state (locations & volumes):
-  $facilitatorState
-
-Return a JSON object with exactly two fields:
-  {
-    "notes":     "...",
-    "activeBots": ["B1","B2"]      # slots you choose to activate
-  }
-""".trimIndent()
-
-
-
-/** Builds the full AI prompt (2nd API call). */
-fun buildAiPrompt(
-    userInput: String,
-    history: String,
-    activeProfilesJson: String,
-    summariesJson: String,
-    facilitatorNotes: String,
-    chatDescription: String,
-    availableSlots: List<String>
-): String = """
-
-Active profiles (full JSON):  $activeProfilesJson
-
-Chat description (personality & relationships):  
-$chatDescription
+Active profiles (full JSON):  
+${JSONArray(availableSlots)}
 
 Inactive summaries (JSON):  
 $summariesJson
@@ -46,24 +21,102 @@ $summariesJson
 Recent history:  
 $history
 
+Facilitator state:  
+$facilitatorState
+
+User said: "$userInput"
+
+SYSTEM:
+You are the facilitator. Output a JSON object:
+{
+  "notes": "<internal notes>",
+  "activeBots": ["${availableSlots.joinToString("\",\"")}"]
+}
+""".trimIndent()
+
+fun buildSandboxAiPrompt(
+    userInput:          String,
+    history:            String,
+    activeProfilesJson: String,
+    summariesJson:      String,
+    facilitatorNotes:   String,
+    chatDescription:    String,
+    availableSlots:     List<String>
+): String = """
+System: You are Narrator (N0) + active characters (${availableSlots.joinToString()}).  
+Description: $chatDescription  
+
+History:  
+$history
+
 Facilitator notes:  
+$facilitatorNotes
+
+Active profiles (full JSON):  
+$activeProfilesJson
+
+User: "$userInput"
+
+FORMAT:
+[N0,<pose>,<speed>] Narration  
+[B<slot>,<pose>,<speed>] Dialogue  
+
+Where <slot>∈${availableSlots}, <pose>∈{happy,sad,…}, <speed>∈{0,1,2}.
+No extra text outside bracketed lines.
+""".trimIndent()
+
+// --- ONE-ON-ONE MODE ---
+
+fun buildOneOnOneFacilitatorPrompt(
+    userInput:       String,
+    history:         String,
+    facilitatorState:String,
+    character:       CharacterProfile
+): String = """
+Character Name: ${character.name}
+Summary: ${character.summary.orEmpty()}
+
+Recent history:
+$history
+
+User said: "$userInput"
+
+SYSTEM:
+You are the facilitator for a one-on-one. Output JSON:
+{
+  "notes": "<internal notes>"
+}
+""".trimIndent()
+
+fun buildOneOnOneAiPrompt(
+    userInput:      String,
+    history:        String,
+    facilitatorNotes:String,
+    character:      CharacterProfile,
+    maxTokens:      Int = 300
+): String = """
+Character Name: ${character.name}
+Summary: ${character.summary.orEmpty()}
+Personality: ${character.personality}
+
+Recent history:
+$history
+
+Facilitator notes:
 $facilitatorNotes
 
 User said: "$userInput"
 
-You are playing both the Narrator (slot N0) and the active characters (slots B1, B2, …). You do not speak for the the User. You can speak for other non-slotted characters. You must use the following format when you respond:  
-Whenever you narrate, you must use:
-  [N0,<pose>,<speed>] Your narration here
+SYSTEM:
+Roles:
+  • Narrator (N0)
+  • Character ${character.name} (B1)
 
-Whenever a character speaks, you must use:
-  [B<slot>,<pose>,<speed>] Their dialogue here
+FORMAT:
+[N0,<pose>,<speed>] Narration  
+[B1,<pose>,<speed>] Dialogue (only words—no name)
 
-Where:
-  • `<slot>`  = 1 or 2 (so B1 or B2)  
-  • `<pose>`  = one of: happy, sad, angry, surprised, shy, flirty, thinking, fighting, frightened, injured  
-  • `<speed>` = 0 (normal), 1 (interrupt), 2 (delayed)  
-
-**No** free‐form asterisks or quotes outside those bracketed lines.  
-Limit total reply to 300 tokens.  
-
+Where <pose>∈{happy,sad,…}, <speed>∈{0,1,2}.  
+No text outside bracketed lines.  
+Keep under $maxTokens tokens.
 """.trimIndent()

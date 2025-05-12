@@ -1,220 +1,216 @@
 package com.example.RealmsAI
 
-import android.content.Context
+import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
-import android.text.InputFilter
-import android.util.Log
-import android.view.View
+import android.view.ViewGroup
 import android.widget.EditText
+import android.widget.ImageButton
 import android.widget.ImageView
-import android.widget.LinearLayout
 import android.widget.Toast
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts.GetContent
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.example.RealmsAI.CharacterProfile
 import com.google.android.material.button.MaterialButton
-import org.json.JSONArray
-import org.json.JSONObject
-import java.io.File
-import java.io.FileOutputStream
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FieldValue
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.gson.Gson
 
 class CharacterCreationActivity : AppCompatActivity() {
+    private var avatarUri: Uri?        = null
+    private var selectedBgUri: Uri?    = null
+    private var selectedBgResId: Int?  = null
 
-    // ──────── state for avatar + pose slots ────────
-    private var avatarUri: Uri? = null
     private lateinit var avatarPicker: ActivityResultLauncher<String>
-
-    private val poseKeys = listOf(
-        "happy","sad","angry","surprised","flirty","fight","thinking","embarrassed"
-    )
+    private val poseKeys = listOf("happy","sad","angry","surprised","flirty","thinking")
     private val poseSlots = poseKeys.map { PoseSlot(it) }.toMutableList()
-    private var currentSlotIndex = 0
-    private lateinit var imagePicker: ActivityResultLauncher<String>
+    private var currentPoseIndex = 0
+    private lateinit var posePicker: ActivityResultLauncher<String>
+
+    private lateinit var bgPicker:     ActivityResultLauncher<String>
+    private lateinit var bgRecycler:   RecyclerView
+
+    // reuse your ChatCreation presets:
+    private val presetBackgrounds = listOf(
+        R.drawable.bg_beach, R.drawable.bg_castle, R.drawable.bg_comedy_club,
+        R.drawable.bg_forest, R.drawable.bg_mountain_path,
+        R.drawable.bg_newsroom, R.drawable.bg_office,
+        R.drawable.bg_space, R.drawable.bg_woods
+    )
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_create_character)
 
-        // ── 1) Avatar picker ──
-        val avatarImageView = findViewById<ImageView>(R.id.avatarImageView)
-        avatarPicker = registerForActivityResult(GetContent()) { uri: Uri? ->
-            uri?.let {
+        // 1) Avatar picker
+        val avatarView = findViewById<ImageView>(R.id.avatarImageView)
+        avatarPicker = registerForActivityResult(GetContent()) { uri ->
+            uri?.also {
                 avatarUri = it
-                avatarImageView.setImageURI(it)
+                avatarView.setImageURI(it)
             }
         }
-        avatarImageView.setOnClickListener {
-            avatarPicker.launch("image/*")
-        }
-
-        // ── 2) Pose‐slot picker via RecyclerView ──
-        // 2a) single gallery picker for any Pose‐slot
-        imagePicker = registerForActivityResult(GetContent()) { uri: Uri? ->
-            uri?.let {
-                poseSlots[currentSlotIndex].uri = it
-                // redraw only that one cell
-                (findViewById<RecyclerView>(R.id.poseRecycler)
-                    .adapter as? PoseAdapter)
-                    ?.notifyItemChanged(currentSlotIndex)
+        avatarView.setOnClickListener { avatarPicker.launch("image/*") }
+        // Pose‐slot gallery picker:
+        posePicker = registerForActivityResult(GetContent()) { uri: Uri? ->
+            uri?.also {
+                poseSlots[currentPoseIndex].uri = it
+                // notify only that one item changed
+                (findViewById<RecyclerView>(R.id.poseRecycler).adapter as PoseAdapter)
+                    .notifyItemChanged(currentPoseIndex)
             }
         }
 
-        // 2b) wire up RecyclerView
+// RecyclerView for your poses:
         val poseRecycler = findViewById<RecyclerView>(R.id.poseRecycler)
         poseRecycler.layoutManager =
             LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
         poseRecycler.adapter = PoseAdapter(poseSlots) { slotIndex ->
-            currentSlotIndex = slotIndex
-            imagePicker.launch("image/*")
+            currentPoseIndex = slotIndex
+            posePicker.launch("image/*")
         }
 
-        // ── 3) Collapsible “Private Info” section ──
-        val privateHeader  = findViewById<LinearLayout>(R.id.privateDescHeader)
-        val privateToggle  = findViewById<ImageView>(R.id.privateDescToggle)
-        val privateSection = findViewById<LinearLayout>(R.id.privateSection)
-        privateHeader.setOnClickListener {
-            if (privateSection.visibility == View.GONE) {
-                privateSection.visibility = View.VISIBLE
-                privateToggle.setImageResource(R.drawable.ic_expand_less)
-            } else {
-                privateSection.visibility = View.GONE
-                privateToggle.setImageResource(R.drawable.ic_expand_more)
+        // 2) Background picker button
+        val bgButton = findViewById<ImageButton>(R.id.backgroundButton)
+        bgPicker = registerForActivityResult(GetContent()) { uri ->
+            uri?.also {
+                selectedBgUri   = it
+                selectedBgResId = null
+                bgButton.setImageURI(it)
+            }
+        }
+        bgButton.setOnClickListener { bgPicker.launch("image/*") }
+
+        // 3) Preset-backgrounds carousel
+        bgRecycler = findViewById(R.id.backgroundRecycler)
+        bgRecycler.layoutManager =
+            LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
+        bgRecycler.adapter = object: RecyclerView.Adapter<RecyclerView.ViewHolder>() {
+            override fun getItemCount() = presetBackgrounds.size
+            override fun onCreateViewHolder(p: ViewGroup, vt: Int) =
+                object: RecyclerView.ViewHolder(ImageView(p.context).apply {
+                    val size = (64 * resources.displayMetrics.density).toInt()
+                    layoutParams = ViewGroup.LayoutParams(size, size)
+                    scaleType = ImageView.ScaleType.CENTER_CROP
+                    setPadding(8,8,8,8)
+                }){}
+            override fun onBindViewHolder(h: RecyclerView.ViewHolder, i: Int) {
+                val res = presetBackgrounds[i]
+                (h.itemView as ImageView).apply {
+                    setImageResource(res)
+                    setOnClickListener {
+                        selectedBgResId = res
+                        selectedBgUri   = null
+                        bgButton.setImageResource(res)
+                    }
+                }
             }
         }
 
-        // ── 4) Grab your form fields ──
-        val nameEt        = findViewById<EditText>(R.id.characterNameInput)
-        val summaryEt     = findViewById<EditText>(R.id.etSummary)
-        val personalityEt = findViewById<EditText>(R.id.characterPersonalityInput)
-        val greetingEt    = findViewById<EditText>(R.id.characterGreetingInput)
-        val tagsEt        = findViewById<EditText>(R.id.characterTagsInput)
-        val privateEt     = findViewById<EditText>(R.id.characterprivateDescriptionInput)
-        val ageEt         = findViewById<EditText>(R.id.ageEditText)
-        val heightEt      = findViewById<EditText>(R.id.heightEditText)
-        val weightEt      = findViewById<EditText>(R.id.weightEditText)
-        val eyeEt         = findViewById<EditText>(R.id.eyeColorEditText)
-        val hairEt        = findViewById<EditText>(R.id.hairColorEditText)
-        val now = System.currentTimeMillis()
-        fun CharacterCreationActivity.saveCharacterAndFinish() {
-            // 5.1) new ID
-            val charId = System.currentTimeMillis().toString()
+        // 4) Form fields
+        val nameEt  = findViewById<EditText>(R.id.characterNameInput)
+        val bioEt   = findViewById<EditText>(R.id.etSummary)
+        val submit  = findViewById<MaterialButton>(R.id.charSubmitButton)
 
-            // 5.2) tags → List<String>
-            val rawTags = tagsEt.text.toString().trim()
-            val tags = if (rawTags.isEmpty()) emptyList()
-            else rawTags.split(",").map(String::trim)
-
-            // 5.3) build JSON
-            val json = JSONObject().apply {
-                put("id", charId)
-                put("createdAt",      now)
-                put("name", nameEt.text.toString().trim())
-                put("summary", summaryEt.text.toString().trim())
-                put("personality", personalityEt.text.toString().trim())
-                put("greeting", greetingEt.text.toString().trim())
-                put("tags", JSONArray(tags))
-                put("privateDescription", privateEt.text.toString().trim())
-                put("profileInfo", JSONObject().apply {
-                    put("age",       ageEt.text.toString().trim())
-                    put("height",    heightEt.text.toString().trim())
-                    put("weight",    weightEt.text.toString().trim())
-                    put("eyeColor",  eyeEt.text.toString().trim())
-                    put("hairColor", hairEt.text.toString().trim())
-                })
-
-                // 5.3a) avatar → file
-                avatarUri?.let { uri ->
-                    val outFile = File(filesDir, "avatar_$charId.png")
-                    contentResolver.openInputStream(uri)?.use { input ->
-                        FileOutputStream(outFile).use { output ->
-                            // copy from input → output
-                            input.copyTo(output)
-                        }
-                    }
-                    put("avatarUri", Uri.fromFile(outFile).toString())
-                }
-
-                // 5.3b) pose slots → save files and map keys
-                val emoObj = JSONObject()
-                poseSlots.forEach { slot ->
-                    slot.uri?.let { uri ->
-                        try {
-                            val outFile = File(filesDir, "${slot.key}_$charId.png")
-                            contentResolver.openInputStream(uri)?.use { input ->
-                                FileOutputStream(outFile).use { output ->
-                                    input.copyTo(output)
-                                }
-                            }
-                            emoObj.put(slot.key, Uri.fromFile(outFile).toString())
-                            Log.d("CHAR_SAVE", "Saved pose ${slot.key} → $outFile")
-                        } catch (e: Exception) {
-                            Log.w("CHAR_SAVE", "Failed to save pose ${slot.key}", e)
-                        }
-                    }
-                }
-                put("poseUris", emoObj)
-
-
-                // 5.3c) author stamp
-                val author = getSharedPreferences("user", Context.MODE_PRIVATE)
-                    .getString("userId","") ?: ""
-                put("author", author)
-            }
-
-            // 5.4) persist to prefs
-            getSharedPreferences("characters", Context.MODE_PRIVATE)
-                .edit()
-                .putString(charId, json.toString())
-                .apply()
-
-            Log.d("CHAR_SAVE", json.toString())
-            finish()
-        }
-        // ─ optional length caps ─
-        summaryEt.   filters = arrayOf(InputFilter.LengthFilter(200))
-        personalityEt.filters = arrayOf(InputFilter.LengthFilter(4000))
-        greetingEt.  filters = arrayOf(InputFilter.LengthFilter(500))
-
-        // ── 5) Submit button ──
-        findViewById<MaterialButton>(R.id.charSubmitButton).setOnClickListener {
+        submit.setOnClickListener {
             val name = nameEt.text.toString().trim()
-            val personality = personalityEt.text.toString().trim()
-            val hasAvatar = avatarUri != null
-            val hasAtLeastOnePose = poseSlots.any { it.uri != null }
+            val bio  = bioEt.text.toString().trim()
+            if (name.isEmpty())  return@setOnClickListener toast("Name required")
+            if (avatarUri == null) return@setOnClickListener toast("Pick an avatar")
+            // background optional
 
-            when {
-                name.isEmpty() -> {
-                    Toast
-                        .makeText(this, "Character name is required", Toast.LENGTH_SHORT)
-                        .show()
-                    return@setOnClickListener
-                }
-                personality.isEmpty() -> {
-                    Toast
-                        .makeText(this, "Please enter a personality", Toast.LENGTH_SHORT)
-                        .show()
-                    return@setOnClickListener
-                }
-                !hasAvatar -> {
-                    Toast
-                        .makeText(this, "Please select a main avatar image", Toast.LENGTH_SHORT)
-                        .show()
-                    return@setOnClickListener
-                }
-                !hasAtLeastOnePose -> {
-                    Toast
-                        .makeText(this, "Please pick at least one pose image", Toast.LENGTH_SHORT)
-                        .show()
-                    return@setOnClickListener
-                }
-                else -> {
-                    // all validations passed: build your JSON, persist & finish()
-                    saveCharacterAndFinish()
-                }
-            }
+            createCharacterAndLaunchChat(name, bio)
         }
+    }
+
+    private fun createCharacterAndLaunchChat(name: String, bio: String) {
+        val charId = System.currentTimeMillis().toString()
+        // 1) Build Firestore CharacterProfile
+        val charProfile = CharacterProfile(
+            id           = charId,
+            name         = name,
+            avatarUri    = avatarUri.toString(),
+            avatarResId  = null,             // gallery-only today
+            background   = selectedBgUri?.toString()
+                ?: selectedBgResId?.let{"android.resource://$packageName/$it"}
+                ?: "",
+            summary  = bio,
+            createdAt    = System.currentTimeMillis()
+        )
+        val emotionMap = poseSlots
+            .mapNotNull { slot ->
+                slot.uri?.let { slot.key to it.toString() }
+            }
+            .toMap()
+
+        val charProfileWithPoses = charProfile.copy(
+            emotionTags = emotionMap
+        )
+        val db = FirebaseFirestore.getInstance()
+        db.collection("characters").document(charId)
+            .set(charProfileWithPoses)
+            .addOnSuccessListener {
+                // 2) Immediately create a one-on-one ChatProfile
+                val chatId = System.currentTimeMillis().toString()
+                val chatProfile = ChatProfile(
+                    id             = chatId,
+                    title          = name,
+                    description    = bio,
+                    tags           = emptyList(),
+                    mode           = ChatMode.ONE_ON_ONE,
+                    backgroundUri  = charProfile.background,
+                    backgroundResId= selectedBgResId,
+                    sfwOnly        = true,
+                    characterIds   = listOf(charId),
+                    rating         = 0f,
+                    timestamp      = System.currentTimeMillis(),
+                    author         = FirebaseAuth.getInstance().currentUser!!.uid
+                )
+                // write chat doc
+                val chatData = mapOf(
+                    "title"        to chatProfile.title,
+                    "description"  to chatProfile.description,
+                    "tags"         to chatProfile.tags,
+                    "mode"         to chatProfile.mode.name,
+                    "characterIds" to chatProfile.characterIds,
+                    "author"       to chatProfile.author,
+                    "timestamp"    to FieldValue.serverTimestamp(),
+                    "lastMessage"  to "",
+                    "lastTimestamp" to FieldValue.serverTimestamp()
+                )
+                db.collection("chats").document(chatId)
+                    .set(chatData)
+                    .addOnSuccessListener {
+                        // 3) Create fresh session & launch
+                        SessionManager.getOrCreateSessionFor(
+                            chatId,
+                            onResult = { sessionId ->
+                                Intent(this, MainActivity::class.java).apply {
+                                    putExtra("CHAT_ID", chatId)
+                                    putExtra("SESSION_ID", sessionId)
+                                    putExtra("CHAT_PROFILE_JSON", Gson().toJson(chatProfile))
+                                }.also{ startActivity(it) }
+                                finish()
+                            },
+                            onError = { e ->
+                                toast("Failed to start session")
+                            }
+                        )
+                    }
+                    .addOnFailureListener { e ->
+                        toast("Failed to create chat")
+                    }
+            }
+            .addOnFailureListener { e ->
+                toast("Failed to save character")
+            }
+    }
+
+    private fun toast(msg: String) {
+        Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
     }
 }

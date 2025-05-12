@@ -9,6 +9,7 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.google.firebase.auth.FirebaseAuth
 
+
 class LoginActivity : AppCompatActivity() {
     private lateinit var auth: FirebaseAuth
 
@@ -23,6 +24,12 @@ class LoginActivity : AppCompatActivity() {
         val passwordInput = findViewById<EditText>(R.id.passwordInput)
         val loginButton   = findViewById<Button>(R.id.loginButton)
         val signupButton  = findViewById<Button>(R.id.signupButton)
+
+        FirebaseAuth.getInstance().currentUser?.let {
+            startActivity(Intent(this, ChatHubActivity::class.java))
+            finish()
+            return
+        }
 
         loginButton.setOnClickListener {
             val email = emailInput.text.toString().trim()
@@ -54,6 +61,7 @@ class LoginActivity : AppCompatActivity() {
                 if (task.isSuccessful) goToMain()
                 else          Toast.makeText(this, "Login failed: ${task.exception?.message}", Toast.LENGTH_LONG).show()
             }
+        Log.d("LoginActivity", "🔥 auth initialized? ${::auth.isInitialized} — instance = $auth")
     }
 
     private fun signup(email: String, password: String) {

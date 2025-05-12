@@ -108,7 +108,7 @@ class CreatedListActivity : BaseActivity() {
                     name       = cp.name,
                     summary    = cp.summary.orEmpty(),
                     avatarUri  = cp.avatarUri,
-                    avatarResId= cp.avatarResId,
+                    avatarResId = cp.avatarResId ?: R.drawable.placeholder_avatar,
                     author     = cp.author
                 )
             }

@@ -1,6 +1,7 @@
 package com.example.RealmsAI.data
 
 import com.example.RealmsAI.FirestoreClient
+import com.example.RealmsAI.FirestoreClient.db
 import com.example.RealmsAI.models.Message
 import com.example.RealmsAI.models.Session
 import com.google.firebase.firestore.DocumentChange
@@ -25,12 +26,18 @@ class SessionRepository {
     }
 
     /** 2) Post one message under this session */
-    suspend fun sendMessage(sessionId: String, msg: Message) {
-        sessions
+    suspend fun sendMessage(
+        chatId: String,
+        sessionId: String,
+        msg: Message
+    ) {
+        db.collection("chats")
+            .document(chatId)
+            .collection("sessions")
             .document(sessionId)
             .collection("messages")
-            .document(msg.id.ifBlank { /* auto ID */ "" })
-            .set(msg, SetOptions.merge())
+            .document(msg.id.ifBlank { db.collection("chats").document().id })
+            .set(msg)
             .await()
     }
 

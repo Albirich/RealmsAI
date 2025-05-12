@@ -15,6 +15,8 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.gson.Gson
 import org.json.JSONObject
+import com.google.firebase.firestore.FieldValue
+import com.google.firebase.firestore.FirebaseFirestore
 
 class ChatCreationActivity : AppCompatActivity() {
 
@@ -200,21 +202,51 @@ class ChatCreationActivity : AppCompatActivity() {
             )
 
             // 6.5) Persist to prefs
-            getSharedPreferences("chats", Context.MODE_PRIVATE)
-                .edit()
-                .putString(chatId, Gson().toJson(profile))
-                .apply()
-            Log.d("ChatCreation", "Saved profile for $chatId:\n${Gson().toJson(profile)}")
 
-            // 6.6) Fire up the chat screen
-            Intent(this, MainActivity::class.java).also {
-                it.putExtra("CHAT_ID", chatId)
-                it.putExtra("CHAT_PROFILE_JSON", Gson().toJson(profile))
-                it.putExtra("CHAT_TITLE", profile.title)
-                it.putExtra("CHAT_DESCRIPTION", profile.description)
-                it.putExtra("FIRST_MESSAGE", firstMsg)
-                startActivity(it)
-            }
+            val chatData = mapOf(
+                "title"         to profile.title,
+                "description"   to profile.description,
+                "tags"          to profile.tags,
+                "mode"          to profile.mode.name,
+                "characterIds"  to profile.characterIds,
+                "author"        to profile.author,
+                "timestamp"     to FieldValue.serverTimestamp(),
+                "lastMessage"   to "",                         // no messages yet
+                "lastTimestamp" to FieldValue.serverTimestamp()
+            )
+
+            val db = FirebaseFirestore.getInstance()
+            db.collection("chats")
+                .document(chatId)
+                .set(chatData)
+                .addOnSuccessListener {
+                    Log.d("ChatCreation", "New chat persisted to Firestore: $chatId")
+
+                    // Now create a fresh session for this chat:
+                    SessionManager.getOrCreateSessionFor(
+                        chatId,
+                        onResult = { sessionId ->
+                            Log.d("ChatCreation", "New session for $chatId → $sessionId")
+                            // Pass both IDs into MainActivity
+                            val intent = Intent(this, MainActivity::class.java).apply {
+                                putExtra("CHAT_ID", chatId)
+                                putExtra("SESSION_ID", sessionId)
+                                putExtra("CHAT_PROFILE_JSON", Gson().toJson(profile))
+                            }
+                            startActivity(intent)
+                            finish()
+                        },
+                        onError = { e ->
+                            Log.e("ChatCreation", "Failed to create session", e)
+                            Toast.makeText(this, "Could not start chat session", Toast.LENGTH_SHORT).show()
+                        }
+                    )
+                }
+                .addOnFailureListener { e ->
+                    Log.e("ChatCreation", "Failed to persist chat", e)
+                    Toast.makeText(this, "Could not create chat", Toast.LENGTH_SHORT).show()
+                }
+
             finish()
         }
 
@@ -268,6 +300,7 @@ class ChatCreationActivity : AppCompatActivity() {
         }
 
     }
+
 
     /** Helper to pull the saved avatarUri from a Character’s prefs entry */
     fun loadAvatarUriForCharacter(charId: String): String {

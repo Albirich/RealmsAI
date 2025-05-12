@@ -1,65 +1,84 @@
 package com.example.RealmsAI.ai
 
+import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import androidx.recyclerview.widget.RecyclerView
 import com.example.RealmsAI.ChatAdapter
 import com.example.RealmsAI.ChatMessage
+import com.example.RealmsAI.SessionManager
 import com.example.RealmsAI.models.ParsedMessage
 
+/**
+ * Parses raw AI output tagged with slot/emotion/speed tokens,
+ * updates avatars, displays each parsed message in the adapter,
+ * persists to Firestore, and scrolls the RecyclerView.
+ */
 class AIResponseParser(
     private val chatAdapter: ChatAdapter,
     private val chatRecycler: RecyclerView,
     private val updateAvatar: (speakerId: String, emotion: String) -> Unit,
-    private val loadName: (speakerId: String) -> String
+    private val loadName: (speakerId: String) -> String,
+    private val chatId: String,
+    private val sessionId: String
 ) {
     private val handler = Handler(Looper.getMainLooper())
-    var activeTokens: List<String> = emptyList()
 
+    // Regex: [N0|B# , emotion , speed] “text”
+    private val re = Regex(
+        """\[\s*(N0|B\d+)\s*,\s*(\w+)\s*,\s*(\d+)\s*\]\s*["“]?(.+?)["”]?$"""
+    )
+
+    /**
+     * Handle the raw response string from the AI.
+     */
     fun handle(raw: String) {
         val parsed = parseAIOutput(raw)
-        var delaySoFar = 0L
+        var cumulativeDelay = 0L
 
         parsed.forEach { pm ->
-            // map speed code → ms
-            val thisDelay = when (pm.speed) {
+            // Determine delay per speed code
+            val delayMs = when (pm.speed) {
                 1    -> 200L
-                2    -> 2500L
-                else -> 800L
+                2    -> 800L
+                else -> 500L
             }
-            delaySoFar += thisDelay
+            cumulativeDelay += delayMs
 
             handler.postDelayed({
-                chatAdapter.addMessage(
-                    ChatMessage(loadName(pm.speakerId), pm.text)
-                )
+                // 1) Update avatar image
                 updateAvatar(pm.speakerId, pm.emotion)
-            }, delaySoFar)
-        }
 
-        handler.postDelayed({
-            chatRecycler.smoothScrollToPosition(chatAdapter.itemCount - 1)
-        }, delaySoFar + 100)
+                // 2) Build and display ChatMessage
+                val name = loadName(pm.speakerId)
+                val chatMsg = ChatMessage(sender = name, messageText = pm.text)
+                chatAdapter.addMessage(chatMsg)
+
+                // 3) Persist to Firestore
+                SessionManager.sendMessage(chatId, sessionId, chatMsg)
+
+                // 4) Scroll to bottom
+                chatRecycler.smoothScrollToPosition(chatAdapter.itemCount - 1)
+            }, cumulativeDelay)
+        }
     }
 
-    private fun parseAIOutput(raw: String): List<ParsedMessage> {
-        // allow either B1, B2, … or N0
-        val re = Regex("""\[(N0|B\d+),(\w+),(\d+)\]\s*["“]?(.+?)["”]?$""")
-
-        return raw
-            .lineSequence()
+    /**
+     * Parses the raw string into a list of ParsedMessage objects.
+     */
+    private fun parseAIOutput(raw: String): List<ParsedMessage> =
+        raw.lineSequence()
             .mapNotNull { line ->
-                re.matchEntire(line.trim())?.destructured?.let { (slot, pose, speed, text) ->
-                    ParsedMessage(
-                        speakerId = slot,
-                        emotion   = pose,
-                        speed     = speed.toInt(),
-                        text      = text.trim()
-                    )
-                }
+                re.matchEntire(line.trim())
+                    ?.destructured
+                    ?.let { (slot, emotion, speedStr, text) ->
+                        ParsedMessage(
+                            speakerId = slot,
+                            emotion   = emotion,
+                            speed     = speedStr.toIntOrNull() ?: 0,
+                            text      = text.trim()
+                        )
+                    }
             }
             .toList()
-    }
-
-
 }

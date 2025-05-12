@@ -81,8 +81,6 @@ dependencies {
     debugImplementation("androidx.compose.ui:ui-tooling:1.6.0")
     implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
 
-
-
     // AndroidX & UI
     implementation("androidx.core:core-ktx:1.10.1")
     implementation("androidx.appcompat:appcompat:1.6.1")
