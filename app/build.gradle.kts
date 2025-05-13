@@ -1,13 +1,11 @@
-// top of your module-level build.gradle.kts
-import java.util.*
-
+import java.util.Properties
+// load local.properties
 val localProps = Properties().apply {
     rootProject.file("local.properties")
         .takeIf { it.exists() }
         ?.inputStream()
         ?.use { load(it) }
 }
-
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -15,6 +13,8 @@ plugins {
     kotlin("plugin.parcelize")
     id("com.google.gms.google-services")
 }
+
+
 
 android {
     namespace   = "com.example.RealmsAI"
@@ -27,12 +27,12 @@ android {
         versionCode   = 1
         versionName   = "1.0"
 
-        // grab your keys out of local.properties
-        val openaiKey  = localProps.getProperty("OPENAI_API_KEY", "")
-        val mixtralKey = localProps.getProperty("MIXTRAL_API_KEY", "")
-        val mixtralUrl = localProps.getProperty("MIXTRAL_URL", "")
+        // grab your secrets
+        val openaiKey  = localProps.getProperty("OPENAI_API_KEY",  "")
+        val mixtralKey = localProps.getProperty("MIXTRAL_API_KEY",  "")
+        val mixtralUrl = localProps.getProperty("MIXTRAL_URL",      "")
 
-// and still do
+        // inject into BuildConfig
         buildConfigField("String", "OPENAI_API_KEY",  "\"$openaiKey\"")
         buildConfigField("String", "MIXTRAL_API_KEY", "\"$mixtralKey\"")
         buildConfigField("String", "MIXTRAL_URL",     "\"$mixtralUrl\"")
@@ -41,6 +41,7 @@ android {
     buildFeatures {
         compose     = true             // turn on Jetpack Compose
         buildConfig = true             // emit your custom BuildConfig fields
+        viewBinding = true
     }
 
 

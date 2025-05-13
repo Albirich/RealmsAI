@@ -10,6 +10,7 @@ import android.widget.Spinner
 import androidx.core.widget.addTextChangedListener
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.example.RealmsAI.models.CharacterProfile
 
 class CharacterHubActivity : BaseActivity() {
 

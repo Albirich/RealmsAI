@@ -2,14 +2,38 @@ package com.example.RealmsAI
 
 import android.content.Context
 import android.content.Intent
+import android.os.Bundle
 import android.widget.ImageButton
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
+import com.example.RealmsAI.models.CharacterProfile
+import com.example.RealmsAI.models.ChatMessage
+import com.example.RealmsAI.models.ChatProfile
 import com.google.gson.Gson
 import org.json.JSONArray
 import org.json.JSONObject
 
 open class BaseActivity : AppCompatActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        makeImmersive()
+    }
 
+    private fun makeImmersive() {
+        // Use the new WindowInsetsController approach for Android 11+
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        val controller = WindowInsetsControllerCompat(window, window.decorView)
+        controller.hide(WindowInsetsCompat.Type.systemBars())
+        controller.systemBarsBehavior =
+            WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) makeImmersive()
+    }
     protected fun setupBottomNav() {
 
         // Chats
@@ -71,10 +95,14 @@ open class BaseActivity : AppCompatActivity() {
                     avatar1Uri   = uri1,
                     avatar2Uri   = uri2,
                     rating       = profile.rating,
-                    timestamp    = profile.timestamp.takeIf { it>0 } ?: now,
-                    mode         = profile.mode,
+                    timestamp = profile.timestamp
+                        ?.toDate()
+                        ?.time
+                        ?: System.currentTimeMillis(),
+                        mode         = profile.mode,
                     author       = profile.author,
-                    chatProfile = profile
+                    chatProfile = profile,
+                    rawJson     = Gson().toJson(profile)
                 )
             }
     }

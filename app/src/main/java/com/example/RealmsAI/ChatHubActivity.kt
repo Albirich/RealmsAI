@@ -1,76 +1,108 @@
 package com.example.RealmsAI
 
+import android.content.ContentValues.TAG
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.util.Log
 import android.view.View
 import android.widget.AdapterView
 import android.widget.ArrayAdapter
 import android.widget.Spinner
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.example.RealmsAI.models.CharacterProfile
+import com.example.RealmsAI.models.ChatProfile
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.Query
 import com.google.gson.Gson
 
 class ChatHubActivity : BaseActivity() {
 
-    private lateinit var adapter: ChatPreviewAdapter
+        // 1) keep a map of all your characters by their ID
+        private val charProfilesById = mutableMapOf<String, CharacterProfile>()
+        private lateinit var adapter: ChatPreviewAdapter
 
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_chat_hub)
-        setupBottomNav()
+        override fun onCreate(savedInstanceState: Bundle?) {
+            super.onCreate(savedInstanceState)
+            setContentView(R.layout.activity_chat_hub)
 
-        // 1) Set up your sort‐by spinner
-        val spinner = findViewById<Spinner>(R.id.sortSpinner)
-        ArrayAdapter.createFromResource(
-            this,
-            R.array.chat_hub_sort_options,                  // e.g. ["Latest","Popular","All"]
-            android.R.layout.simple_spinner_item
-        ).also { spinAdapter ->
-            spinAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-            spinner.adapter = spinAdapter
+            // 2) First – load all your characters from Firestore into that map
+            val me = FirebaseAuth.getInstance().currentUser?.uid ?: return
+            FirebaseFirestore.getInstance()
+                .collection("characters")
+                .whereEqualTo("author", me)
+                .get()
+                .addOnSuccessListener { snap ->
+                    snap.documents.forEach { doc ->
+                        doc.toObject(CharacterProfile::class.java)
+                            ?.let { charProfilesById[it.id] = it }
+                    }
+
+                    // 3) Now that you have everyone in memory, load your chats
+                    loadChatsFromFirestore { previews ->
+                        adapter.updateList(previews)
+                    }
+                }
+                .addOnFailureListener { e ->
+                    Log.e(TAG, "failed loading characters", e)
+                }
         }
 
-        // 2) Build the RecyclerView + adapter
-        val rv = findViewById<RecyclerView>(R.id.chatHubRecyclerView)
-        rv.layoutManager = GridLayoutManager(this, 2)
+        private fun loadChatsFromFirestore(onLoaded: (List<ChatPreview>) -> Unit) {
+            val me = FirebaseAuth.getInstance().currentUser?.uid ?: return
+            FirebaseFirestore.getInstance()
+                .collection("chats")
+                .whereEqualTo("author", me)
+                .orderBy("timestamp", Query.Direction.DESCENDING)
+                .get()
+                .addOnSuccessListener { snap ->
+                    val list = snap.documents.mapNotNull { doc ->
+                        val profile = doc.toObject(ChatProfile::class.java) ?: return@mapNotNull null
 
-        // 2a) Load your initial list of previews
-        val initialList = loadAllChatPreviews()
+                        // pull the raw Firestore timestamp out safely:
+                        val ts = doc.get("timestamp").let {
+                            when (it) {
+                                is com.google.firebase.Timestamp -> it.toDate().time
+                                is Long                         -> it
+                                else                            -> System.currentTimeMillis()
+                            }
+                        }
 
-        // --- FIXED: pass `this` then the list, then the click‐lambda ---
-        adapter = ChatPreviewAdapter(
-            context = this,
-            chatList = initialList,
-            onClick  = { preview ->
-                // launch MainActivity directly with the ChatProfile we already loaded
-                Intent(this, MainActivity::class.java).apply {
-                    putExtra("CHAT_ID", preview.id)
-                    putExtra("CHAT_PROFILE_JSON", Gson().toJson(preview.chatProfile)) // optional but helps with speed
+                        // look up each B-slot’s CharacterProfile
+                        val ids = profile.characterIds
+                        val cp1 = charProfilesById[ids.getOrNull(0)]
+                        val cp2 = charProfilesById[ids.getOrNull(1)]
+                        val uri1 = cp1?.avatarUri
+                        val res1 = cp1?.avatarResId ?: R.drawable.placeholder_character
+                        val uri2 = cp2?.avatarUri
+                        val res2 = cp2?.avatarResId ?: R.drawable.placeholder_character
+
+                        // serialize the full ChatProfile back to JSON for rawJson
+                        val rawJson = Gson().toJson(profile)
+
+                        ChatPreview(
+                            id           = profile.id,
+                            title        = profile.title,
+                            description  = profile.description,
+                            avatar1Uri   = uri1,
+                            avatar1ResId = res1,
+                            avatar2Uri   = uri2,
+                            avatar2ResId = res2,
+                            rating       = profile.rating,
+                            timestamp    = ts,
+                            mode         = profile.mode,
+                            author       = profile.author,
+                            chatProfile  = profile,
+                            rawJson      = rawJson
+                        )
+                    }
+                    onLoaded(list)
                 }
-                    .also(::startActivity)
-            }
-        )
-        rv.adapter = adapter
-
-        // 3) Wire up sorting
-        spinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-            override fun onNothingSelected(parent: AdapterView<*>?) = Unit
-            override fun onItemSelected(parent: AdapterView<*>, view: View?, pos: Int, id: Long) {
-                val choice = parent.getItemAtPosition(pos) as String
-                val sorted = when (choice) {
-                    "Latest"  -> loadAllChatPreviews().sortedByDescending { it.timestamp }
-                    "Popular" -> loadAllChatPreviews().sortedByDescending { it.rating    }
-                    else      -> loadAllChatPreviews()
+                .addOnFailureListener { e ->
+                    Log.e(TAG, "fetch failed", e)
+                    onLoaded(emptyList())
                 }
-                adapter.updateList(sorted)
-            }
         }
     }
-
-    override fun onResume() {
-        super.onResume()
-        // refresh the list in case someone just created a new chat
-        adapter.updateList(loadAllChatPreviews())
-    }
-}

@@ -22,18 +22,21 @@ import com.example.RealmsAI.ai.buildOneOnOneAiPrompt
 import com.example.RealmsAI.ai.buildOneOnOneFacilitatorPrompt
 import com.example.RealmsAI.ai.buildSandboxAiPrompt
 import com.example.RealmsAI.ai.buildSandboxFacilitatorPrompt
+import com.example.RealmsAI.network.ModelClient
 import com.google.firebase.auth.FirebaseAuth
-import com.google.gson.Gson
-import kotlinx.coroutines.Dispatchers
+import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import kotlinx.coroutines.suspendCancellableCoroutine
 import okhttp3.OkHttpClient
-import okhttp3.RequestBody.Companion.toRequestBody
-import okhttp3.Request
 import okhttp3.logging.HttpLoggingInterceptor
 import org.json.JSONArray
 import org.json.JSONObject
+import kotlin.coroutines.resumeWithException
+import com.example.RealmsAI.models.CharacterProfile
+import com.example.RealmsAI.models.ChatMessage
+import com.example.RealmsAI.models.ChatMode
+import kotlinx.coroutines.Dispatchers
+
 
 class MainActivity : AppCompatActivity() {
     companion object {
@@ -149,55 +152,68 @@ class MainActivity : AppCompatActivity() {
         }
         chatRecycler.adapter = chatAdapter
 
-        // Firestore session + message listener
+        // 1) First get or create the session
         SessionManager.getOrCreateSessionFor(
+
             chatId,
             onResult = { sid ->
                 sessionId = sid
 
-                parser = AIResponseParser(
-                    chatAdapter  = chatAdapter,
-                    chatRecycler = chatRecycler,
+                // 2) In MainActivity, inside your SessionManager.getOrCreateSessionFor(onResult=…) block:
+                lifecycleScope.launch(Dispatchers.Main) {
+                    // a) Once, load whole history:
+                    SessionManager.loadHistory(chatId, sessionId,
+                        onResult = { history ->
+                            chatAdapter.clearMessages()
+                            history.forEach { chatAdapter.addMessage(it) }
+                            chatRecycler.scrollToPosition(history.lastIndex)
+                        },
+                        onError = { e -> Log.e(TAG,"history load failed",e) }
+                    )
 
-
-
-                    // 1) updateAvatar: (speakerId, emotion) -> Unit
-                    updateAvatar = { slot, _emotion ->
-                        if (slot == "N0") return@AIResponseParser
-                        val idx = slot.removePrefix("B").toIntOrNull()?.minus(1) ?: return@AIResponseParser
-                        if (idx in avatarViews.indices) {
-                            avatarViews[idx].setImageURI(Uri.parse(charAvatarUris[idx]))
-                        }
-                    },
-
-                    // 2) loadName: (speakerId) -> String
-                    loadName = { slot ->
-                        if (slot == "N0") {
-                            "Narrator"
-                        } else {
-                            val idx = slot.removePrefix("B").toIntOrNull()?.minus(1) ?: return@AIResponseParser slot
-                            charNames.getOrNull(idx) ?: slot
-                        }
-                    },
-
-                    // 3) pass chatId & sessionId into the parser so it can Persist turns
-                    chatId    = chatId,
-                    sessionId = sessionId
-                )
-
-                SessionManager.listenMessages(chatId, sessionId) { fullHistory ->
-                    runOnUiThread {
-                        // 1) Clear out the adapter’s old list
-                        chatAdapter.clearMessages()
-                        // 2) Re-populate with every message
-                        fullHistory.forEach { chatAdapter.addMessage(it) }
-                        // 3) Scroll to the latest
-                        chatRecycler.scrollToPosition(fullHistory.size - 1)
+                    // b) Then start listening for _new_ messages one‐by‐one:
+                    SessionManager.listenMessages(chatId, sessionId) { msg ->
+                        chatAdapter.addMessage(msg)
+                        chatRecycler.smoothScrollToPosition(chatAdapter.itemCount - 1)
                     }
-                }
 
+                    // 3) Pull your character IDs from the profile JSON
+                    val charIds = JSONObject(fullProfilesJson)
+                        .optJSONArray("characterIds") ?: JSONArray()
+
+                    // prepare the lookup-tables
+                    val slotToName   = mutableMapOf("N0" to "Narrator")
+                    val slotToAvatar = mutableMapOf<String,String>()
+
+                    // iterate by index, not forEachIndexed
+                    for (i in 0 until charIds.length()) {
+                        val slot   = "B${i + 1}"
+                        val charId = charIds.getString(i)
+
+                        // suspend call is now legal inside this coroutine
+                        val profile = fetchCharacterProfile(charId)
+                        slotToName[slot]   = profile.name
+                        slotToAvatar[slot] = profile.avatarUri ?: ""
+                    }
+
+                    // 5) Now that you have your look-ups, you can build your parser
+                    parser = AIResponseParser(
+                        chatAdapter  = chatAdapter,
+                        chatRecycler = chatRecycler,
+                        updateAvatar = { slot, emotion ->
+                            // example: look up uri & set on the matching ImageView
+                            val uri = slotToAvatar[slot]
+                            val iv  = if (slot=="B1") avatarViews[0] else avatarViews[1]
+                            if (!uri.isNullOrEmpty()) iv.setImageURI(Uri.parse(uri))
+                        },
+                        loadName = { slot -> slotToName[slot] ?: slot },
+                        chatId    = chatId,
+                        sessionId = sessionId,
+                        chatMode  = chatMode
+                    )
+                }
             },
-            onError = { e -> Log.e(TAG, "Session error", e) }
+            onError = { e -> Log.e(TAG,"session setup failed",e) }
         )
 
 
@@ -221,55 +237,160 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun sendToAI(userInput: String) = lifecycleScope.launch {
-        // 1) Build common history
+        Log.d(TAG, "sendToAI() called with input: $userInput")
+        // 1) Build common history string
         val historyStr = chatAdapter.getMessages()
             .joinToString("\n") { "${it.sender}: ${it.messageText}" }
+        // if you have N characters in this chat profile, slots are B1..BN:
+        val charArr = JSONObject(fullProfilesJson)
+            .optJSONArray("characterIds") ?: JSONArray()
+        val defaultSlots = (1..charArr.length())
+            .map { idx -> "B$idx" }
 
         when (chatMode) {
             ChatMode.ONE_ON_ONE -> {
-                // — load your single CharacterProfile —
+                // ---- Fetch the single character profile from Firestore ----
                 val charId = JSONObject(fullProfilesJson)
                     .optJSONArray("characterIds")
-                    ?.getString(0).orEmpty()
-                val charJson = prefs.getString(charId, "")!!
-                val character = Gson().fromJson(charJson, CharacterProfile::class.java)
+                    ?.getString(0)
+                    .orEmpty()
 
-                // — 2a) Facilitator step (optional for one-on-one) —
+                val character = fetchCharacterProfile(charId)  // suspend helper
+
+                // ---- 2a) Lightweight facilitator step ----
                 val oneFacPrompt = buildOneOnOneFacilitatorPrompt(
-                    userInput, historyStr, facilitatorNotes, character
+                    userInput        = userInput,
+                    history          = historyStr,
+                    facilitatorState = facilitatorNotes,
+                    character        = character
                 )
-                val facRespJson = callModel(oneFacPrompt)
-                facilitatorNotes = facRespJson.optString("notes", "")
 
-                // — 2b) AI step —
-                val oneAiPrompt = buildOneOnOneAiPrompt(
-                    userInput, historyStr, facilitatorNotes, character
+                Log.d(TAG, "One-on-One FAC prompt:\n$oneFacPrompt")
+                val facJson = ModelClient.callModel(
+                    promptJson     = oneFacPrompt,
+                    forFacilitator = true,
+                    openAiKey      = BuildConfig.OPENAI_API_KEY,
+                    mixtralKey     = BuildConfig.MIXTRAL_API_KEY
                 )
-                val aiRaw = callModel(oneAiPrompt)
-                parser.handle(aiRaw)
+                Log.d(TAG, "Facilitator response JSON: $facJson")
+                facilitatorNotes = facJson.optString("notes", "")
+
+                // ---- 2b) Character response step ----
+                val oneAiPrompt = buildOneOnOneAiPrompt(
+                    userInput        = userInput,
+                    history          = historyStr,
+                    facilitatorNotes = facilitatorNotes,
+                    character        = character
+                )
+                Log.d(TAG, "One-on-One AI prompt:\n$oneAiPrompt")
+                // 1) Build the Mixtral chat-completion JSON
+                val chatPayload = JSONObject().apply {
+                    put("model", "mistralai/mixtral-8x7b-instruct")
+                    put("messages", JSONArray().put(
+                        JSONObject()
+                            .put("role",    "system")
+                            .put("content", oneAiPrompt)
+                    ))
+                    put("max_tokens", 300)
+                }.toString()
+                Log.d(TAG, "One-on-One payload JSON:\n$chatPayload")
+
+                // 2) Send that JSON to the Mixtral path
+                val aiJson = ModelClient.callModel(
+                    promptJson     = chatPayload,
+                    forFacilitator = false,
+                    openAiKey      = BuildConfig.OPENAI_API_KEY,
+                    mixtralKey     = BuildConfig.MIXTRAL_API_KEY
+                )
+                Log.d(TAG, "AI raw JSON: $aiJson")
+                // Extract the assistant “content” and hand off to your parser
+                val rawContent = aiJson
+                    .optJSONArray("choices")
+                    ?.optJSONObject(0)
+                    ?.optJSONObject("message")
+                    ?.optString("content")
+                    .orEmpty()
+                Log.d(TAG, "Parsed rawContent: $rawContent")
+
+                if (chatMode == ChatMode.ONE_ON_ONE) {
+                    parser.handleOneOnOne(rawContent)
+                } else {
+                    parser.handle(rawContent)  // your existing group/sandbox handler
+                }
+
             }
 
             else -> {
-                // — SANDBOX / GROUP FLOW —
-                // 2a) Facilitator
-                val facPrompt = buildSandboxFacilitatorPrompt(
-                    userInput, historyStr, summariesJson, facilitatorNotes, finalActiveBots
-                )
-                val facJson = callModel(facPrompt)
-                facilitatorNotes = facJson.optString("notes","")
-                finalActiveBots  = facJson
-                    .optJSONArray("activeBots")?.let { ... } ?: finalActiveBots
+                // ---- Sandbox flow ----
 
-                // 2b) AI
-                val activeProfilesJson = buildActiveProfilesJson(finalActiveBots)
-                val aiPrompt = buildSandboxAiPrompt(
-                    userInput, historyStr,
-                    activeProfilesJson, summariesJson,
-                    facilitatorNotes, chatDescription,
-                    finalActiveBots
+                // 2a) Facilitator round
+                val sandboxFac = buildSandboxFacilitatorPrompt(
+                    userInput        = userInput,
+                    history          = historyStr,
+                    summariesJson    = summariesJson,
+                    facilitatorState = facilitatorNotes,
+                    availableSlots   = defaultSlots
                 )
-                val aiRaw = callModel(aiPrompt)
-                parser.handle(aiRaw)
+                val facJson = ModelClient.callModel(
+                    promptJson     = sandboxFac,
+                    forFacilitator = true,
+                    openAiKey      = BuildConfig.OPENAI_API_KEY,
+                    mixtralKey     = BuildConfig.MIXTRAL_API_KEY
+                )
+                Log.d(TAG, "Facilitator response JSON: $facJson")
+                facilitatorNotes = facJson.optString("notes","")
+
+                // parse out “activeBots”, falling back to defaultSlots if missing
+                val activeBots = facJson
+                    .optJSONArray("activeBots")
+                    ?.let { arr ->
+                        (0 until arr.length())
+                            .mapNotNull { i -> arr.optString(i).takeIf(String::isNotBlank) }
+                    }
+                    ?: defaultSlots
+
+
+                // 2b) AI chat round
+                val activeProfilesJson = JSONArray(activeBots).toString()
+
+                val sandboxAi = buildSandboxAiPrompt(
+                    userInput          = userInput,
+                    history            = historyStr,
+                    activeProfilesJson = activeProfilesJson,
+                    summariesJson      = summariesJson,
+                    facilitatorNotes   = facilitatorNotes,
+                    chatDescription    = chatDescription,
+                    availableSlots     = activeBots
+                )
+
+                val sandboxPayload = JSONObject().apply {
+                    put("model", "mistralai/mixtral-8x7b-instruct")
+                    put("messages", JSONArray().put(
+                        JSONObject()
+                            .put("role",    "system")
+                            .put("content", sandboxAi)
+                    ))
+                    put("max_tokens", 300)
+                }.toString()
+
+                val aiJson = ModelClient.callModel(
+                    promptJson     = sandboxPayload,
+                    forFacilitator = false,
+                    openAiKey      = BuildConfig.OPENAI_API_KEY,
+                    mixtralKey     = BuildConfig.MIXTRAL_API_KEY
+                )
+
+
+                Log.d(TAG, "AI raw JSON: $aiJson")
+                val rawContent = aiJson
+                    .optJSONArray("choices")
+                    ?.optJSONObject(0)
+                    ?.optJSONObject("message")
+                    ?.optString("content")
+                    .orEmpty()
+                Log.d(TAG, "Parsed rawContent: $rawContent")
+
+                parser.handle(rawContent)
             }
         }
     }
@@ -285,3 +406,25 @@ class MainActivity : AppCompatActivity() {
         else -> super.onOptionsItemSelected(item)
     }
 }
+/**
+ * Fetches a CharacterProfile document from Firestore by its ID.
+ * Call this from within a coroutine (e.g. in sendToAI).
+ */
+private suspend fun fetchCharacterProfile(charId: String): CharacterProfile =
+    suspendCancellableCoroutine { cont ->
+        FirebaseFirestore
+            .getInstance()
+            .collection("characters")
+            .document(charId)
+            .get()
+            .addOnSuccessListener { doc ->
+                val profile = doc.toObject(CharacterProfile::class.java)
+                if (profile != null) cont.resume(profile,onCancellation = null)
+                else              cont.resumeWithException(
+                    RuntimeException("Character $charId not found")
+                )
+            }
+            .addOnFailureListener { e ->
+                cont.resumeWithException(e)
+            }
+    }

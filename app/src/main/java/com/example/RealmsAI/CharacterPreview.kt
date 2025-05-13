@@ -6,5 +6,5 @@ data class CharacterPreview(
     val summary: String,
     val avatarUri: String?,
     val avatarResId: Int,
-    val author: String
+    val author: String,
 )

@@ -24,11 +24,11 @@
         <activity android:name=".ProfileActivity"/>
         <activity android:name=".CreationHubActivity"/>
         <activity android:name=".CharacterCreationActivity" />
-        <activity android:name=".ChatListActivity" />
         <activity android:name=".ChatCreationActivity"/>
         <activity android:name=".CharacterSelectionActivity"/>
         <activity android:name=".CreatedListActivity"/>
         <activity android:name=".ChatHubActivity"/>
+        <activity android:name=".WardrobeActivity"/>
     </application>
     <uses-permission android:name="android.permission.INTERNET"/>
 </manifest>

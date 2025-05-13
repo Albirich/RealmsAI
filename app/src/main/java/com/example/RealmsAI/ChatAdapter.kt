@@ -1,7 +1,6 @@
 package com.example.RealmsAI
 
 import android.app.AlertDialog
-import android.graphics.drawable.GradientDrawable
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -9,6 +8,7 @@ import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
+import com.example.RealmsAI.models.ChatMessage
 
 class ChatAdapter(
     private val messages: MutableList<ChatMessage>,

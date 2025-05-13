@@ -13,6 +13,9 @@ import androidx.activity.result.contract.ActivityResultContracts.StartActivityFo
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.example.RealmsAI.models.ChatMode
+import com.example.RealmsAI.models.ChatProfile
+import com.google.firebase.Timestamp
 import com.google.gson.Gson
 import org.json.JSONObject
 import com.google.firebase.firestore.FieldValue
@@ -158,6 +161,7 @@ class ChatCreationActivity : AppCompatActivity() {
         fun saveAndLaunchChat() {
             // 6.1) Read all your inputs
             val chatId = System.currentTimeMillis().toString()
+            val now = Timestamp.now()
             val title = titleEt.text.toString().trim().takeIf { it.isNotEmpty() } ?: run {
                 titleEt.error = "Required"; return
             }
@@ -191,13 +195,13 @@ class ChatCreationActivity : AppCompatActivity() {
                 description = desc,
                 tags = tags,
                 mode = mode,
-                backgroundUri   = bgUriString,
+                backgroundUri = bgUriString,
                 backgroundResId = bgResId,
                 sfwOnly = sfwOnly,
                 characterIds = chars,
                 rating = 0f,
-                timestamp = System.currentTimeMillis(),
-                author = getSharedPreferences("user", Context.MODE_PRIVATE)
+                timestamp = now,
+                author = getSharedPreferences("user", MODE_PRIVATE)
                     .getString("userId", "")!!
             )
 

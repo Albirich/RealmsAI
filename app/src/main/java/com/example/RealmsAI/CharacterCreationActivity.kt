@@ -13,26 +13,39 @@ import androidx.activity.result.contract.ActivityResultContracts.GetContent
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import com.example.RealmsAI.CharacterProfile
+import com.example.RealmsAI.models.CharacterProfile
+import com.example.RealmsAI.models.ChatMode
+import com.example.RealmsAI.models.ChatProfile
+import com.example.RealmsAI.models.Outfit
 import com.google.android.material.button.MaterialButton
+import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.gson.Gson
 
+data class CharacterDraft(
+    val name: String,
+    val summary: String,
+    val avatarUri: String?,
+    val poseUris: List<String?>,
+    val backgroundUri: String?,
+    val backgroundResId: Int?
+)
+
 class CharacterCreationActivity : AppCompatActivity() {
     private var avatarUri: Uri?        = null
     private var selectedBgUri: Uri?    = null
     private var selectedBgResId: Int?  = null
-
+    private val WARDROBE_REQUEST = 42
     private lateinit var avatarPicker: ActivityResultLauncher<String>
     private val poseKeys = listOf("happy","sad","angry","surprised","flirty","thinking")
     private val poseSlots = poseKeys.map { PoseSlot(it) }.toMutableList()
-    private var currentPoseIndex = 0
-    private lateinit var posePicker: ActivityResultLauncher<String>
 
+    private lateinit var avatarView: ImageView
     private lateinit var bgPicker:     ActivityResultLauncher<String>
     private lateinit var bgRecycler:   RecyclerView
+    private lateinit var bgButton: ImageButton
 
     // reuse your ChatCreation presets:
     private val presetBackgrounds = listOf(
@@ -55,24 +68,38 @@ class CharacterCreationActivity : AppCompatActivity() {
             }
         }
         avatarView.setOnClickListener { avatarPicker.launch("image/*") }
-        // Pose‐slot gallery picker:
-        posePicker = registerForActivityResult(GetContent()) { uri: Uri? ->
-            uri?.also {
-                poseSlots[currentPoseIndex].uri = it
-                // notify only that one item changed
-                (findViewById<RecyclerView>(R.id.poseRecycler).adapter as PoseAdapter)
-                    .notifyItemChanged(currentPoseIndex)
+        val wardrobeBtn = findViewById<MaterialButton>(R.id.wardrobeButton)
+        wardrobeBtn.setOnClickListener {
+            // 1) Gather your current draft
+            val name    = findViewById<EditText>(R.id.characterNameInput).text.toString().trim()
+            val summary = findViewById<EditText>(R.id.etSummary).text.toString().trim()
+            val avatar  = avatarUri?.toString()
+            val poses   = poseSlots.map { it.uri?.toString() }
+            val bgUri   = selectedBgUri?.toString()
+            val bgRes   = selectedBgResId
+
+            val draft = CharacterDraft(name, summary, avatar, poses, bgUri, bgRes)
+            val draftJson = Gson().toJson(draft)
+
+            // 2) Save it temporarily
+            getSharedPreferences("char_drafts", MODE_PRIVATE)
+                .edit()
+                .putString("current_draft", draftJson)
+                .apply()
+
+            // 3) Launch wardrobe screen
+            Intent(this, WardrobeActivity::class.java).also { intent ->
+                intent.putExtra("DRAFT_JSON", draftJson)
+                startActivityForResult(intent, WARDROBE_REQUEST)
             }
         }
 
-// RecyclerView for your poses:
-        val poseRecycler = findViewById<RecyclerView>(R.id.poseRecycler)
-        poseRecycler.layoutManager =
-            LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
-        poseRecycler.adapter = PoseAdapter(poseSlots) { slotIndex ->
-            currentPoseIndex = slotIndex
-            posePicker.launch("image/*")
-        }
+        findViewById<MaterialButton>(R.id.wardrobeButton)
+            .setOnClickListener {
+                val intent = Intent(this, WardrobeActivity::class.java)
+                startActivityForResult(intent, WARDROBE_REQUEST)
+            }
+
 
         // 2) Background picker button
         val bgButton = findViewById<ImageButton>(R.id.backgroundButton)
@@ -129,6 +156,7 @@ class CharacterCreationActivity : AppCompatActivity() {
 
     private fun createCharacterAndLaunchChat(name: String, bio: String) {
         val charId = System.currentTimeMillis().toString()
+        val now = Timestamp.now()
         // 1) Build Firestore CharacterProfile
         val charProfile = CharacterProfile(
             id           = charId,
@@ -157,18 +185,18 @@ class CharacterCreationActivity : AppCompatActivity() {
                 // 2) Immediately create a one-on-one ChatProfile
                 val chatId = System.currentTimeMillis().toString()
                 val chatProfile = ChatProfile(
-                    id             = chatId,
-                    title          = name,
-                    description    = bio,
-                    tags           = emptyList(),
-                    mode           = ChatMode.ONE_ON_ONE,
-                    backgroundUri  = charProfile.background,
-                    backgroundResId= selectedBgResId,
-                    sfwOnly        = true,
-                    characterIds   = listOf(charId),
-                    rating         = 0f,
-                    timestamp      = System.currentTimeMillis(),
-                    author         = FirebaseAuth.getInstance().currentUser!!.uid
+                    id = chatId,
+                    title = name,
+                    description = bio,
+                    tags = emptyList(),
+                    mode = ChatMode.ONE_ON_ONE,
+                    backgroundUri = charProfile.background,
+                    backgroundResId = selectedBgResId,
+                    sfwOnly = true,
+                    characterIds = listOf(charId),
+                    rating = 0f,
+                    timestamp = now,
+                    author = FirebaseAuth.getInstance().currentUser!!.uid
                 )
                 // write chat doc
                 val chatData = mapOf(
@@ -208,6 +236,39 @@ class CharacterCreationActivity : AppCompatActivity() {
             .addOnFailureListener { e ->
                 toast("Failed to save character")
             }
+    }
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+
+        if (requestCode == WARDROBE_REQUEST && resultCode == RESULT_OK) {
+            // 1) Pull back the possibly-modified draft
+            val returnedJson = data?.getStringExtra("DRAFT_JSON")
+                ?: getSharedPreferences("char_drafts", MODE_PRIVATE)
+                    .getString("current_draft", null)
+
+            returnedJson?.let {
+                val draft = Gson().fromJson(it, CharacterDraft::class.java)
+
+                // 2) Rehydrate your form:
+                findViewById<EditText>(R.id.characterNameInput).setText(draft.name)
+                findViewById<EditText>(R.id.etSummary).setText(draft.summary)
+                draft.avatarUri?.let { uri -> avatarView.setImageURI(Uri.parse(uri)) }
+                draft.poseUris.forEachIndexed { idx, uriStr ->
+                    uriStr?.let {
+                        poseSlots[idx].uri = Uri.parse(it)
+                    }
+                }
+                draft.backgroundUri?.let {
+                    bgButton.setImageURI(Uri.parse(it))
+                    selectedBgUri = Uri.parse(it)
+                    selectedBgResId = null
+                } ?: draft.backgroundResId?.let {
+                    bgButton.setImageResource(it)
+                    selectedBgResId = it
+                    selectedBgUri = null
+                }
+            }
+        }
     }
 
     private fun toast(msg: String) {

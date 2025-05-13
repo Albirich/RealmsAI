@@ -75,12 +75,13 @@
 
 
         <!-- Images -->
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/poseRecycler"
-            android:layout_width="match_parent"
+        <TextView
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:paddingTop="16dp"
-            app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"/>
+            android:layout_marginTop="12dp"
+            android:text="Avatar"
+            android:layout_gravity="center_horizontal"
+            android:textStyle="bold" />
 
         <ImageView
             android:id="@+id/avatarImageView"
@@ -91,6 +92,14 @@
             android:src="@drawable/placeholder_avatar"
             android:contentDescription="@string/avatar"
             android:scaleType="centerCrop"/>
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/wardrobeButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="Wardrobe" />
+
         <!-- Background Selector -->
         <TextView
             android:layout_width="wrap_content"

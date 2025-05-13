@@ -1,6 +1,6 @@
 package com.example.RealmsAI
 
-import android.util.Log
+import com.example.RealmsAI.models.ChatMessage
 import com.google.firebase.firestore.DocumentChange
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FieldValue
@@ -54,30 +54,22 @@ object SessionManager {
     fun listenMessages(
         chatId: String,
         sessionId: String,
-        onNewList: (List<ChatMessage>) -> Unit
+        onNew: (ChatMessage) -> Unit
     ): ListenerRegistration {
-        val msgsRef = db
-            .collection("chats").document(chatId)
+        val collRef = db.collection("chats").document(chatId)
             .collection("sessions").document(sessionId)
             .collection("messages")
-
-        Log.d("SessionManager", "➡️ Listening on path: ${msgsRef.path}")
-
-        // Build ordered query
-        val query = msgsRef.orderBy("timestamp", Query.Direction.ASCENDING)
-
-        // Single snapshot listener that gives the full contents each time
-        return query.addSnapshotListener { snap, err ->
-            if (err != null || snap == null) {
-                Log.e("SessionManager", "Listen failed on ${msgsRef.path}", err)
-                return@addSnapshotListener
+        return collRef
+            .orderBy("timestamp", Query.Direction.ASCENDING)
+            .addSnapshotListener { snap, err ->
+                if (snap == null || err != null) return@addSnapshotListener
+                snap.documentChanges
+                    .filter { it.type == DocumentChange.Type.ADDED }
+                    .forEach { dc ->
+                        val msg = dc.document.toObject(ChatMessage::class.java)
+                        onNew(msg)
+                    }
             }
-            // Map docs → ChatMessage
-            val allMsgs = snap.documents
-                .mapNotNull { it.toObject(ChatMessage::class.java) }
-            // Callback with the complete list
-            onNewList(allMsgs)
-        }
     }
 
 
@@ -99,4 +91,25 @@ object SessionManager {
                 "timestamp" to FieldValue.serverTimestamp()
             ))
     }
+
+    // In SessionManager.kt
+    fun loadHistory(
+        chatId: String,
+        sessionId: String,
+        onResult: (List<ChatMessage>) -> Unit,
+        onError: (Exception) -> Unit = {}
+    ) {
+        db.collection("chats").document(chatId)
+            .collection("sessions").document(sessionId)
+            .collection("messages")
+            .orderBy("timestamp", Query.Direction.ASCENDING)
+            .get()
+            .addOnSuccessListener { snap ->
+                val all = snap.documents
+                    .mapNotNull { it.toObject(ChatMessage::class.java) }
+                onResult(all)
+            }
+            .addOnFailureListener(onError)
+    }
+
 }

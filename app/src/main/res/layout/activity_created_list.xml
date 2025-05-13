@@ -12,24 +12,31 @@
     <!-- Filter dropdown at the top -->
     <Spinner
         android:id="@+id/filterSpinner"
-        android:layout_width="0dp"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        app:layout_constraintTop_toTopOf="parent"
+        android:prompt="@string/filter_prompt"
+        android:paddingTop="20dp"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        android:clipToPadding="false"/>
+        app:layout_constraintTop_toTopOf="parent"/>
 
-    <!-- Only one RecyclerView here! -->
+    <!-- Your two RecyclerViews: -->
     <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/createdRecycler"
-        android:layout_width="0dp"
+        android:id="@+id/recyclerChats"
+        android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:paddingBottom="8dp"
-        app:layout_constraintTop_toBottomOf="@id/filterSpinner"
-        app:layout_constraintBottom_toTopOf="@id/bottomNavBar"
+        android:layout_weight="1"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        android:clipToPadding="false"/>
+        app:layout_constraintTop_toBottomOf="@id/filterSpinner"/>
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/recyclerCharacters"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/filterSpinner"/>
 
     <!-- bottom nav -->
     <include

@@ -1,6 +1,6 @@
 package com.example.RealmsAI.ai
 
-import com.example.RealmsAI.CharacterProfile
+import com.example.RealmsAI.models.CharacterProfile
 import org.json.JSONArray
 
 // --- SANDBOX / GROUP MODES ---
@@ -65,6 +65,15 @@ Where <slot>∈${availableSlots}, <pose>∈{happy,sad,…}, <speed>∈{0,1,2}.
 No extra text outside bracketed lines.
 """.trimIndent()
 
+
+
+
+
+
+
+
+
+
 // --- ONE-ON-ONE MODE ---
 
 fun buildOneOnOneFacilitatorPrompt(
@@ -113,10 +122,10 @@ Roles:
   • Character ${character.name} (B1)
 
 FORMAT:
-[N0,<pose>,<speed>] Narration  
-[B1,<pose>,<speed>] Dialogue (only words—no name)
+[N0,<pose>] Narration  
+[B1,<pose>] Dialogue (only words—no name)
 
-Where <pose>∈{happy,sad,…}, <speed>∈{0,1,2}.  
+Where <pose>∈("happy","sad","angry","surprised","flirty", or "thinking").  
 No text outside bracketed lines.  
 Keep under $maxTokens tokens.
 """.trimIndent()

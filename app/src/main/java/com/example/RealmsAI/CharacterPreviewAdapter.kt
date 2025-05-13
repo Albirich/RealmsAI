@@ -59,7 +59,7 @@ class CharacterPreviewAdapter(
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
         val v = LayoutInflater.from(parent.context)
-            .inflate(R.layout.item_character_preview, parent, false)
+            .inflate(R.layout.character_preview_item, parent, false)
         return VH(v)
     }
 

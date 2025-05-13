@@ -1,5 +1,8 @@
 package com.example.RealmsAI
 
+import com.example.RealmsAI.models.ChatMode
+import com.example.RealmsAI.models.ChatProfile
+
 data class ChatPreview(
     val id: String,
     val title: String,
@@ -14,5 +17,6 @@ data class ChatPreview(
     val author: String = "",
     val tags: List<String> = emptyList(),      // ← Add this
     val sfwOnly: Boolean = true,
-    val chatProfile: ChatProfile? = null
+    val chatProfile: ChatProfile? = null,
+    val rawJson: String
 )
