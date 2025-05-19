@@ -1,6 +1,7 @@
 package com.example.RealmsAI.models
 
 import com.google.gson.annotations.SerializedName
+import com.google.firebase.Timestamp
 
 data class CharacterProfile(
     val id                 : String              = "",
@@ -14,9 +15,15 @@ data class CharacterProfile(
     @SerializedName("avatarUri")
     val avatarUri          : String?             = null,
     val background         : String              = "",
-    val additionalInfo     : String              = "",
     val summary            : String?             = null,
-    val createdAt          : Long                = 0L
+    val outfits            : List<Outfit>      = emptyList(),
+    val currentOutfit      : String           = "",
+    val createdAt          : Timestamp? = null,
+    // Add these:
+    val age: String = "",
+    val height: Double? = null,
+    val weight: String = "",
+    val eyeColor: String = "",
+    val hairColor: String = ""
 )
-
 

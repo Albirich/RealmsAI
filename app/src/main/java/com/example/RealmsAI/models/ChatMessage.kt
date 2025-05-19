@@ -1,7 +1,10 @@
 package com.example.RealmsAI.models
 
+import com.google.firebase.Timestamp
+
 data class ChatMessage(
+    val id: String = "",
     val sender: String = "",
-    var messageText: String = "",
-    val timeStamp: Long = System.currentTimeMillis()
+    val messageText: String = "",
+    val timestamp: Timestamp? = null
 )

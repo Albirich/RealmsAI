@@ -16,10 +16,9 @@
     <string name="avatar">Avatar</string>
     <string name="filter_prompt">Show:</string>
     <string-array name="filter_options">
-        <item>All</item>
         <item>Chats</item>
         <item>Characters</item>
+        <item>Personas</item>
     </string-array>
-
 </resources>
 

@@ -7,4 +7,5 @@ data class CharacterPreview(
     val avatarUri: String?,
     val avatarResId: Int,
     val author: String,
+    val rawJson: String
 )

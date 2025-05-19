@@ -1,0 +1,148 @@
+<androidx.constraintlayout.widget.ConstraintLayout android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+       <FrameLayout android:id="@+id/cropperRoot"
+       android:layout_width="match_parent"
+       android:layout_height="match_parent"
+       android:background="#99dbe7"
+       xmlns:android="http://schemas.android.com/apk/res/android"
+       xmlns:app="http://schemas.android.com/apk/res-auto">
+
+           <!-- 1. Chat UI mockup as background -->
+    <ImageView
+              android:id="@+id/mockupBackground"
+              android:layout_width="match_parent"
+              android:layout_height="match_parent"
+              android:scaleType="fitXY"
+              android:src="@drawable/bg_cropper" />
+
+    <!-- 2. User image on top, movable/croppable -->
+    <ImageView
+        android:id="@+id/userImage"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="matrix"
+        android:background="#33000000"/>
+
+    <!-- 3. Height guidelines overlay (custom view, if you want lines/labels) -->
+    <com.example.RealmsAI.views.GuidelinesView
+             android:id="@+id/guidelinesOverlay"
+             android:layout_width="match_parent"
+             android:layout_height="match_parent"
+             android:clickable="false"
+             android:focusable="false" />
+      </FrameLayout>
+
+
+    <!-- 4. Done button -->
+    <Button
+        android:id="@+id/saveCropButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Done"
+        android:layout_gravity="bottom|end"
+        app:layout_constraintTop_toBottomOf="@id/horizontalGuide8ft"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_margin="24dp"/>
+
+
+    <!-- 5. Fake messagebox -->
+    <!-- Chat input row -->
+     <LinearLayout
+          android:id="@+id/messagearea"
+          android:layout_width="match_parent"
+          android:layout_height="48dp"
+          app:layout_constraintBottom_toBottomOf="parent"
+          android:orientation="horizontal"
+          android:background="#FFAAAAAA"
+          android:layout_marginHorizontal="16dp"
+          android:layout_marginBottom="17dp">
+          <!-- EditText for typing messages -->
+      <EditText
+         android:id="@+id/messageEditText"
+         android:layout_width="match_parent"
+         android:layout_height="match_parent"
+         android:layout_weight="1"
+         android:hint="@string/text_prompt"/>
+     <!-- Send Button -->
+      <Button
+           android:id="@+id/sendButton"
+           android:layout_width="wrap_content"
+           android:layout_height="wrap_content"
+           android:text="Send"/>
+   </LinearLayout>
+
+   <LinearLayout
+        android:id="@+id/mockChatOverlay"
+        android:layout_width="match_parent"
+        android:layout_height="150dp"
+        android:layout_gravity="bottom"
+        android:orientation="vertical"
+        app:layout_constraintBottom_toTopOf="@id/messagearea"
+        android:background="#DA222222"
+        android:layout_marginHorizontal="16dp">
+    </LinearLayout>
+
+ <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="100dp"
+        android:layout_gravity="top"
+        app:layout_constraintBottom_toTopOf="@id/mockChatOverlay"
+        android:background="@drawable/fade_top"
+        android:layout_marginHorizontal="16dp" >
+        <!-- Mock message area (could be replaced with actual RecyclerView) -->
+       <TextView
+           android:id="@+id/mockMessage"
+           android:layout_width="match_parent"
+           android:layout_height="50dp"
+           android:layout_weight="1"
+           android:text="Messages will appear here"
+           android:textSize="18sp"
+           android:textColor="#EEEEEE"
+           android:layout_marginBottom="50dp"
+           app:layout_constraintBottom_toBottomOf="parent"
+           android:background="@android:color/transparent" />
+   </LinearLayout>
+
+
+   <!-- 6. guides -->
+    <androidx.constraintlayout.widget.Guideline
+        android:id="@+id/verticalGuide33"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        app:layout_constraintGuide_percent="0.33" />
+
+    <androidx.constraintlayout.widget.Guideline
+        android:id="@+id/horizontalGuide8ft"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        app:layout_constraintGuide_percent="0.15" />
+
+    <!-- Shaded: left 33% (cropped out) -->
+    <View
+        android:id="@+id/leftCutoff"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:background="#AAFF0000"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toStartOf="@id/verticalGuide33"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"/>
+
+    <!-- Shaded: top 22% (cropped out) -->
+    <View
+        android:id="@+id/topCutoff"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:background="#AAFF0000"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toEndOf="@id/verticalGuide33"
+        app:layout_constraintBottom_toTopOf="@id/horizontalGuide8ft"/>
+
+
+ </androidx.constraintlayout.widget.ConstraintLayout>

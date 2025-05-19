@@ -118,6 +118,7 @@ dependencies {
     implementation("com.google.firebase:firebase-analytics-ktx")
     implementation("com.google.firebase:firebase-auth-ktx")
     implementation("com.google.firebase:firebase-firestore-ktx:24.7.1")
+    implementation("com.google.firebase:firebase-storage-ktx:20.2.0")
 
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.1")
@@ -134,6 +135,8 @@ dependencies {
 
     // Material 3
     implementation("androidx.compose.material3:material3")
+    implementation("com.github.chrisbanes:PhotoView:2.3.0")
+
 
     // Tooling for @Preview etc
     debugImplementation("androidx.compose.ui:ui-tooling")

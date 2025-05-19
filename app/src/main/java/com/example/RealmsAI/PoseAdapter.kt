@@ -27,17 +27,24 @@ class PoseAdapter(
 
     override fun onBindViewHolder(holder: VH, position: Int) {
         val slot = slots[position]
-        // show picked URI or placeholder
+
+        // 1) Show picked image or placeholder
         if (slot.uri != null) {
             holder.img.setImageURI(slot.uri)
         } else {
             holder.img.setImageResource(R.drawable.placeholder_avatar)
         }
-        // label = capitalized key
-        holder.label.text = slot.key.replaceFirstChar { it.uppercaseChar() }
 
-        holder.img.setOnClickListener {
-            onPick(position)
+        // 2) Compute a nice capitalized label (and make sure it shows)
+        val rawKey = slot.key.replace('_',' ').replace('-', ' ')
+        val labelText = rawKey.replaceFirstChar {
+            it.titlecase(java.util.Locale.getDefault())
         }
+        holder.label.text = labelText
+        holder.label.visibility = View.VISIBLE
+
+        // 3) Wire up the click
+        holder.img.setOnClickListener { onPick(position) }
     }
+
 }

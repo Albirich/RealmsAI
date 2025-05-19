@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#6ba7c7"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="18dp">
+
+        <!-- Persona Name -->
+        <EditText
+            android:id="@+id/personaNameInput"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Enter persona name"
+            android:background="@android:color/transparent"
+            android:textSize="16sp"
+            android:paddingBottom="8dp"/>
+
+        <!-- Age, Gender, Height (side by side) -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:paddingBottom="8dp">
+
+            <EditText
+                android:id="@+id/personaAgeInput"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:hint="Age"
+                android:background="@android:color/transparent"
+                android:inputType="number" />
+
+            <EditText
+                android:id="@+id/personaGenderInput"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:hint="Gender"
+                android:background="@android:color/transparent" />
+
+            <EditText
+                android:id="@+id/personaHeightInput"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:hint="Height"
+                android:background="@android:color/transparent" />
+        </LinearLayout>
+
+        <!-- Hair & Eyes (side by side) -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:paddingBottom="8dp">
+
+            <EditText
+                android:id="@+id/personaHairInput"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:hint="Hair"
+                android:background="@android:color/transparent" />
+
+            <EditText
+                android:id="@+id/personaEyesInput"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:hint="Eyes"
+                android:background="@android:color/transparent" />
+        </LinearLayout>
+
+        <!-- Physical Description -->
+        <EditText
+            android:id="@+id/personaDescriptionInput"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Physical Description"
+            android:background="@android:color/transparent"
+            android:minLines="3"
+            android:maxLines="8"
+            android:textSize="15sp"
+            android:paddingBottom="10dp" />
+
+        <!-- Avatar Picker -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Avatar"
+            android:layout_marginTop="8dp"
+            android:textColor="#222"
+            android:textSize="14sp"
+            android:layout_gravity="center_horizontal"/>
+
+        <ImageView
+            android:id="@+id/personaAvatarView"
+            android:layout_width="96dp"
+            android:layout_height="96dp"
+            android:layout_gravity="center_horizontal"
+            android:src="@drawable/placeholder_avatar"
+            android:contentDescription="Persona Avatar"
+            android:padding="8dp"
+            android:background="@android:color/darker_gray"/>
+
+        <Button
+            android:id="@+id/pickPersonaAvatarButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Pick Avatar"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginTop="6dp"/>
+        <Button
+            android:id="@+id/wardrobeButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Wardrobe"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginTop="10dp"/>
+
+        <!-- Save Button -->
+        <Button
+            android:id="@+id/savePersonaButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Save Persona"
+            android:layout_marginTop="18dp"/>
+
+    </LinearLayout>
+</ScrollView>

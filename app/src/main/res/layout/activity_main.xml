@@ -20,15 +20,12 @@
         android:layout_marginTop="25dp"
         />
 
-    <!-- Collapsible description container -->
     <LinearLayout
-        android:id="@+id/descriptionContainer"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:layout_marginTop="8dp">
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
 
-        <!-- Header row: “Description” label + toggle icon -->
+        <!-- Header with label and toggle arrow -->
         <LinearLayout
             android:id="@+id/descriptionHeader"
             android:layout_width="match_parent"
@@ -53,47 +50,100 @@
                 android:src="@drawable/ic_expand_more"/>
         </LinearLayout>
 
-        <!-- Actual description text, hidden by default -->
-        <TextView
-            android:id="@+id/chatDescription"
+        <!-- DROPDOWN/COLLAPSIBLE SECTION STARTS HERE -->
+        <LinearLayout
+            android:id="@+id/descriptionDropdown"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:visibility="gone"
-            android:paddingStart="16dp"
-            android:paddingEnd="16dp"
-            android:textAppearance="?attr/textAppearanceBody2"/>
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/chatDescription"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp"
+                android:textAppearance="?attr/textAppearanceBody2"/>
+        </LinearLayout>
+        <!-- DROPDOWN/COLLAPSIBLE SECTION ENDS HERE -->
+
     </LinearLayout>
     <androidx.constraintlayout.widget.ConstraintLayout
+        xmlns:android="http://schemas.android.com/apk/res/android"
         xmlns:app="http://schemas.android.com/apk/res-auto"
         android:layout_width="match_parent"
         android:layout_height="match_parent">
 
-        <!-- Bot1 Avatar -->
+        <!-- Back left (Bot 3) -->
+        <ImageView
+            android:id="@+id/botAvatar3ImageView"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:layout_marginBottom="90dp"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toStartOf="@id/botAvatar1ImageView"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            android:translationX="30dp"
+            app:layout_constraintWidth_percent="0.38"
+            app:layout_constraintHeight_percent="0.55"
+            android:scaleType="fitCenter"
+            android:src="@drawable/default_01"
+            android:alpha="0.85"
+            android:scaleX="-1" />
+
+        <!-- Back right (Bot 4) -->
+        <ImageView
+            android:id="@+id/botAvatar4ImageView"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:layout_marginBottom="90dp"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintStart_toEndOf="@id/botAvatar2ImageView"
+            android:translationX="-30dp"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintWidth_percent="0.38"
+            app:layout_constraintHeight_percent="0.55"
+            android:scaleType="fitCenter"
+            android:src="@drawable/default_01"
+            android:alpha="0.85" />
+
+        <!-- Front left (Bot 1) -->
         <ImageView
             android:id="@+id/botAvatar1ImageView"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:maxHeight="600dp"
-            android:src="@drawable/default_01"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
             app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toStartOf="@id/botAvatar2ImageView"
             app:layout_constraintStart_toStartOf="parent"
-            android:translationX="0dp"
+            android:translationX="15dp"
+            app:layout_constraintHorizontal_chainStyle="packed"
+            app:layout_constraintWidth_percent="0.48"
+            app:layout_constraintHeight_percent="0.75"
+
             android:scaleType="fitCenter"
-            android:scaleX="-1"
-            android:adjustViewBounds="true" />
-        <!-- Bot2 Avatar, overlapping Bot12-->
+            android:src="@drawable/default_01"
+            android:scaleX="-1" />
+
+        <!-- Front right (Bot 2) -->
         <ImageView
             android:id="@+id/botAvatar2ImageView"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:maxHeight="600dp"
-            android:src="@drawable/default_01"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
             app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintStart_toEndOf="@id/botAvatar1ImageView"
             app:layout_constraintEnd_toEndOf="parent"
-            android:translationX="-1dp"
+            android:translationX="-15dp"
+            app:layout_constraintHorizontal_chainStyle="packed"
+            app:layout_constraintWidth_percent="0.48"
+            app:layout_constraintHeight_percent="0.75"
             android:scaleType="fitCenter"
-            android:adjustViewBounds="true" />
+            android:src="@drawable/default_01" />
+
     </androidx.constraintlayout.widget.ConstraintLayout>
+
 
 
     <!-- User Message Display -->
@@ -149,5 +199,6 @@
             android:layout_height="wrap_content"
             android:text="Send"/>
     </LinearLayout>
+
 
 </LinearLayout>

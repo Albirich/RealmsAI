@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "224508547645",
+    "project_id": "realmsai-86ea9",
+    "storage_bucket": "realmsai-86ea9.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:224508547645:android:278ce02a80f9b6f8c49054",
+        "android_client_info": {
+          "package_name": "com.example.RealmsAI"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAdVZBECJWJmzNEsIDewMzrFbqa3Es5v5o"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

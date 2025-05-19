@@ -1,6 +1,8 @@
 package com.example.RealmsAI
 
 import android.app.AlertDialog
+import android.content.ContentValues.TAG
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -65,7 +67,8 @@ class ChatAdapter(
                 .setTitle("Edit Message")
                 .setView(edit)
                 .setPositiveButton("Save") { _, _ ->
-                    msg.messageText = edit.text.toString()
+                    val newMsg = msg.copy(messageText = edit.text.toString())
+                    messages[position] = newMsg
                     notifyItemChanged(position)
                 }
                 .setNeutralButton("Delete this + following") { _, _ ->
@@ -81,12 +84,15 @@ class ChatAdapter(
     }
 
     /** Add a message, notify the insertion, then fire your scroll hook. */
-    fun addMessage(msg: ChatMessage) {
-        messages += msg
-        val pos = messages.size - 1
-        notifyItemInserted(pos)
-        onNewMessage(pos)
-    }
+    fun addMessage(newMsg: ChatMessage) {
+        messages.add(newMsg)
+        Log.d(TAG, "addMessage: Added message '${newMsg.messageText.take(30)}...' at position ${messages.size - 1}")
+        notifyItemInserted(messages.size - 1)
+        onNewMessage(messages.size - 1)
+    } // <-- This triggers the callback with the new message position
+
+
+
 
     /** Clear both list and view. */
     fun clearMessages() {

@@ -9,6 +9,7 @@ import android.widget.AdapterView
 import android.widget.ArrayAdapter
 import android.widget.Spinner
 import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -18,6 +19,7 @@ import com.example.RealmsAI.ChatPreview
 import com.example.RealmsAI.ChatPreviewAdapter
 import com.example.RealmsAI.models.CharacterProfile
 import com.example.RealmsAI.models.ChatMode
+import com.example.RealmsAI.models.PersonaProfile
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
@@ -46,6 +48,7 @@ class CreatedListActivity : AppCompatActivity() {
 
         val chatsRv      = findViewById<RecyclerView>(R.id.recyclerChats)
         val charactersRv = findViewById<RecyclerView>(R.id.recyclerCharacters)
+        val personasRv = findViewById<RecyclerView>(R.id.recyclerPersonas)
 
         // initially show both or just chats
         chatsRv.visibility      = View.VISIBLE
@@ -54,17 +57,26 @@ class CreatedListActivity : AppCompatActivity() {
         spinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(parent: AdapterView<*>, view: View?, position: Int, id: Long) {
                 when (parent.getItemAtPosition(position) as String) {
-                    "All" -> {
-                        chatsRv.visibility      = View.VISIBLE
-                        charactersRv.visibility = View.VISIBLE
-                    }
+            //       "All" -> {
+            //            chatsRv.visibility = View.VISIBLE
+            //            charactersRv.visibility = View.VISIBLE
+            //            personasRv.visibility = View.VISIBLE
+            //        }
+
                     "Chats" -> {
-                        chatsRv.visibility      = View.VISIBLE
+                        chatsRv.visibility = View.VISIBLE
                         charactersRv.visibility = View.GONE
+                        personasRv.visibility = View.GONE
                     }
                     "Characters" -> {
-                        chatsRv.visibility      = View.GONE
+                        chatsRv.visibility = View.GONE
                         charactersRv.visibility = View.VISIBLE
+                        personasRv.visibility = View.GONE
+                    }
+                    "Personas" -> {
+                        chatsRv.visibility = View.GONE
+                        charactersRv.visibility = View.GONE
+                        personasRv.visibility = View.VISIBLE
                     }
                 }
             }
@@ -76,6 +88,7 @@ class CreatedListActivity : AppCompatActivity() {
         // …then kick off your Firestore loads into each RecyclerView…
         showChats(chatsRv)
         showCharacters(charactersRv)
+        showPersonas(personasRv)
     }
     private fun lookupAvatar(charId: String): String? {
         // load from the same shared‐prefs or wherever you persisted your CharacterProfile
@@ -85,35 +98,61 @@ class CreatedListActivity : AppCompatActivity() {
     }
 
     private fun showChats(rv: RecyclerView) {
-        // 1) Layout
         rv.layoutManager = GridLayoutManager(this, 2)
-
-        // 2) Adapter
         val adapter = ChatPreviewAdapter(
             context = this,
             chatList = emptyList(),
             onClick = { preview ->
-                startActivity(Intent(this, MainActivity::class.java).apply {
-                    putExtra("CHAT_ID", preview.id)
-                    putExtra("CHAT_PROFILE_JSON", preview.rawJson)
-                })
+                // If you want, you can launch MainActivity or edit page
+                // startActivity(Intent(this, ChatEditActivity::class.java) ... )
             },
-            onLongClick = { /* e.g. delete or share */ }
+            onLongClick = { preview ->
+                AlertDialog.Builder(this)
+                    .setTitle(preview.title)
+                    .setItems(arrayOf("Edit", "Delete")) { _, which ->
+                        when (which) {
+                            0 -> {
+                                // Edit: Launch an edit activity with this chat's profile
+                                startActivity(
+                                    Intent(this, ChatCreationActivity::class.java)
+                                        .putExtra("CHAT_EDIT_ID", preview.id)
+                                        .putExtra("CHAT_PROFILE_JSON", preview.rawJson)
+                                )
+                            }
+                            1 -> {
+                                AlertDialog.Builder(this)
+                                    .setTitle("Delete?")
+                                    .setMessage("Are you sure you want to delete '${preview.title}'?")
+                                    .setPositiveButton("Yes") { _, _ ->
+                                        // Remove from Firestore (make sure it's "chats")
+                                        FirebaseFirestore.getInstance()
+                                            .collection("chats")
+                                            .document(preview.id)
+                                            .delete()
+                                            .addOnSuccessListener {
+                                                Toast.makeText(this, "Deleted.", Toast.LENGTH_SHORT).show()
+                                                // Optionally refresh the list
+                                            }
+                                            .addOnFailureListener { e ->
+                                                Toast.makeText(this, "Failed: ${e.message}", Toast.LENGTH_SHORT).show()
+                                            }
+                                    }
+                                    .setNegativeButton("No", null)
+                                    .show()
+                            }
+                        }
+                    }
+                    .show()
+            }
         )
         rv.adapter = adapter
 
-
-        // 3) Fetch from Firestore
         FirebaseFirestore.getInstance()
             .collection("chats")
             .whereEqualTo("author", FirebaseAuth.getInstance().uid)
             .orderBy("timestamp", Query.Direction.DESCENDING)
             .get()
             .addOnSuccessListener { snap ->
-                Log.d("CreatedList", "🔥 raw chats.size() = ${snap.size()}")
-                Toast.makeText(this, "Chats fetched: ${snap.size()}", Toast.LENGTH_LONG).show()
-
-                // 4) Map to ChatPreview
                 val previews = snap.documents.mapNotNull { doc ->
                     doc.toObject(ChatProfile::class.java)?.let { p ->
                         ChatPreview(
@@ -123,24 +162,19 @@ class CreatedListActivity : AppCompatActivity() {
                             description = p.description,
                             avatar1Uri = p.characterIds.getOrNull(0)?.let(::lookupAvatar),
                             avatar2Uri = p.characterIds.getOrNull(1)?.let(::lookupAvatar),
-                            avatar1ResId = R.drawable.placeholder_avatar,
-                            avatar2ResId = R.drawable.placeholder_avatar,
+                            avatar1ResId = R.drawable.icon_01,
+                            avatar2ResId = R.drawable.icon_01,
                             rating = p.rating,
                             mode = p.mode
                         )
                     }
                 }
-
-                // 5) Push into adapter
                 adapter.updateList(previews)
-
             }
             .addOnFailureListener { e ->
-                Log.e("CreatedList", "fetch failed", e)
                 Toast.makeText(this, "Fetch error: ${e.message}", Toast.LENGTH_LONG).show()
             }
     }
-
 
     private fun showCharacters(rv: RecyclerView) {
         rv.layoutManager = GridLayoutManager(this, 2)
@@ -158,8 +192,9 @@ class CreatedListActivity : AppCompatActivity() {
                         name        = cp.name,
                         summary     = cp.summary.orEmpty(),
                         avatarUri   = cp.avatarUri,
-                        avatarResId = cp.avatarResId ?: R.drawable.placeholder_avatar,
-                        author      = cp.author
+                        avatarResId = cp.avatarResId ?: R.drawable.icon_01,
+                        author      = cp.author,
+                        rawJson   = Gson().toJson(cp)
                     )
                 }
 
@@ -174,7 +209,54 @@ class CreatedListActivity : AppCompatActivity() {
                         )
                     },
                     onLongClick = { preview ->
-                        // …delete‐dialog…
+                        // THIS is where the dialog should go!
+                        AlertDialog.Builder(this)
+                            .setTitle(preview.name)
+                            .setItems(arrayOf("Edit", "Delete")) { _, which ->
+                                when (which) {
+                                    0 -> { // Edit
+                                        startActivity(
+                                            Intent(this, CharacterCreationActivity::class.java)
+                                                .putExtra("CHAR_EDIT_ID", preview.id)
+                                                .putExtra(
+                                                    "CHAR_PROFILE_JSON",
+                                                    Gson().toJson(preview)
+                                                )
+                                        )
+                                    }
+
+                                    1 -> { // Delete
+                                        AlertDialog.Builder(this)
+                                            .setTitle("Delete?")
+                                            .setMessage("Are you sure you want to delete '${preview.name}'?")
+                                            .setPositiveButton("Yes") { _, _ ->
+                                                // Remove from Firestore
+                                                FirebaseFirestore.getInstance()
+                                                    .collection("characters")
+                                                    .document(preview.id)
+                                                    .delete()
+                                                    .addOnSuccessListener {
+                                                        Toast.makeText(
+                                                            this,
+                                                            "Deleted.",
+                                                            Toast.LENGTH_SHORT
+                                                        ).show()
+                                                        // Optionally refresh the list
+                                                    }
+                                                    .addOnFailureListener { e ->
+                                                        Toast.makeText(
+                                                            this,
+                                                            "Failed: ${e.message}",
+                                                            Toast.LENGTH_SHORT
+                                                        ).show()
+                                                    }
+                                            }
+                                            .setNegativeButton("No", null)
+                                            .show()
+                                    }
+                                }
+                            }
+                            .show()
                     }
                 )
             }
@@ -182,4 +264,83 @@ class CreatedListActivity : AppCompatActivity() {
                 Toast.makeText(this, "Could not load characters: ${e.message}", Toast.LENGTH_SHORT).show()
             }
     }
+
+    private fun showPersonas(rv: RecyclerView) {
+        rv.layoutManager = GridLayoutManager(this, 2)
+
+        if (currentUserId == null) return
+
+        db.collection("personas")
+            .whereEqualTo("author", currentUserId)
+            .get()
+            .addOnSuccessListener { snap ->
+                val previews = snap.documents.mapNotNull { doc ->
+                    val pp = doc.toObject<PersonaProfile>() ?: return@mapNotNull null
+                    PersonaPreview(
+                        id = pp.id,
+                        name = pp.name,
+                        description = pp.description,
+                        avatarUri = pp.images.firstOrNull(),
+                        avatarResId = R.drawable.icon_01,
+                        author = currentUserId // Or pp.author if present
+                    )
+                }
+
+                rv.adapter = PersonaPreviewAdapter(
+                    this,
+                    previews,
+                    onClick = { preview ->
+                        // e.g. open a Persona view/edit page
+                        startActivity(
+                            Intent(this, PersonaCreationActivity::class.java)
+                                .putExtra("PERSONA_EDIT_ID", preview.id)
+                                .putExtra("PERSONA_PROFILE_JSON", Gson().toJson(preview))
+                        )
+                    },
+                    onLongClick = { preview ->
+                        // THIS is where the dialog should go!
+                        AlertDialog.Builder(this)
+                            .setTitle(preview.name)
+                            .setItems(arrayOf("Edit", "Delete")) { _, which ->
+                                when (which) {
+                                    0 -> { // Edit
+                                        startActivity(Intent(this, CharacterCreationActivity::class.java)
+                                            .putExtra("PERSONA_EDIT_ID", preview.id)
+                                            .putExtra("PERSONA_PROFILE_JSON", Gson().toJson(preview))
+                                        )
+                                    }
+                                    1 -> { // Delete
+                                        AlertDialog.Builder(this)
+                                            .setTitle("Delete?")
+                                            .setMessage("Are you sure you want to delete '${preview.name}'?")
+                                            .setPositiveButton("Yes") { _, _ ->
+                                                // Remove from Firestore
+                                                FirebaseFirestore.getInstance()
+                                                    .collection("personas")
+                                                    .document(preview.id)
+                                                    .delete()
+                                                    .addOnSuccessListener {
+                                                        Toast.makeText(this, "Deleted.", Toast.LENGTH_SHORT).show()
+                                                        // Optionally refresh the list
+                                                    }
+                                                    .addOnFailureListener { e ->
+                                                        Toast.makeText(this, "Failed: ${e.message}", Toast.LENGTH_SHORT).show()
+                                                    }
+                                            }
+                                            .setNegativeButton("No", null)
+                                            .show()
+                                    }
+                                }
+                            }
+                            .show()
+                    }
+
+                )
+            }
+            .addOnFailureListener { e ->
+                Toast.makeText(this, "Could not load personas: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+    }
+
+
 }

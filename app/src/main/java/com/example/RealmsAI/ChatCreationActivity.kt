@@ -200,7 +200,7 @@ class ChatCreationActivity : AppCompatActivity() {
                 sfwOnly = sfwOnly,
                 characterIds = chars,
                 rating = 0f,
-                timestamp = now,
+                timestamp      = Timestamp.now(),
                 author = getSharedPreferences("user", MODE_PRIVATE)
                     .getString("userId", "")!!
             )
@@ -214,7 +214,7 @@ class ChatCreationActivity : AppCompatActivity() {
                 "mode"          to profile.mode.name,
                 "characterIds"  to profile.characterIds,
                 "author"        to profile.author,
-                "timestamp"     to FieldValue.serverTimestamp(),
+                "timestamp"     to Timestamp.now(),
                 "lastMessage"   to "",                         // no messages yet
                 "lastTimestamp" to FieldValue.serverTimestamp()
             )
@@ -232,7 +232,7 @@ class ChatCreationActivity : AppCompatActivity() {
                         onResult = { sessionId ->
                             Log.d("ChatCreation", "New session for $chatId → $sessionId")
                             // Pass both IDs into MainActivity
-                            val intent = Intent(this, MainActivity::class.java).apply {
+                            val intent = Intent(this, SessionLandingActivity::class.java).apply {
                                 putExtra("CHAT_ID", chatId)
                                 putExtra("SESSION_ID", sessionId)
                                 putExtra("CHAT_PROFILE_JSON", Gson().toJson(profile))

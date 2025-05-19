@@ -27,8 +27,11 @@
         <activity android:name=".ChatCreationActivity"/>
         <activity android:name=".CharacterSelectionActivity"/>
         <activity android:name=".CreatedListActivity"/>
+        <activity android:name=".SessionHubActivity" />
         <activity android:name=".ChatHubActivity"/>
         <activity android:name=".WardrobeActivity"/>
+        <activity android:name=".CropperActivity" />
+        <activity android:name=".SessionLandingActivity" />
     </application>
     <uses-permission android:name="android.permission.INTERNET"/>
 </manifest>

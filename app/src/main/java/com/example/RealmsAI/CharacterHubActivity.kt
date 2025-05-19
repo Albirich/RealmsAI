@@ -2,118 +2,108 @@ package com.example.RealmsAI
 
 import android.content.Intent
 import android.os.Bundle
+import android.util.Log
 import android.view.View
 import android.widget.AdapterView
 import android.widget.ArrayAdapter
-import android.widget.EditText
 import android.widget.Spinner
-import androidx.core.widget.addTextChangedListener
+import android.widget.Toast
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.example.RealmsAI.models.CharacterProfile
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.Query
+import com.google.gson.Gson
 
 class CharacterHubActivity : BaseActivity() {
-
+    private lateinit var sortSpinner: Spinner
     private lateinit var adapter: CharacterPreviewAdapter
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_character_hub)
         setupBottomNav()
 
-        // 1) load all profiles
-        val allChars = loadAllCharacterProfiles()
 
-        // 2) Recycler + adapter…
-        val recycler = findViewById<RecyclerView>(R.id.characterHubRecyclerView)
-        recycler.layoutManager = GridLayoutManager(this, 2)
-        adapter = CharacterPreviewAdapter(this, emptyList(), onClick = { preview ->
-            val fullJson = preview.toFullProfileJson()
+        // 1) Find & configure RecyclerView
+        val charsRv = findViewById<RecyclerView>(R.id.characterHubRecyclerView).apply {
+            layoutManager = GridLayoutManager(this@CharacterHubActivity, 2)
+        }
 
-            val intent = Intent(this, MainActivity::class.java).apply {
-                putExtra("chatId", preview.id)
-                putExtra("CHAT_PROFILE_JSON", fullJson)
+        adapter = CharacterPreviewAdapter(
+            context = this,
+            items = emptyList(),
+            onClick = { preview ->
+                // Log character info before launching session landing
+                Log.d("CharacterHub", "Launching SessionLandingActivity with character:")
+                Log.d("CharacterHub", "ID: ${preview.id}")
+                Log.d("CharacterHub", "Raw JSON: ${preview.rawJson.take(500)}") // Limit to first 500 chars to keep logs manageable
+
+                // Launch SessionLandingActivity passing character profile JSON
+                startActivity(Intent(this, SessionLandingActivity::class.java).apply {
+                    putExtra("CHARACTER_ID", preview.id)  // optional for quick lookup if used
+                    putExtra("CHARACTER_PROFILE_JSON", preview.rawJson)
+                })
             }
+        )
+        charsRv.adapter = adapter
 
-            startActivity(intent)
-        })
-        recycler.adapter = adapter
-
-        // 3) Sort spinner—declare it before your search listener!
-        val spinnerSort = findViewById<Spinner>(R.id.sortSpinner)
-        val searchEditText = findViewById<EditText>(R.id.searchEditText)
-        val sortOptions = listOf("Name", "Recent")
-        spinnerSort.adapter = ArrayAdapter(
+        // 3) Set up the Spinner ("Latest" vs. "Hot")
+        sortSpinner = findViewById(R.id.sortSpinner)
+        val options = listOf("Latest", "Hot")
+        sortSpinner.adapter = ArrayAdapter(
             this,
             android.R.layout.simple_spinner_item,
-            sortOptions
+            options
         ).also { it.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item) }
-        spinnerSort.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-            override fun onNothingSelected(parent: AdapterView<*>?) {}
+
+        sortSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onNothingSelected(parent: AdapterView<*>?) = Unit
             override fun onItemSelected(parent: AdapterView<*>, view: View?, pos: Int, id: Long) {
-                refreshList(allChars, search = searchEditText.text.toString(), sortBy = sortOptions[pos])
+                // pos==0 → sort by createdAt; pos==1 → sort by your “hotness” field (e.g. popularity)
+                val field = if (pos == 0) "createdAt" else "popularity"
+                showCharacters(charsRv, orderBy = field)
             }
         }
 
-        // 4) Search box
-        searchEditText.addTextChangedListener { editable ->
-            refreshList(
-                allChars,
-                search  = editable?.toString().orEmpty(),
-                sortBy  = spinnerSort.selectedItem as String
-            )
-        }
-
-        // 5) initial load
-        refreshList(allChars, search = "", sortBy = sortOptions.first())
+        // 4) Initial load = “Latest”
+        showCharacters(charsRv, orderBy = "createdAt")
     }
 
-
-    /**
-     * Filters and sorts the full list, maps down to [CharacterPreview], and
-     * pushes into the adapter in one go.
-     */
-    private fun refreshList(
-        allChars: List<CharacterProfile>,
-        search: String,
-        sortBy: String
+    private fun showCharacters(
+        rv: RecyclerView,
+        orderBy: String = "createdAt"
     ) {
-        // a) filter
-        val filtered = allChars.filter { cp ->
-            cp.name.contains(search, ignoreCase = true) ||
-                    (cp.summary ?: "").contains(search, ignoreCase = true)
-        }
+        FirebaseFirestore.getInstance()
+            .collection("characters")
+            .orderBy(orderBy, Query.Direction.DESCENDING)
+            .get()
+            .addOnSuccessListener { snap ->
+                val list = snap.documents.mapNotNull { doc ->
+                    // 1) Deserialize + inject doc ID
+                    val cp = doc.toObject(CharacterProfile::class.java)
+                        ?.copy(id = doc.id)
+                        ?: return@mapNotNull null
 
-        // b) sort
-        val sorted = when (sortBy) {
-            "Name"   -> filtered.sortedBy { it.name }
-            "Recent" -> filtered.sortedByDescending { it.createdAt }
-            // "Favorites" -> filtered.filter { it.isFavorite } // if you support favorites
-            else     -> filtered
-        }
+                    // 2) Build preview
+                    CharacterPreview(
+                        id        = cp.id,
+                        name      = cp.name,
+                        summary   = cp.summary.orEmpty(),
+                        avatarUri = cp.avatarUri,
+                        avatarResId = cp.avatarResId ?: R.drawable.placeholder_avatar,
+                        author    = cp.author,
+                        rawJson   = Gson().toJson(cp) // FULL profile as JSON!
+                    )
 
-        // c) map to previews
-        val previews = sorted.map { cp ->
-            CharacterPreview(
-                id          = cp.id,
-                name        = cp.name,
-                summary     = cp.summary.orEmpty(),
-                avatarUri   = cp.avatarUri,
-                avatarResId = cp.avatarResId ?: R.drawable.placeholder_avatar,
-                author      = cp.author
-            )
-        }
-
-        // d) update adapter
-        adapter.updateList(previews)
-    }
-
-    /**
-     * Helps you pass the full JSON back into your chat screen.
-     */
-    private fun CharacterPreview.toFullProfileJson(): String {
-        return getSharedPreferences("characters", MODE_PRIVATE)
-            .getString(id, "{}")
-            ?: "{}"
+                }
+                adapter.updateList(list)
+            }
+            .addOnFailureListener { e ->
+                Toast.makeText(
+                    this,
+                    "Failed to load characters: ${e.message}",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
     }
 }

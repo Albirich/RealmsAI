@@ -5,6 +5,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.util.Log
+import android.webkit.MimeTypeMap
 import android.widget.EditText
 import android.widget.LinearLayout
 import androidx.activity.result.ActivityResultLauncher
@@ -17,16 +18,19 @@ import androidx.recyclerview.widget.RecyclerView
 import com.example.RealmsAI.models.Outfit
 import com.google.android.material.button.MaterialButton
 import com.google.gson.Gson
+import java.io.File
+import java.io.FileOutputStream
 
 class WardrobeActivity : AppCompatActivity() {
+
     companion object {
         const val EXTRA_OUTFITS_JSON = "EXTRA_OUTFITS_JSON"
     }
 
     // pose types
     private val poseKeys = listOf(
-        "happy","sad","angry","embarrassed","thinking",
-        "flirty","fighting","surprised","frightened","exasperated"
+        "happy", "sad", "angry", "embarrassed", "thinking",
+        "flirty", "fighting", "surprised", "frightened", "exasperated"
     )
 
     // We’ll keep one list-of-slots per outfit block
@@ -34,27 +38,50 @@ class WardrobeActivity : AppCompatActivity() {
 
     // Which outfit & which pose within it is being picked right now?
     private var currentOutfitIndex = 0
-    private var currentPoseIndex   = 0
+    private var currentPoseIndex = 0
 
     // Single global picker
+    private lateinit var cropperLauncher: ActivityResultLauncher<Intent>
     private lateinit var imagePicker: ActivityResultLauncher<String>
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_wardrobe)
-
-        // 1) register the shared image picker
-        imagePicker = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-            uri?.let {
-                // stick it into the correct PoseSlot
-                allPoseLists[currentOutfitIndex][currentPoseIndex].uri = it
-                // and notify that block’s RecyclerView to redraw
-                val block = (findViewById<LinearLayout>(R.id.outfitsContainer))
-                    .getChildAt(currentOutfitIndex)
-                val rv    = block.findViewById<RecyclerView>(R.id.poseRecycler)
-                rv.adapter?.notifyItemChanged(currentPoseIndex)
+        val charHeight = intent.getFloatExtra("CHARACTER_HEIGHT_FEET", 6.0f)
+        cropperLauncher = registerForActivityResult(
+            ActivityResultContracts.StartActivityForResult()
+        ) { result ->
+            if (result.resultCode == Activity.RESULT_OK) {
+                val croppedUri = result.data?.getParcelableExtra<Uri>("CROPPED_IMAGE_URI")
+                if (croppedUri != null) {
+                    allPoseLists[currentOutfitIndex][currentPoseIndex].uri = croppedUri
+                    // Notify just that pose slot
+                    val block = findViewById<LinearLayout>(R.id.outfitsContainer)
+                        .getChildAt(currentOutfitIndex)
+                    val rv = block.findViewById<RecyclerView>(R.id.poseRecycler)
+                    rv.adapter?.notifyItemChanged(currentPoseIndex)
+                }
             }
         }
+
+        imagePicker = registerForActivityResult(GetContent()) { uri ->
+            uri?.let { contentUri ->
+                val cropIntent = Intent(this, CropperActivity::class.java).apply {
+                    intent.putExtra("CHARACTER_HEIGHT_FEET", charHeight)
+                    putExtra("EXTRA_IMAGE_URI", contentUri)
+                }
+                cropperLauncher.launch(cropIntent)
+            }
+        }
+        registerForActivityResult(GetContent()) { uri ->
+            uri?.let { contentUri ->
+                // Launch CropperActivity with the selected image
+                val intent = Intent(this, CropperActivity::class.java)
+                intent.putExtra("EXTRA_IMAGE_URI", contentUri) // Pass the actual URI
+                startActivity(intent) // Or startActivityForResult if you want a result back
+            }
+        }
+
 
         // 2) wire up “Add Outfit”
         findViewById<MaterialButton>(R.id.addOutfitButton)

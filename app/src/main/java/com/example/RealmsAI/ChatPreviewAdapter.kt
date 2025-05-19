@@ -11,7 +11,6 @@ import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import com.google.gson.Gson
 
-
 class ChatPreviewAdapter(
     private val context: Context,
     private var chatList: List<ChatPreview>,

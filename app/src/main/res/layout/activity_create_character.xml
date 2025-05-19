@@ -12,8 +12,6 @@
         android:orientation="vertical">
 
         <!-- Name Input -->
-
-
         <EditText
             android:id="@+id/characterNameInput"
             android:layout_width="match_parent"
@@ -35,7 +33,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             app:counterEnabled="true"
-            app:counterMaxLength="4000">
+            app:counterMaxLength="1000">
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/characterPersonalityInput"
@@ -51,7 +49,9 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             app:counterEnabled="true"
-            app:counterMaxLength="500">
+            app:counterMaxLength="200"
+            app:helperText="Tell the AI what its first message should be. Talk to it like you're speaking to the characters as a director.">
+            >
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/characterGreetingInput"
@@ -62,7 +62,12 @@
                 android:inputType="textMultiLine"/>
         </com.google.android.material.textfield.TextInputLayout>
 
-
+        <EditText
+            android:id="@+id/characterprivateDescriptionInput"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Enter private information (for creator)"
+            app:counterMaxLength="300"/>
 
         <!-- Tags Input -->
         <EditText
@@ -129,7 +134,7 @@
 
         <!-- 2) Profile Info (collapsible) -->
         <LinearLayout
-            android:id="@+id/privateDescHeader"
+            android:id="@+id/physicalInfoHeader"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
@@ -138,32 +143,27 @@
             android:focusable="true">
 
             <TextView
+                android:id="@+id/physicalInfoLabel"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="Private Info"
+                android:text="Physcial Info"
                 android:textAppearance="?attr/textAppearanceSubtitle1"/>
 
             <ImageView
-                android:id="@+id/privateDescToggle"
+                android:id="@+id/physicalInfoToggle"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:src="@drawable/ic_expand_more"/>
+                android:src="@drawable/ic_expand_more" />
         </LinearLayout>
 
         <LinearLayout
-            android:id="@+id/privateSection"
+            android:id="@+id/physicalInfoSection"
             android:orientation="vertical"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:visibility="gone"
             android:paddingStart="16dp">
-
-            <EditText
-                android:id="@+id/characterprivateDescriptionInput"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:hint="Enter private information (for creator)"/>
 
             <EditText
                 android:id="@+id/ageEditText"
@@ -203,6 +203,5 @@
             android:layout_height="wrap_content"
             android:text="Submit"
             android:layout_centerInParent="true"/>
-
     </LinearLayout>
 </ScrollView>

@@ -50,7 +50,7 @@ open class BaseActivity : AppCompatActivity() {
         }
         // History / “Created”
         findViewById<ImageButton>(R.id.navHistory).setOnClickListener {
-            startActivity(Intent(this, CreatedListActivity::class.java))
+            startActivity(Intent(this, SessionHubActivity::class.java))
         }
         // Profile
         findViewById<ImageButton>(R.id.navProfile).setOnClickListener {
@@ -95,14 +95,11 @@ open class BaseActivity : AppCompatActivity() {
                     avatar1Uri   = uri1,
                     avatar2Uri   = uri2,
                     rating       = profile.rating,
-                    timestamp = profile.timestamp
-                        ?.toDate()
-                        ?.time
-                        ?: System.currentTimeMillis(),
-                        mode         = profile.mode,
+                    timestamp    = profile.timestamp,
+                    mode         = profile.mode,
                     author       = profile.author,
-                    chatProfile = profile,
-                    rawJson     = Gson().toJson(profile)
+                    chatProfile  = profile,
+                    rawJson      = Gson().toJson(profile)
                 )
             }
     }
