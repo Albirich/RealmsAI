@@ -17,6 +17,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.example.RealmsAI.SessionManager.loadHistory
 import com.example.RealmsAI.ai.AIResponseParser
 import com.example.RealmsAI.ai.buildOneOnOneAiPrompt
 import com.example.RealmsAI.ai.buildOneOnOneFacilitatorPrompt
@@ -79,7 +80,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun loadAvatarUriForCharacter(charId: String): String {
         val prefs = getSharedPreferences("characters", Context.MODE_PRIVATE)
-        val json  = prefs.getString(charId, null) ?: return ""
+        val json = prefs.getString(charId, null) ?: return ""
         return JSONObject(json).optString("avatarUri", "")
     }
 
@@ -167,18 +168,17 @@ class MainActivity : AppCompatActivity() {
 
 // 3) Build your two helper lists **right here**, before the parser
         val charNames: List<String> = (0 until charArr.length()).map { idx ->
-            val charId   = charArr.optString(idx)
+            val charId = charArr.optString(idx)
             val charJson = getSharedPreferences("characters", Context.MODE_PRIVATE)
                 .getString(charId, null)
-                ?: return@map "B${idx+1}"
-            JSONObject(charJson).optString("name", "B${idx+1}")
+                ?: return@map "B${idx + 1}"
+            JSONObject(charJson).optString("name", "B${idx + 1}")
         }
 
         this.charAvatarUris = (0 until charArr.length()).map { idx ->
             val charId = charArr.optString(idx)
             this.loadAvatarUriForCharacter(charId)
         }
-
 
 
         // Recycler setup
@@ -194,95 +194,7 @@ class MainActivity : AppCompatActivity() {
         }
         chatRecycler.adapter = chatAdapter
 
-        // 1) First get or create the session
-        SessionManager.getOrCreateSessionFor(
 
-            chatId,
-            onResult = { sid ->
-                sessionId = sid
-
-                // 2) In MainActivity, inside your SessionManager.getOrCreateSessionFor(onResult=…) block:
-                lifecycleScope.launch(Dispatchers.Main) {
-                    // a) Once, load whole history:
-                    SessionManager.loadHistory(chatId, sessionId,
-                        onResult = { history ->
-                            chatAdapter.clearMessages()
-                            history.forEach { chatAdapter.addMessage(it) }
-                            chatRecycler.scrollToPosition(history.lastIndex)
-                            // --- ADD THIS: Greeting logic
-                            val profileObj = JSONObject(fullProfilesJson) // Full chat/session profile JSON
-                            val greeting = profileObj.optString("greeting", "") // or whatever your greeting field is called
-                            if (history.isEmpty() && greeting.isNotBlank()) {
-                                Log.d("SessionStartup", "Greeting? history=${history.size}, greeting='$greeting'")
-                                sendToAI(greeting)
-                            }
-                        },
-                        onError = { e -> Log.e(TAG,"history load failed",e) }
-                    )
-
-                    // b) Then start listening for _new_ messages one‐by‐one:
-                    SessionManager.listenMessages(chatId, sessionId) { msg ->
-                        chatAdapter.addMessage(msg)
-                        chatRecycler.smoothScrollToPosition(chatAdapter.itemCount - 1)
-                    }
-
-                    // 3) Pull your character IDs from the profile JSON
-                    val charIds = JSONObject(fullProfilesJson)
-                        .optJSONArray("characterIds") ?: JSONArray()
-
-
-                    // prepare the lookup-tables
-                    val slotToName = mutableMapOf("N0" to "Narrator")
-
-                    for (i in 0 until charIds.length()) {
-                        val slot = "B${i + 1}"
-                        val charId = charIds.getString(i)
-                        if (charId.isBlank()) continue
-
-                        val profile = fetchCharacterProfile(charId)  // suspend function that fetches profile
-                        slotToName[slot] = profile.name
-                    }
-                    val slotToAvatar = mutableMapOf<String,String>()
-
-                    // iterate by index, not forEachIndexed
-                    for (i in 0 until charIds.length()) {
-                        val slot = "B${i + 1}"
-                        val charId = charIds.getString(i)
-
-                        // suspend call is now legal inside this coroutine
-                        if (charId.isBlank()) {
-                            Log.e("Debug", "Attempted to fetch character profile with empty ID — skipping!")
-                            continue  // skip this iteration instead of return so other characters load
-                        }
-
-                        val profile = fetchCharacterProfile(charId)
-                        slotToName[slot] = profile.name
-                        slotToAvatar[slot] = profile.avatarUri ?: ""
-                    }
-
-                    val singleCharacterName = slotToName["B1"] ?: "B1"
-
-
-
-                    // 5) Now that you have your look-ups, you can build your parser
-                    parser = AIResponseParser(
-                        chatAdapter = chatAdapter,
-                        chatRecycler = chatRecycler,
-                        updateAvatar = { slot, emotion -> /* your existing update avatar logic */ },
-                        loadName = { slot ->
-                            if (chatMode == ChatMode.ONE_ON_ONE) singleCharacterName else slotToName[slot] ?: slot
-                        },
-                        chatId = chatId,
-                        sessionId = sessionId,
-                        chatMode = chatMode,
-                        onNewMessage = { speakerId, emotions ->
-                        }
-                    )
-                }
-
-            },
-            onError = { e -> Log.e(TAG,"session setup failed",e) }
-        )
 
         // Send button
         sendButton.setOnClickListener {
@@ -296,7 +208,6 @@ class MainActivity : AppCompatActivity() {
                 messageText = text,
                 timestamp = Timestamp.now()
             )
-            chatAdapter.addMessage(userMsg)
 
             // 2) Persist it
             SessionManager.sendMessage(chatId, sessionId, userMsg)
@@ -308,13 +219,13 @@ class MainActivity : AppCompatActivity() {
         }
 
     }
+
     // Helper to get the last message timestamp for a given sender (bot slot)
     fun getLastMessageTimestampForSender(sender: String): Long {
         return chatAdapter.getMessages()
             .filter { it.sender == sender }
             .maxOfOrNull { it.timestamp as Long } ?: 0L
     }
-
 
     // On message received:
     fun onNewMessage(speakerSlot: String, emotions: Map<String, String>) {
@@ -333,7 +244,8 @@ class MainActivity : AppCompatActivity() {
         }
 
         // Speaker not assigned yet — assign to the older front slot (0 or 1)
-        val olderFrontSlot = if ((frontSlotTimestamps[0] ?: 0) < (frontSlotTimestamps[1] ?: 0)) 0 else 1
+        val olderFrontSlot =
+            if ((frontSlotTimestamps[0] ?: 0) < (frontSlotTimestamps[1] ?: 0)) 0 else 1
 
         // Find which bot is currently occupying the older front slot
         val displacedBot = botSlotToAvatarIndex.entries.find { it.value == olderFrontSlot }?.key
@@ -341,11 +253,12 @@ class MainActivity : AppCompatActivity() {
         // If a bot is displaced from front slot, move it to a back slot
         if (displacedBot != null) {
             // Find a free back slot that is not currently assigned
-            val freeBackSlot = backSlots.find { backSlot -> botSlotToAvatarIndex.values.none { it == backSlot } }
-                ?: backSlots.minByOrNull { slot ->
-                    // For now, just pick the first back slot as fallback
-                    0L
-                } ?: backSlots[0]
+            val freeBackSlot =
+                backSlots.find { backSlot -> botSlotToAvatarIndex.values.none { it == backSlot } }
+                    ?: backSlots.minByOrNull { slot ->
+                        // For now, just pick the first back slot as fallback
+                        0L
+                    } ?: backSlots[0]
 
             botSlotToAvatarIndex[displacedBot] = freeBackSlot
         }
@@ -357,7 +270,6 @@ class MainActivity : AppCompatActivity() {
         // Finally, update avatars with new emotions mapping
         updateAvatars(emotions)
     }
-
 
     // Updates the avatarViews according to the botSlotToAvatarIndex and emotions map
     fun updateAvatars(emotions: Map<String, String>) {
@@ -378,7 +290,6 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-
     private fun cleanFacilitatorContent(rawContent: String): String {
         // Clean escaped newlines and quotes from JSON string if needed
         return rawContent
@@ -391,8 +302,8 @@ class MainActivity : AppCompatActivity() {
         Log.d(TAG, "sendToAI() called with input: $userInput")
 
         // 1) Build common history string
-        val historyStr = chatAdapter.getMessages()
-            .joinToString("\n") { "${it.sender}: ${it.messageText}" }
+        val historyStr = buildTrimmedHistory(chatAdapter.getMessages(), 500)
+
 
         // Parse the fullProfilesJson raw response to extract the actual session data from 'content'
         if (!this@MainActivity::fullProfilesJson.isInitialized) {
@@ -477,7 +388,8 @@ class MainActivity : AppCompatActivity() {
                     ?.optString("content")
                     .orEmpty()
 
-                val facContentJson = if (facContentStr.isNotBlank()) JSONObject(facContentStr) else null
+                val facContentJson =
+                    if (facContentStr.isNotBlank()) JSONObject(facContentStr) else null
                 facilitatorNotes = facContentJson?.optString("notes", "") ?: ""
 
                 // ---- AI prompt ----
@@ -485,7 +397,9 @@ class MainActivity : AppCompatActivity() {
                     userInput = userInput,
                     history = historyStr,
                     facilitatorNotes = facilitatorNotes,
-                    character = character
+                    characterName = character.name,   // or whatever your variable is
+                    emotionTags = character.emotionTags,
+                    maxTokens = 300
                 )
                 Log.d(TAG, "One-on-One AI prompt:\n$oneAiPrompt")
 
@@ -523,7 +437,6 @@ class MainActivity : AppCompatActivity() {
             else -> {
                 // ---- Sandbox flow ----
                 val sandboxFac = buildSandboxFacilitatorPrompt(
-                    userInput = userInput,
                     history = historyStr,
                     summariesJson = summariesJson,
                     facilitatorState = facilitatorNotes,
@@ -545,8 +458,10 @@ class MainActivity : AppCompatActivity() {
                     ?.optString("content")
                     .orEmpty()
 
-                val sessionProfileObjSandbox = if (contentStrSandbox.isNotBlank()) JSONObject(contentStrSandbox) else null
-                val chatModeStrSandbox = sessionProfileObjSandbox?.optString("chatMode", "SANDBOX") ?: "SANDBOX"
+                val sessionProfileObjSandbox =
+                    if (contentStrSandbox.isNotBlank()) JSONObject(contentStrSandbox) else null
+                val chatModeStrSandbox =
+                    sessionProfileObjSandbox?.optString("chatMode", "SANDBOX") ?: "SANDBOX"
                 chatMode = try {
                     ChatMode.valueOf(chatModeStrSandbox)
                 } catch (e: Exception) {
@@ -606,10 +521,6 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-
-
-
-
     override fun onCreateOptionsMenu(menu: Menu) =
         menuInflater.inflate(R.menu.main_menu, menu).let { true }
 
@@ -618,7 +529,25 @@ class MainActivity : AppCompatActivity() {
             chatAdapter.clearMessages()
             true
         }
+
         else -> super.onOptionsItemSelected(item)
+    }
+
+    fun buildTrimmedHistory(
+        messages: List<ChatMessage>,
+        maxChars: Int = 500 // ~2000 tokens
+    ): String {
+        var totalChars = 0
+        val trimmed = mutableListOf<String>()
+        // Traverse from latest to oldest
+        for (msg in messages.asReversed()) {
+            val line = "${msg.sender}: ${msg.messageText}"
+            if (totalChars + line.length > maxChars) break
+            trimmed.add(line)
+            totalChars += line.length
+        }
+        // Now reverse to restore original order
+        return trimmed.asReversed().joinToString("\n")
     }
 }
 
@@ -626,7 +555,6 @@ class MainActivity : AppCompatActivity() {
  * Fetches a CharacterProfile document from Firestore by its ID.
  * Call this from within a coroutine (e.g. in sendToAI).
  */
-
 private suspend fun fetchCharacterProfile(charId: String): CharacterProfile =
     suspendCancellableCoroutine { cont ->
         if (charId.isBlank()) {

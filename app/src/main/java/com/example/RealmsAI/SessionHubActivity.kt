@@ -5,6 +5,7 @@ import android.content.Intent
 import android.os.Bundle
 import android.util.Log
 import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -57,14 +58,36 @@ class SessionHubActivity : BaseActivity() {
                     context = this,
                     sessionList = previews,
                     onClick = { preview ->
-                        // You can launch MainActivity for this session/chat here
+                        // Launch MainActivity for this session/chat here
                         startActivity(Intent(this, MainActivity::class.java).apply {
                             putExtra("SESSION_ID", preview.id)
                             putExtra("CHAT_ID", preview.chatId)
                             putExtra("SESSION_JSON", preview.rawJson)
                         })
+                    },
+                    onLongClick = { preview ->
+                        AlertDialog.Builder(this)
+                            .setTitle(preview.title)
+                            .setMessage("Delete this session?\n\nThis action cannot be undone.")
+                            .setPositiveButton("Delete") { _, _ ->
+                                // Remove from Firestore
+                                FirebaseFirestore.getInstance()
+                                    .collection("chats").document(preview.chatId)
+                                    .collection("sessions").document(preview.id)
+                                    .delete()
+                                    .addOnSuccessListener {
+                                        Toast.makeText(this, "Session deleted.", Toast.LENGTH_SHORT).show()
+                                        // Optionally: reload/refresh the session list
+                                    }
+                                    .addOnFailureListener { e ->
+                                        Toast.makeText(this, "Failed: ${e.message}", Toast.LENGTH_SHORT).show()
+                                    }
+                            }
+                            .setNegativeButton("Cancel", null)
+                            .show()
                     }
                 )
+
             }
             .addOnFailureListener { e ->
                 Log.e("SessionHub", "fetch failed", e)

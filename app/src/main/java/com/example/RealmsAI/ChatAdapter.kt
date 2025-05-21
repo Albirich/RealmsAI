@@ -11,6 +11,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import com.example.RealmsAI.models.ChatMessage
+import java.util.UUID
 
 class ChatAdapter(
     private val messages: MutableList<ChatMessage>,
@@ -85,11 +86,21 @@ class ChatAdapter(
 
     /** Add a message, notify the insertion, then fire your scroll hook. */
     fun addMessage(newMsg: ChatMessage) {
+        // Log for debug
+        Log.d("ChatAdapter", "Trying to add message ID: ${newMsg.id}")
+
+        // Check for duplicate by unique ID (as long as ID is not blank)
+
+
+        // Add message to the adapter’s list
         messages.add(newMsg)
-        Log.d(TAG, "addMessage: Added message '${newMsg.messageText.take(30)}...' at position ${messages.size - 1}")
+        Log.d("ChatAdapter", "addMessage: Added message '${newMsg.messageText.take(30)}...' at position ${messages.size - 1}")
+
+        // Notify RecyclerView and trigger callback
         notifyItemInserted(messages.size - 1)
         onNewMessage(messages.size - 1)
-    } // <-- This triggers the callback with the new message position
+    }
+
 
 
 

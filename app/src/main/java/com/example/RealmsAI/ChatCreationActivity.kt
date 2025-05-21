@@ -76,10 +76,10 @@ class ChatCreationActivity : AppCompatActivity() {
         charSlots = listOf(
             findViewById(R.id.charButton1),
             findViewById(R.id.charButton2),
-          //  findViewById(R.id.charButton3),
-          //  findViewById(R.id.charButton4),
-          //  findViewById(R.id.charButton5),
-          //  findViewById(R.id.charButton6)
+            findViewById(R.id.charButton3),
+            findViewById(R.id.charButton4),
+            findViewById(R.id.charButton5),
+            findViewById(R.id.charButton6)
         )
 
         // 2) Spinner: load your array from resources
@@ -159,35 +159,22 @@ class ChatCreationActivity : AppCompatActivity() {
         }
 
         fun saveAndLaunchChat() {
-            // 6.1) Read all your inputs
             val chatId = System.currentTimeMillis().toString()
-            val now = Timestamp.now()
             val title = titleEt.text.toString().trim().takeIf { it.isNotEmpty() } ?: run {
                 titleEt.error = "Required"; return
             }
             val desc = descEt.text.toString().trim()
-            val firstMsg = firstMsgEt.text.toString().trim()
             val tags = tagsEt.text.toString()
                 .split(",").map(String::trim).filter(String::isNotEmpty)
             val sfwOnly = sfwSwitch.isChecked
             val modeLabel = modeSpinner.selectedItem as String
             val mode = ChatMode.valueOf(modeLabel.uppercase().replace(' ', '_'))
-
-            // 6.2) Pick your background‐URI string
             val bgUriString = selectedBackgroundUri?.toString()
-                ?: selectedBackgroundResId?.let { resId ->
-                    // encode it as an android.resource URI the loader can understand:
-                    "android.resource://${packageName}/$resId"
-                }
-
-            // 6.3) Pull only non-null character IDs
+                ?: selectedBackgroundResId?.let { "android.resource://${packageName}/$it" }
             val chars = selectedCharIds.filterNotNull()
-
             val bgResId = selectedBackgroundResId
-
-            // 6.4) Build your profile
-            Log.d("ChatCreation", "DEBUG: title=$title, desc=$desc")
-            Log.d("ChatCreation", "Creating chat with title=$title")
+            val authorId = getSharedPreferences("user", MODE_PRIVATE)
+                .getString("userId", "") ?: ""
 
             val profile = ChatProfile(
                 id = chatId,
@@ -200,22 +187,23 @@ class ChatCreationActivity : AppCompatActivity() {
                 sfwOnly = sfwOnly,
                 characterIds = chars,
                 rating = 0f,
-                timestamp      = Timestamp.now(),
-                author = getSharedPreferences("user", MODE_PRIVATE)
-                    .getString("userId", "")!!
+                timestamp = Timestamp.now(),
+                author = authorId
             )
 
-            // 6.5) Persist to prefs
-
             val chatData = mapOf(
+                "id"            to profile.id,
                 "title"         to profile.title,
                 "description"   to profile.description,
                 "tags"          to profile.tags,
                 "mode"          to profile.mode.name,
+                "backgroundUri" to (bgUriString ?: ""),
+                "backgroundResId" to bgResId,
+                "sfwOnly"       to sfwOnly,
                 "characterIds"  to profile.characterIds,
                 "author"        to profile.author,
                 "timestamp"     to Timestamp.now(),
-                "lastMessage"   to "",                         // no messages yet
+                "lastMessage"   to "",
                 "lastTimestamp" to FieldValue.serverTimestamp()
             )
 
@@ -225,34 +213,21 @@ class ChatCreationActivity : AppCompatActivity() {
                 .set(chatData)
                 .addOnSuccessListener {
                     Log.d("ChatCreation", "New chat persisted to Firestore: $chatId")
-
-                    // Now create a fresh session for this chat:
-                    SessionManager.getOrCreateSessionFor(
-                        chatId,
-                        onResult = { sessionId ->
-                            Log.d("ChatCreation", "New session for $chatId → $sessionId")
-                            // Pass both IDs into MainActivity
-                            val intent = Intent(this, SessionLandingActivity::class.java).apply {
-                                putExtra("CHAT_ID", chatId)
-                                putExtra("SESSION_ID", sessionId)
-                                putExtra("CHAT_PROFILE_JSON", Gson().toJson(profile))
-                            }
-                            startActivity(intent)
-                            finish()
-                        },
-                        onError = { e ->
-                            Log.e("ChatCreation", "Failed to create session", e)
-                            Toast.makeText(this, "Could not start chat session", Toast.LENGTH_SHORT).show()
-                        }
-                    )
+                    Toast.makeText(this, "Chat created!", Toast.LENGTH_SHORT).show()
+                    // Return to CreationHubActivity (or whatever your chat hub is called)
+                    val intent = Intent(this, CreationHubActivity::class.java)
+                    intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                    startActivity(intent)
+                    finish()
                 }
                 .addOnFailureListener { e ->
                     Log.e("ChatCreation", "Failed to persist chat", e)
                     Toast.makeText(this, "Could not create chat", Toast.LENGTH_SHORT).show()
+                    // Optionally return to CreationHubActivity anyway
+                    finish()
                 }
-
-            finish()
         }
+
 
 
         // 6) Finally: “Create Chat” button

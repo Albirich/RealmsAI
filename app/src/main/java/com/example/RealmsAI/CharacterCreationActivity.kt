@@ -193,7 +193,7 @@ class CharacterCreationActivity : AppCompatActivity() {
             if (name.isEmpty()) return@setOnClickListener toast("Name required")
             if (avatarUri == null) return@setOnClickListener toast("Pick an avatar")
 
-            createCharacterAndLaunchChat(name, bio, personality, privateDescription, age, height, weight, eyeColor, hairColor)
+            saveCharacterAndReturnToHub(name, bio, personality, privateDescription, age, height, weight, eyeColor, hairColor)
         }
     }
 
@@ -228,7 +228,7 @@ class CharacterCreationActivity : AppCompatActivity() {
         }
     }
 
-    private fun createCharacterAndLaunchChat(
+    private fun saveCharacterAndReturnToHub(
         name: String,
         bio: String,
         personality: String,
@@ -240,9 +240,11 @@ class CharacterCreationActivity : AppCompatActivity() {
         hairColor: String
     ) {
         val charId = System.currentTimeMillis().toString()
+        val currentUserId = FirebaseAuth.getInstance().currentUser?.uid ?: ""
         val storage = FirebaseStorage.getInstance().reference
         val firestore = FirebaseFirestore.getInstance()
 
+        // 1. Upload avatar file if available
         val avatarFileUri: Uri? = avatarUri?.let { originalUri ->
             val ext = contentResolver.getType(originalUri)
                 ?.let { MimeTypeMap.getSingleton().getExtensionFromMimeType(it) }
@@ -259,7 +261,7 @@ class CharacterCreationActivity : AppCompatActivity() {
         val uploadTasks = mutableListOf<Task<Pair<String, String>>>()
         avatarFileUri?.let { fileUri ->
             val ext = fileUri.path!!.substringAfterLast('.')
-            val ref = storage.child("characters/$charId/avatar.$ext")
+            val ref = storage.child("users/$currentUserId/characters/$charId/avatar.$ext")
             val task = ref.putFile(fileUri)
                 .continueWithTask { t ->
                     if (!t.isSuccessful) throw t.exception!!
@@ -271,13 +273,13 @@ class CharacterCreationActivity : AppCompatActivity() {
             uploadTasks += task
         }
 
-        // Upload all pose images with outfit names
+        // 2. Upload all pose images with outfit names
         val poseTasks = outfitsList.flatMap { outfit ->
             outfit.poseUris.mapNotNull { (poseKey, uriStr) ->
                 if (uriStr.isBlank()) return@mapNotNull null
                 val fileUri = Uri.parse(uriStr)
                 val ext = File(fileUri.path!!).extension.ifBlank { "jpg" }
-                val ref = storage.child("characters/$charId/poses/${outfit.name}/$poseKey.$ext")
+                val ref = storage.child("users/$currentUserId/characters/$charId/poses/${outfit.name}/$poseKey.$ext")
                 val task = ref.putFile(fileUri)
                     .continueWithTask { t ->
                         if (!t.isSuccessful) throw t.exception!!
@@ -290,16 +292,15 @@ class CharacterCreationActivity : AppCompatActivity() {
             }
         }
 
-        // Wait for all uploads to finish
-        Tasks.whenAllSuccess<Pair<String, String>>(uploadTasks + poseTasks).addOnSuccessListener { results ->
-            // results: List of either Pair<String,String> or Triple<String,String,String>
-            // Separate avatar upload result and pose upload results:
+        // 3. Wait for all uploads to finish
+        Tasks.whenAllSuccess<Any>(uploadTasks + poseTasks).addOnSuccessListener { results ->
+            // Parse avatar and pose upload results
             val avatarPair = results.filterIsInstance<Pair<String, String>>().firstOrNull()
             val poseTriples = results.filterIsInstance<Triple<String, String, String>>()
 
             val avatarUrl = avatarPair?.second.orEmpty()
 
-            // Build a map of outfitName -> Map<poseKey, url>
+            // Map of outfitName -> Map<poseKey, url>
             val outfitsMap = mutableMapOf<String, MutableMap<String, String>>()
             for ((outfitName, poseKey, url) in poseTriples) {
                 val poseMap = outfitsMap.getOrPut(outfitName) { mutableMapOf() }
@@ -320,17 +321,17 @@ class CharacterCreationActivity : AppCompatActivity() {
                 )
             }
 
-            // Save character data with avatar URL and outfits with pose URLs
+            // Save character data with avatar URL and outfits
             val charData: Map<String, Any?> = mapOf(
                 "id" to charId,
                 "name" to name,
                 "personality" to personality,
                 "privateDescription" to privateDesc,
-                "age      " to age       ,
-                "height   " to height    ,
-                "weight   " to weight    ,
-                "eyeColor " to eyeColor  ,
-                "hairColor" to hairColor ,
+                "age" to age,
+                "height" to height,
+                "weight" to weight,
+                "eyeColor" to eyeColor,
+                "hairColor" to hairColor,
                 "author" to currentUserId,
                 "tags" to emptyList<String>(),
                 "emotionTags" to poseSlots.mapNotNull { s ->
@@ -346,57 +347,16 @@ class CharacterCreationActivity : AppCompatActivity() {
                 "createdAt" to FieldValue.serverTimestamp()
             )
 
-            firestore.collection("characters").document(charId).set(charData)
+            // Save to /users/{userId}/characters/{charId}
+            firestore.collection("users").document(currentUserId)
+                .collection("characters").document(charId)
+                .set(charData)
                 .addOnSuccessListener {
-                    val chatCollection = firestore.collection("chats")
-                    val chatDocRef = chatCollection.document()
-                    val chatId = chatDocRef.id
-                    val chatProfile = ChatProfile(
-                        id = chatId,
-                        title = name,
-                        description = bio,
-                        tags = emptyList(),
-                        mode = ChatMode.ONE_ON_ONE,
-                        backgroundUri = selectedBgUri?.toString() ?: "",
-                        backgroundResId = selectedBgResId,
-                        sfwOnly = true,
-                        characterIds = listOf(charId),
-                        rating = 0f,
-                        author = currentUserId
-                    )
-                    val chatData = mapOf(
-                        "id" to chatId,
-                        "title" to name,
-                        "description" to bio,
-                        "tags" to emptyList<String>(),
-                        "mode" to ChatMode.ONE_ON_ONE.name,
-                        "backgroundUri" to (selectedBgUri?.toString() ?: ""),
-                        "backgroundResId" to selectedBgResId,
-                        "sfwOnly" to true,
-                        "characterIds" to listOf(charId),
-                        "rating" to 0f,
-                        "timestamp" to Timestamp.now(),
-                        "author" to currentUserId
-                    )
-                    chatDocRef.set(chatData)
-                        .addOnSuccessListener {
-                            SessionManager.getOrCreateSessionFor(chatId,
-                                onResult = { sessionId ->
-                                    Intent(this, SessionLandingActivity::class.java).apply {
-                                        putExtra("CHAT_ID", chatId)
-                                        putExtra("SESSION_ID", sessionId)
-                                        putExtra("CHAT_PROFILE_JSON", Gson().toJson(chatProfile))
-                                    }.also { startActivity(it) }
-                                    finish()
-                                },
-                                onError = { e ->
-                                    toast("Couldn’t start chat: ${e.message}")
-                                }
-                            )
-                        }
-                        .addOnFailureListener { e ->
-                            toast("Failed to create chat doc: ${e.message}")
-                        }
+                    Toast.makeText(this, "Character created!", Toast.LENGTH_SHORT).show()
+                    val intent = Intent(this, CreationHubActivity::class.java)
+                    intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                    startActivity(intent)
+                    finish()
                 }
                 .addOnFailureListener { e ->
                     toast("Failed to save character: ${e.message}")
@@ -406,6 +366,7 @@ class CharacterCreationActivity : AppCompatActivity() {
                 toast("Upload failed: ${e.message}")
             }
     }
+
 
 
 }

@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:paddingStart="54dp"
+    android:paddingEnd="8dp"
+    android:paddingTop="2dp"
+    android:paddingBottom="2dp">
+
+    <TextView
+        android:id="@+id/relationshipToName"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:text="To Name"
+        android:textSize="16sp" />
+
+    <TextView
+        android:id="@+id/relationshipType"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Type"
+        android:textColor="@android:color/darker_gray"
+        android:textSize="15sp"
+        android:layout_marginStart="6dp"/>
+
+    <TextView
+        android:id="@+id/relationshipSummary"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Short desc"
+        android:textColor="@android:color/darker_gray"
+        android:textSize="14sp"
+        android:layout_marginStart="10dp"/>
+
+    <!-- Optionally, add a delete button -->
+    <ImageButton
+        android:id="@+id/btnDeleteRelationship"
+        android:layout_width="28dp"
+        android:layout_height="28dp"
+        android:background="?android:selectableItemBackgroundBorderless"
+        android:src="@drawable/ic_delete"
+        android:contentDescription="Delete"
+        android:layout_marginStart="4dp"/>
+</LinearLayout>

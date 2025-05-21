@@ -5,4 +5,5 @@ data class ParsedMessage(
     val speed:     Int,      // numeric code
     val emotion:   String,   // e.g. "happy"
     val text:      String,   // the actual reply
+    val others:    Map<String, String> = emptyMap(),
 )

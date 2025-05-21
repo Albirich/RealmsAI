@@ -41,6 +41,14 @@ class CropperActivity : AppCompatActivity() {
         setContentView(R.layout.activity_cropper)
         userImage = findViewById(R.id.userImage)
 
+        val viewWidth = userImage.width.toFloat()
+        val viewHeight = userImage.height.toFloat()
+
+        val cropLeftView = viewWidth * 0.33f
+        val cropTopView = viewHeight * 0.15f
+        val cropRightView = viewWidth
+        val cropBottomView = viewHeight
+
         // Set up guidelines
         val charHeight = intent.getFloatExtra("CHARACTER_HEIGHT_FEET", 6.0f)
         val guidelinesView = findViewById<GuidelinesView>(R.id.guidelinesOverlay)
@@ -143,6 +151,9 @@ class CropperActivity : AppCompatActivity() {
 
     /** Crop visible region of the ImageView */
     private fun getCroppedBitmap(): Bitmap {
+        val OUTPUT_WIDTH = 900
+        val OUTPUT_HEIGHT = 2560
+
         val drawable = userImage.drawable as BitmapDrawable
         val originalBitmap = drawable.bitmap
 
@@ -155,39 +166,42 @@ class CropperActivity : AppCompatActivity() {
         val transX = values[Matrix.MTRANS_X]
         val transY = values[Matrix.MTRANS_Y]
 
-        // Get crop rectangle in VIEW coordinates
         val viewWidth = userImage.width.toFloat()
         val viewHeight = userImage.height.toFloat()
 
-        // LEFT: verticalGuide33 at 33% of width
+        // Your "safe area" box:
         val cropLeftView = viewWidth * 0.33f
-        // TOP: horizontalGuide8ft at 15% of height
         val cropTopView = viewHeight * 0.15f
-
-        // RIGHT/BOTTOM: the bottom/right of the image (optionally minus message/chat overlays if needed)
         val cropRightView = viewWidth
-        val cropBottomView = viewHeight // Or (viewHeight - chatBoxHeight) if you want
+        val cropBottomView = viewHeight
 
-        // Convert to BITMAP coordinates using the image matrix
+        // Map to bitmap coords:
         fun toBitmapX(viewX: Float): Float = (viewX - transX) / scaleX
         fun toBitmapY(viewY: Float): Float = (viewY - transY) / scaleY
 
-        val leftBitmap   = toBitmapX(cropLeftView).toInt().coerceIn(0, originalBitmap.width - 1)
-        val topBitmap    = toBitmapY(cropTopView).toInt().coerceIn(0, originalBitmap.height - 1)
-        val rightBitmap  = toBitmapX(cropRightView).toInt().coerceIn(leftBitmap+1, originalBitmap.width)
-        val bottomBitmap = toBitmapY(cropBottomView).toInt().coerceIn(topBitmap+1, originalBitmap.height)
+        val srcLeft = toBitmapX(cropLeftView)
+        val srcTop = toBitmapY(cropTopView)
+        val srcRight = toBitmapX(cropRightView)
+        val srcBottom = toBitmapY(cropBottomView)
 
-        val widthBitmap = rightBitmap - leftBitmap
-        val heightBitmap = bottomBitmap - topBitmap
+        val srcRect = android.graphics.RectF(srcLeft, srcTop, srcRight, srcBottom)
+        val outBitmap = Bitmap.createBitmap(OUTPUT_WIDTH, OUTPUT_HEIGHT, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(outBitmap)
+        canvas.drawARGB(0, 0, 0, 0) // transparent background
 
-        return Bitmap.createBitmap(
-            originalBitmap,
-            leftBitmap,
-            topBitmap,
-            widthBitmap,
-            heightBitmap
+        val dstRect = android.graphics.RectF(0f, 0f, OUTPUT_WIDTH.toFloat(), OUTPUT_HEIGHT.toFloat())
+        val srcRectInt = android.graphics.Rect(
+            srcRect.left.toInt(),
+            srcRect.top.toInt(),
+            srcRect.right.toInt(),
+            srcRect.bottom.toInt()
         )
+        canvas.drawBitmap(originalBitmap, srcRectInt, dstRect, null)
+
+
+        return outBitmap
     }
+
 
 
     /** Save bitmap to cache and return Uri */

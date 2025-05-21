@@ -36,11 +36,9 @@ class AIResponseParser(
         }
     }
     fun String.capitalizeWords(): String = split(" ").joinToString(" ") { it.replaceFirstChar(Char::titlecase) }
-
-    private val oneOnOneRe = Regex("""\[\s*([\w\s]+)\s*,\s*(\w+)\s*\]\s*["“]?(.+?)["”]?$""")
-    private val oneOnOneCharacterName: String? = null
-
     // ONE-ON-ONE handler
+    private val oneOnOneRe = Regex("""\[\s*([\w\s]+)\s*,\s*(\w+)\s*,\s*(\d+)\s*]\s*["“]?(.+?)["”]?$""")
+
     fun handleOneOnOne(raw: String) {
         val parsedMessages = mutableListOf<ParsedMessage>()
 
@@ -48,13 +46,13 @@ class AIResponseParser(
             .map { it.trim() }
             .filter { it.isNotEmpty() }
             .forEachIndexed { index, line ->
-                oneOnOneRe.matchEntire(line)?.destructured?.let { (slot, emotion, text) ->
+                oneOnOneRe.matchEntire(line)?.destructured?.let { (slot, pose, timing, text) ->
                     val displayName = if (slot.equals("N0", ignoreCase = true)) "Narrator" else slot.capitalizeWords()
                     parsedMessages.add(
                         ParsedMessage(
                             speakerId = displayName,
-                            emotion = emotion,
-                            speed = 0,
+                            emotion = pose,
+                            speed = timing.toIntOrNull() ?: 0,
                             text = text.trim()
                         )
                     )
@@ -70,22 +68,36 @@ class AIResponseParser(
     // SANDBOX / GROUP handler
     private fun handleSandbox(raw: String) {
         val parsedMessages = mutableListOf<ParsedMessage>()
-        val headerRegex = """\[(.*?),\s*(\w+)]""".toRegex()
+        val headerRegex = Regex("""\[\s*(\w+)\s*,\s*(\w+)(?:;\s*([^\]]+))?\]\s*(.*)""")
+        // [B2,0; B1=happy, B3=surprised] Dialogue
 
         raw.lineSequence()
             .map { it.trim() }
             .filter { it.isNotEmpty() }
             .forEach { line ->
-                val headerMatch = headerRegex.matchEntire(line)
-                if (headerMatch != null) {
-                    val (slot, emotion) = headerMatch.destructured
-                    val messageText = line.substring(headerMatch.range.last + 1).trim()
+                val match = headerRegex.matchEntire(line)
+                if (match != null) {
+                    val slot = match.groupValues[1]
+                    val emotion = match.groupValues[2]
+                    val othersStr = match.groupValues[3]
+                    val messageText = match.groupValues[4]
+
+                    // Parse pose/emotion updates for others
+                    val others = mutableMapOf<String, String>()
+                    if (othersStr.isNotBlank()) {
+                        othersStr.split(",").forEach { part ->
+                            val (char, emo) = part.trim().split("=").map { it.trim() }
+                            others[char] = emo
+                        }
+                    }
+
                     parsedMessages.add(
                         ParsedMessage(
                             speakerId = slot,
                             emotion = emotion,
-                            speed = 0,  // or parse speed if available
-                            text = messageText
+                            speed = 0,
+                            text = messageText,
+                            others = others // <-- you will need to add this field to ParsedMessage
                         )
                     )
                 } else {
@@ -95,7 +107,8 @@ class AIResponseParser(
                             speakerId = "N0",
                             emotion = "neutral",
                             speed = 0,
-                            text = line
+                            text = line,
+                            others = emptyMap()
                         )
                     )
                 }
@@ -105,6 +118,7 @@ class AIResponseParser(
             renderParsedWithSpeed(parsedMessages)
         }
     }
+
 
     private fun handleRpg(raw: String) {
         val re3 = Regex("""\[(B\d+),(\w+),(\d+)\]\s*["“]?(.+?)["”]?$""")
@@ -138,28 +152,34 @@ class AIResponseParser(
     // Common postMessage with default speedCode = 0 and delay handling
     fun renderParsedWithSpeed(parsedMessages: List<ParsedMessage>) {
         var cumulativeDelay = 0L
-
-        parsedMessages.forEachIndexed { index, parsedMessage ->
+        parsedMessages.forEach { parsedMessage ->
             val delayMs = when (chatMode) {
-                ChatMode.ONE_ON_ONE -> 100L
-                else -> (parsedMessage.speed * 400L).coerceAtLeast(200L)
+                ChatMode.ONE_ON_ONE -> 500L
+                else -> (parsedMessage.speed * 400L).coerceAtLeast(400L)
             }
+            cumulativeDelay += delayMs
+            Log.d("DELAY", "Cumulative delay: $cumulativeDelay for ${parsedMessage.speakerId}")
+            handler.postDelayed({
 
             val displayName = parsedMessage.speakerId // <- use the property from parsedMessage
 
-            val chatMsg = ChatMessage(sender = displayName, messageText = parsedMessage.text)
+            val chatMsg = ChatMessage(
+                id = UUID.randomUUID().toString(),
+                sender = displayName,
+                messageText = parsedMessage.text
+            )
 
-            cumulativeDelay += delayMs
-            handler.postDelayed({
-                updateAvatar(displayName, parsedMessage.emotion)
-                chatAdapter.addMessage(chatMsg)
+            parsedMessage.others.forEach { (otherId, emo) ->
+                updateAvatar(otherId, emo)
+            }
                 SessionManager.sendMessage(chatId, sessionId, chatMsg)
                 chatRecycler.smoothScrollToPosition(chatAdapter.itemCount - 1)
-            }, cumulativeDelay)
 
-            Log.d(TAG, "Posting [${displayName}] ${parsedMessage.text} with delay $cumulativeDelay")
-        }
+                Log.d(TAG, "Posting [${displayName}] ${parsedMessage.text} with delay $cumulativeDelay")
+        },cumulativeDelay)
     }
+}
+
 
 
 

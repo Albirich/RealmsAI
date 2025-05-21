@@ -7,7 +7,7 @@ import com.example.RealmsAI.ai.parseFacilitatorJson
 class ChatGptFacilitator(private val openAi: OpenAiService) {
     suspend fun getFacilitatorNotes(prompt: String): Pair<String,List<String>> {
         val req = OpenAiChatRequest(
-            model    = "gpt-4o-mini",
+            model    = "gpt-4.1-nano-2025-04-14",
             messages = listOf(Message(role="user", content=prompt))
         )
         val resp = openAi.getFacilitatorNotes(req)

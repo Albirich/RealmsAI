@@ -3,7 +3,6 @@ package com.example.RealmsAI
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
-import android.util.Log
 import android.view.View
 import android.widget.AdapterView
 import android.widget.ArrayAdapter
@@ -12,13 +11,9 @@ import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.GridLayoutManager
-import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import com.example.RealmsAI.models.ChatProfile           // ← Make sure you import your data class here!
-import com.example.RealmsAI.ChatPreview
-import com.example.RealmsAI.ChatPreviewAdapter
+import com.example.RealmsAI.models.ChatProfile
 import com.example.RealmsAI.models.CharacterProfile
-import com.example.RealmsAI.models.ChatMode
 import com.example.RealmsAI.models.PersonaProfile
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
@@ -28,8 +23,10 @@ import com.google.firebase.ktx.Firebase
 import com.google.firebase.firestore.ktx.firestore
 import com.google.gson.Gson
 import org.json.JSONObject
+import com.example.RealmsAI.PersonaPreview
 
-class CreatedListActivity : AppCompatActivity() {
+
+class CreatedListActivity : BaseActivity() {
 
     private val db = Firebase.firestore
     private val currentUserId = FirebaseAuth.getInstance().currentUser?.uid
@@ -37,6 +34,7 @@ class CreatedListActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_created_list)
+        setupBottomNav()
 
         val spinner = findViewById<Spinner>(R.id.filterSpinner).apply {
             adapter = ArrayAdapter.createFromResource(

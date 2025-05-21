@@ -11,6 +11,7 @@ import android.widget.Toast
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.example.RealmsAI.models.CharacterProfile
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
 import com.google.gson.Gson
@@ -18,6 +19,7 @@ import com.google.gson.Gson
 class CharacterHubActivity : BaseActivity() {
     private lateinit var sortSpinner: Spinner
     private lateinit var adapter: CharacterPreviewAdapter
+    private val currentUserId = FirebaseAuth.getInstance().currentUser?.uid
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_character_hub)
@@ -33,18 +35,46 @@ class CharacterHubActivity : BaseActivity() {
             context = this,
             items = emptyList(),
             onClick = { preview ->
-                // Log character info before launching session landing
-                Log.d("CharacterHub", "Launching SessionLandingActivity with character:")
-                Log.d("CharacterHub", "ID: ${preview.id}")
-                Log.d("CharacterHub", "Raw JSON: ${preview.rawJson.take(500)}") // Limit to first 500 chars to keep logs manageable
+                // Get user ID
+                val userId = currentUserId
+                if (userId == null) {
+                    Toast.makeText(this, "You must be signed in to continue.", Toast.LENGTH_SHORT).show()
+                    return@CharacterPreviewAdapter
+                }
 
-                // Launch SessionLandingActivity passing character profile JSON
-                startActivity(Intent(this, SessionLandingActivity::class.java).apply {
-                    putExtra("CHARACTER_ID", preview.id)  // optional for quick lookup if used
-                    putExtra("CHARACTER_PROFILE_JSON", preview.rawJson)
-                })
+                // Check for an existing session for this character & user
+                SessionManager.findSessionForUser(
+                    chatId = preview.id, // or however you map characterId to chatId
+                    userId = userId,
+                    onResult = { sessionId ->
+                        if (sessionId != null) {
+                            // Session found: go straight to MainActivity with session info
+                            startActivity(Intent(this, MainActivity::class.java).apply {
+                                putExtra("SESSION_ID", sessionId)
+                                putExtra("CHARACTER_ID", preview.id)
+                                putExtra("CHARACTER_PROFILE_JSON", preview.rawJson)
+                            })
+                        } else {
+                            // No session: go to SessionLandingActivity to start/setup
+                            startActivity(Intent(this, SessionLandingActivity::class.java).apply {
+                                putExtra("CHARACTER_ID", preview.id)
+                                putExtra("CHARACTER_PROFILE_JSON", preview.rawJson)
+                            })
+                        }
+                    },
+                    onError = { error ->
+                        // Handle error (show a message, retry, etc)
+                        Toast.makeText(this, "Failed to load session.", Toast.LENGTH_SHORT).show()
+                        // Optionally, fallback to session landing
+                        startActivity(Intent(this, SessionLandingActivity::class.java).apply {
+                            putExtra("CHARACTER_ID", preview.id)
+                            putExtra("CHARACTER_PROFILE_JSON", preview.rawJson)
+                        })
+                    }
+                )
             }
         )
+
         charsRv.adapter = adapter
 
         // 3) Set up the Spinner ("Latest" vs. "Hot")

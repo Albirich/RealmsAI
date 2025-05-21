@@ -9,8 +9,10 @@ import android.widget.Spinner
 import android.widget.Toast
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.example.RealmsAI.SessionManager.findSessionForUser
 import com.example.RealmsAI.models.ChatProfile
 import com.google.firebase.Timestamp
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
 import com.google.gson.Gson
@@ -18,6 +20,7 @@ import com.google.gson.Gson
 class ChatHubActivity : BaseActivity() {
     private lateinit var sortSpinner: Spinner
     private lateinit var adapter: ChatPreviewAdapter
+    private val currentUserId = FirebaseAuth.getInstance().currentUser?.uid
 
         override fun onCreate(savedInstanceState: Bundle?) {
             super.onCreate(savedInstanceState)
@@ -30,15 +33,49 @@ class ChatHubActivity : BaseActivity() {
             }
             // 2) Initialize the CLASS‐LEVEL adapter (not a local val)
             adapter = ChatPreviewAdapter(
-                context  = this,
+                context = this,
                 chatList = emptyList(),
-                onClick  = { preview ->
-                    startActivity(Intent(this, SessionLandingActivity::class.java).apply {
-                        putExtra("CHAT_ID", preview.id)
-                        putExtra("CHAT_PROFILE_JSON", preview.rawJson)
-                    })
+                onClick = { preview ->
+                    // Get userId from auth/session/wherever you store it
+                    val userId = currentUserId
+                    if (userId == null) {
+                        // Handle error: user is not logged in!
+                        Toast.makeText(this, "You must be signed in to continue.", Toast.LENGTH_SHORT).show()
+                        return@ChatPreviewAdapter
+                    }
+
+                    // Find an existing session for this user and chat
+                    findSessionForUser(
+                        chatId = preview.id,
+                        userId = userId,
+                        onResult = { sessionId ->
+                            if (sessionId != null) {
+                                // Session found: go directly to MainActivity with session info
+                                startActivity(Intent(this, MainActivity::class.java).apply {
+                                    putExtra("SESSION_ID", sessionId)
+                                    putExtra("CHAT_ID", preview.id)
+                                    putExtra("CHAT_PROFILE_JSON", preview.rawJson)
+                                })
+                            } else {
+                                // No session: go to SessionLandingActivity to start/setup
+                                startActivity(Intent(this, SessionLandingActivity::class.java).apply {
+                                    putExtra("CHAT_ID", preview.id)
+                                    putExtra("CHAT_PROFILE_JSON", preview.rawJson)
+                                })
+                            }
+                        },
+                        onError = {
+                            // Handle error (show a message, retry, etc)
+                            // Optionally: fallback to SessionLandingActivity
+                            startActivity(Intent(this, SessionLandingActivity::class.java).apply {
+                                putExtra("CHAT_ID", preview.id)
+                                putExtra("CHAT_PROFILE_JSON", preview.rawJson)
+                            })
+                        }
+                    )
                 }
             )
+
             // 3) Attach it to YOUR chatsRv
             chatsRv.adapter = adapter
 

@@ -140,7 +140,7 @@
                     android:contentDescription="Character slot 2"
                     android:background="?attr/selectableItemBackgroundBorderless"
                     android:scaleType="centerCrop" />
-<!--
+
                 <ImageButton
                     android:id="@+id/charButton3"
                     android:layout_width="100dp"
@@ -179,7 +179,7 @@
                     android:contentDescription="Character slot 6"
                     android:background="?attr/selectableItemBackgroundBorderless"
                     android:scaleType="centerCrop" />
-                    -->
+
             </LinearLayout>
         </HorizontalScrollView>
 
