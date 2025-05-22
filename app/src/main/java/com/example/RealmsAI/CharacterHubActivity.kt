@@ -103,7 +103,15 @@ class CharacterHubActivity : BaseActivity() {
         rv: RecyclerView,
         orderBy: String = "createdAt"
     ) {
+        val userId = FirebaseAuth.getInstance().currentUser?.uid
+        if (userId == null) {
+            Toast.makeText(this, "You must be signed in to view characters.", Toast.LENGTH_SHORT).show()
+            return
+        }
+
         FirebaseFirestore.getInstance()
+            .collection("users")
+            .document(userId)
             .collection("characters")
             .orderBy(orderBy, Query.Direction.DESCENDING)
             .get()

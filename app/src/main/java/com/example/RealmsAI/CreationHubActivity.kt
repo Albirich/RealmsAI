@@ -26,6 +26,12 @@ import android.widget.Toast
             startActivity(Intent(this, CharacterCreationActivity::class.java))
         }
 
+        findViewById<ImageButton>(R.id.btn_new_sona).setOnClickListener {
+            Log.d("CreateHub", "Persona button clicked")
+            Toast.makeText(this, "Clicked Persona!", Toast.LENGTH_SHORT).show()
+            startActivity(Intent(this, PersonaCreationActivity::class.java))
+        }
+
         findViewById<ImageButton>(R.id.btn_view_created).setOnClickListener {
             Log.d("CreateHub", "created button clicked")
             Toast.makeText(this, "Clicked Created!", Toast.LENGTH_SHORT).show()

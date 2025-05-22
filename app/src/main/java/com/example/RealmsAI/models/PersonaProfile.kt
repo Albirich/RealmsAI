@@ -11,5 +11,6 @@ data class PersonaProfile(
     val description: String = "",
     val images: List<String> = emptyList(),
     val author: String = "",
-    val avatarUri: String = ""
+    val avatarUri: String = "",
+    val profileType: String = "player"
 )

@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.webkit.MimeTypeMap
 import android.widget.*
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
@@ -12,12 +13,14 @@ import com.google.android.material.button.MaterialButton
 import com.google.gson.Gson
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.storage.FirebaseStorage
 
 class PersonaCreationActivity : AppCompatActivity() {
     private lateinit var nameEt: EditText
     private lateinit var ageEt: EditText
     private lateinit var genderEt: EditText
     private lateinit var heightEt: EditText
+    private lateinit var weightEt: EditText
     private lateinit var hairEt: EditText
     private lateinit var eyesEt: EditText
     private lateinit var descEt: EditText
@@ -42,6 +45,7 @@ class PersonaCreationActivity : AppCompatActivity() {
         ageEt     = findViewById(R.id.personaAgeInput)
         genderEt  = findViewById(R.id.personaGenderInput)
         heightEt  = findViewById(R.id.personaHeightInput)
+        weightEt  = findViewById(R.id.personaWeightInput)
         hairEt    = findViewById(R.id.personaHairInput)
         eyesEt    = findViewById(R.id.personaEyesInput)
         descEt    = findViewById(R.id.personaDescriptionInput)
@@ -86,7 +90,7 @@ class PersonaCreationActivity : AppCompatActivity() {
                 author      = userId,
                 avatarUri   = avatarStringUri
             )
-
+            uploadAvatarAndSavePersona(persona)
             savePersona(persona)
         }
     }
@@ -125,4 +129,33 @@ class PersonaCreationActivity : AppCompatActivity() {
             }
         }
     }
+    private fun uploadAvatarAndSavePersona(persona: PersonaProfile) {
+        val userId = persona.author
+        val personaId = persona.id
+        val storageRef = FirebaseStorage.getInstance().reference
+        val avatarUri = avatarUri // the Uri picked by user
+
+        if (avatarUri != null) {
+            val ext = contentResolver.getType(avatarUri)
+                ?.let { MimeTypeMap.getSingleton().getExtensionFromMimeType(it) }
+                ?: "jpg"
+            val avatarRef = storageRef.child("users/$userId/personas/$personaId/avatar.$ext")
+
+            avatarRef.putFile(avatarUri)
+                .continueWithTask { task ->
+                    if (!task.isSuccessful) throw task.exception!!
+                    avatarRef.downloadUrl
+                }
+                .addOnSuccessListener { downloadUri ->
+                    val updatedPersona = persona.copy(avatarUri = downloadUri.toString())
+                    savePersona(updatedPersona) // Save persona with Storage URL
+                }
+                .addOnFailureListener { e ->
+                    Toast.makeText(this, "Avatar upload failed: ${e.message}", Toast.LENGTH_LONG).show()
+                }
+        } else {
+            savePersona(persona) // No avatar, just save persona data
+        }
+    }
+
 }

@@ -16,19 +16,24 @@ import androidx.recyclerview.widget.RecyclerView
 class CharacterSelectAdapter(
     private val characters: List<Character>,
     private val selectedIds: MutableSet<String>,
-    private val onToggle: (String, Boolean) -> Unit
+    private val onToggle: (String, Boolean) -> Unit,
+    private val loadAvatar: (ImageView, String?) -> Unit
 ) : RecyclerView.Adapter<CharacterSelectAdapter.VH>() {
 
     inner class VH(itemView: View) : RecyclerView.ViewHolder(itemView) {
         val avatar: ImageView = itemView.findViewById(R.id.itemCharAvatar)
-        val name:   TextView  = itemView.findViewById(R.id.itemCharName)
+        val name: TextView = itemView.findViewById(R.id.itemCharName)
 
         fun bind(char: Character) {
-            // load avatar from local URI, or show placeholder
-            if (!char.avatarUri.isNullOrEmpty()) {
-                avatar.setImageURI(Uri.parse(char.avatarUri))
-            } else {
-                avatar.setImageResource(R.drawable.placeholder_avatar)
+            loadAvatar(avatar, char.avatarUri)
+            name.text = char.name
+            itemView.isSelected = selectedIds.contains(char.id)
+            itemView.alpha = if (itemView.isSelected) 1f else 0.5f
+            itemView.setOnClickListener {
+                val now = !selectedIds.contains(char.id)
+                if (now) selectedIds += char.id else selectedIds -= char.id
+                notifyItemChanged(adapterPosition)
+                onToggle(char.id, now)
             }
 
             name.text = char.name

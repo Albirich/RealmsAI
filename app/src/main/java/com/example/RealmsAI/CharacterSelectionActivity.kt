@@ -5,6 +5,7 @@ import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.bumptech.glide.Glide
 import com.google.android.material.button.MaterialButton
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
@@ -47,10 +48,26 @@ class CharacterSelectionActivity : AppCompatActivity() {
 
         loadCharactersFromFirestore(userId = currentUserId ?: "",
             onLoaded = { allChars ->
-                val adapter = CharacterSelectAdapter(allChars, selectedIds) { charId, isNowSelected ->
-                    if (isNowSelected) selectedIds += charId else selectedIds -= charId
-                }
+                val adapter = CharacterSelectAdapter(
+                    allChars,
+                    selectedIds,
+                    onToggle = { charId, isSelected ->
+                        if (isSelected) selectedIds += charId else selectedIds -= charId
+                    },
+                    loadAvatar = { imageView, avatarUri ->
+                        if (!avatarUri.isNullOrEmpty()) {
+                            Glide.with(imageView.context)
+                                .load(avatarUri)
+                                .placeholder(R.drawable.placeholder_avatar)
+                                .error(R.drawable.placeholder_avatar)
+                                .into(imageView)
+                        } else {
+                            imageView.setImageResource(R.drawable.placeholder_avatar)
+                        }
+                    }
+                )
                 recycler.adapter = adapter
+
             }
         )
 

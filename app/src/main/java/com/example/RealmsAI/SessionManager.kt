@@ -9,6 +9,7 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.Query
+import org.json.JSONObject
 import java.util.UUID
 
 object SessionManager {
@@ -19,25 +20,45 @@ object SessionManager {
      */
     fun createSession(
         sessionProfile: SessionProfile,
-        chatId: String,
+        chatProfileJson: String,
         userId: String,
+        characterProfilesJson: String,
         characterId: String,
         onResult: (sessionId: String) -> Unit,
         onError: (Exception) -> Unit = {}
     ) {
+        // Parse chatId from chatProfileJson if needed
+        val chatId = try {
+            JSONObject(chatProfileJson).optString("id", sessionProfile.chatId)
+        } catch (e: Exception) {
+            sessionProfile.chatId
+        }
+
+        // Prepare session data to write
         val sessionData = hashMapOf(
             "chatId" to chatId,
-            "participants" to listOf(userId),
+            "participants" to sessionProfile.participants,
             "characterId" to characterId,
-            "startedAt" to com.google.firebase.Timestamp.now()
-            // Add more fields as needed
+            "sessionId" to sessionProfile.sessionId,
+            "startedAt" to com.google.firebase.Timestamp.now(),
+            "sfwOnly" to sessionProfile.sfwOnly,
+            "title" to sessionProfile.title,
+            "backgroundUri" to sessionProfile.backgroundUri,
+            "chatMode" to sessionProfile.chatMode,
+            "slotRoster" to sessionProfile.slotRoster, // you might want to serialize this properly
+            "personaProfiles" to sessionProfile.personaProfiles, // same here
+            // Add any other needed sessionProfile fields here
+            "characterProfilesJson" to characterProfilesJson
         )
+
         val sessionsRef = db.collection("chats").document(chatId).collection("sessions")
-        val newSessionRef = sessionsRef.document() // auto-generates a unique ID
+        val newSessionRef = sessionsRef.document() // auto-generate session ID
+
         newSessionRef.set(sessionData)
             .addOnSuccessListener { onResult(newSessionRef.id) }
             .addOnFailureListener(onError)
     }
+
 
 
     /**
@@ -125,5 +146,13 @@ object SessionManager {
             .document(sessionId)
             .collection("messages")
             .add(msgMap)
+            .addOnSuccessListener { docRef ->
+                Log.d("SessionManager", "Message sent: ${docRef.id}")
+            }
+            .addOnFailureListener { e ->
+                Log.e("SessionManager", "Failed to send message", e)
+            }
     }
+
+
 }

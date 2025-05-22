@@ -42,8 +42,15 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:hint="Gender"
+                android:hint="Pronouns"
                 android:background="@android:color/transparent" />
+        </LinearLayout>
+        <!-- Hair & Eyes (side by side) -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:paddingBottom="8dp">
 
             <EditText
                 android:id="@+id/personaHeightInput"
@@ -52,8 +59,15 @@
                 android:layout_weight="1"
                 android:hint="Height"
                 android:background="@android:color/transparent" />
-        </LinearLayout>
 
+            <EditText
+                android:id="@+id/personaWeightInput"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:hint="Weight"
+                android:background="@android:color/transparent" />
+        </LinearLayout>
         <!-- Hair & Eyes (side by side) -->
         <LinearLayout
             android:layout_width="match_parent"

@@ -103,6 +103,8 @@ class CharacterCreationActivity : AppCompatActivity() {
         eyeColorEt    = findViewById(R.id.eyeColorEditText)
         hairColorEt   = findViewById(R.id.hairColorEditText)
         val submit    = findViewById<MaterialButton>(R.id.charSubmitButton)
+        val weightInput = weightEt.text.toString().trim()
+        val weightValue = if (weightInput.isEmpty()) "" else weightInput  // Always a String
 
         // --- PHYSICAL INFO HEADER ---
         val physicalHeader = findViewById<LinearLayout>(R.id.physicalInfoHeader)
@@ -141,7 +143,17 @@ class CharacterCreationActivity : AppCompatActivity() {
                         name, summary, avatar, poses, bgUri, bgRes
                     )
                 )
+
+                // Create Intent to start WardrobeActivity
+                val intent = Intent(this, WardrobeActivity::class.java)
+
+                // Add the draft JSON as an extra
+                intent.putExtra("characterDraftJson", draftJson)
+
+                // Start the activity
+                startActivity(intent)
             }
+
 
         // Background picker
         bgPicker = registerForActivityResult(GetContent()) { uri ->

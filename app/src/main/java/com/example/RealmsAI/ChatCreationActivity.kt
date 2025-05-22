@@ -13,6 +13,7 @@ import androidx.activity.result.contract.ActivityResultContracts.StartActivityFo
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.bumptech.glide.Glide
 import com.example.RealmsAI.models.ChatMode
 import com.example.RealmsAI.models.ChatProfile
 import com.google.firebase.Timestamp
@@ -140,7 +141,17 @@ class ChatCreationActivity : AppCompatActivity() {
                 // load its avatar right on the slot button
                 selectedCharIds[currentCharSlot]?.let { id ->
                     val uri = loadAvatarUriForCharacter(id)
-                    charSlots[currentCharSlot].setImageURI(Uri.parse(uri))
+                    val imageView = charSlots[currentCharSlot]
+
+                    if (uri.isNotEmpty()) {
+                        Glide.with(this)
+                            .load(uri)
+                            .placeholder(R.drawable.placeholder_avatar)
+                            .error(R.drawable.placeholder_avatar)
+                            .into(imageView)
+                    } else {
+                        imageView.setImageResource(R.drawable.placeholder_avatar)
+                    }
                 }
             }
         }

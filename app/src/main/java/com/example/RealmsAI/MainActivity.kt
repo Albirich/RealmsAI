@@ -2,7 +2,6 @@ package com.example.RealmsAI
 
 import android.content.Context
 import android.content.Intent
-import android.content.SharedPreferences
 import android.net.Uri
 import android.os.Bundle
 import android.util.Log
@@ -17,143 +16,70 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import com.example.RealmsAI.SessionManager.loadHistory
 import com.example.RealmsAI.ai.AIResponseParser
 import com.example.RealmsAI.ai.buildOneOnOneAiPrompt
 import com.example.RealmsAI.ai.buildOneOnOneFacilitatorPrompt
 import com.example.RealmsAI.ai.buildSandboxAiPrompt
 import com.example.RealmsAI.ai.buildSandboxFacilitatorPrompt
-import com.example.RealmsAI.network.ModelClient
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.FirebaseFirestore
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.suspendCancellableCoroutine
-import okhttp3.OkHttpClient
-import okhttp3.logging.HttpLoggingInterceptor
-import org.json.JSONArray
-import org.json.JSONObject
-import kotlin.coroutines.resumeWithException
 import com.example.RealmsAI.models.CharacterProfile
 import com.example.RealmsAI.models.ChatMessage
 import com.example.RealmsAI.models.ChatMode
+import com.example.RealmsAI.models.SessionProfile
+import com.example.RealmsAI.network.ModelClient
 import com.google.firebase.Timestamp
-import kotlinx.coroutines.Dispatchers
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.gson.Gson
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
+import org.json.JSONArray
+import org.json.JSONObject
 import java.util.UUID
-import kotlin.text.isNullOrEmpty
-
+import kotlin.coroutines.resumeWithException
 
 class MainActivity : AppCompatActivity() {
     companion object {
         private const val TAG = "MainActivity"
-        private const val OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
     }
 
-    private lateinit var chatId: String
-    private lateinit var fullProfilesJson: String
-    private var facilitatorNotes: String = ""
-    private var summariesJson: String = "[]"
-    private lateinit var chatTitle: String
-    private var chatDescription: String = ""
-    private lateinit var avatarViews: List<ImageView>
+    private lateinit var parser: AIResponseParser
+    private var chatId: String? = null
+    private var characterId: String? = null
+    private lateinit var sessionId: String
+    private lateinit var chatMode: ChatMode
     private lateinit var chatTitleView: TextView
     private lateinit var chatDescriptionView: TextView
     private lateinit var chatRecycler: RecyclerView
     private lateinit var messageEditText: EditText
     private lateinit var sendButton: Button
     private lateinit var chatAdapter: ChatAdapter
-    private lateinit var parser: AIResponseParser
-    private lateinit var sessionId: String
-    private lateinit var chatMode: ChatMode
-    private lateinit var prefs: SharedPreferences
-    private lateinit var charAvatarUris: List<String>
+    private lateinit var avatarViews: List<ImageView>
     private val botSlotToAvatarIndex = mutableMapOf<String, Int>()
-    val frontSlotTimestamps = mutableListOf(0L, 0L)         // For slots 0 and 1
-    val backSlots = listOf(2, 3)                            // Back slots
-
-    // Shared OkHttpClient with logging
-    private val client = OkHttpClient.Builder()
-        .addInterceptor(
-            HttpLoggingInterceptor { msg -> Log.d("HTTP-OpenAI", msg) }
-                .apply { level = HttpLoggingInterceptor.Level.BODY }
-        )
-        .build()
-
-    private fun loadAvatarUriForCharacter(charId: String): String {
-        val prefs = getSharedPreferences("characters", Context.MODE_PRIVATE)
-        val json = prefs.getString(charId, null) ?: return ""
-        return JSONObject(json).optString("avatarUri", "")
-    }
+    private val frontSlotTimestamps = mutableListOf(0L, 0L)
+    private val backSlots = listOf(2, 3)
+    private lateinit var sessionProfile: SessionProfile
+    private var summariesJson: String = "[]"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Auth guard
+        // Auth check
         val user = FirebaseAuth.getInstance().currentUser
         if (user == null) {
             startActivity(Intent(this, LoginActivity::class.java))
+            Log.d("SessionLanding", "Launching MainActivity with chatId=$chatId, sessionId=$sessionId")
             finish()
             return
         }
 
         setContentView(R.layout.activity_main)
 
-        // Bind views
+        // Bind UI elements
         chatTitleView = findViewById(R.id.chatTitle)
         chatDescriptionView = findViewById(R.id.chatDescription)
         chatRecycler = findViewById(R.id.chatRecyclerView)
         messageEditText = findViewById(R.id.messageEditText)
         sendButton = findViewById(R.id.sendButton)
-
-        // Load intent data
-        // Initialize chatId ASAP
-        chatId = intent.getStringExtra("CHAT_ID") ?: error("CHAT_ID missing")
-
-        // Initialize sessionId similarly
-        sessionId = intent.getStringExtra("SESSION_ID") ?: error("SESSION_ID missing")
-
-        // Initialize fullProfilesJson as discussed
-        fullProfilesJson = intent.getStringExtra("SESSION_PROFILE_JSON") ?: "{}"
-
-        val sessionProfileJson = intent.getStringExtra("SESSION_PROFILE_JSON") ?: "{}"
-        val sessionProfileApiResponse = JSONObject(sessionProfileJson)
-        val contentStr = sessionProfileApiResponse
-            .optJSONArray("choices")
-            ?.optJSONObject(0)
-            ?.optJSONObject("message")
-            ?.optString("content")
-            .orEmpty()
-
-        val unescapedContent = contentStr
-            .replace("\\n", "\n")
-            .replace("\\\"", "\"")
-            .trim()
-
-        val sessionProfileObj = JSONObject(unescapedContent)
-        val chatModeStr = sessionProfileObj.optString("chatMode", "SANDBOX")
-        chatMode = try {
-            ChatMode.valueOf(chatModeStr)
-        } catch (e: Exception) {
-            ChatMode.SANDBOX
-        }
-
-        Log.d(TAG, "Chat mode set early: $chatMode")
-
-        Log.d(TAG, "Using chatId: $chatId")
-        Log.d(TAG, "Using sessionId: $sessionId")
-
-
-        // Header
-        val profileObj = JSONObject(fullProfilesJson)
-        chatTitle = profileObj.optString("title", "Untitled")
-        chatDescription = profileObj.optString("description", "")
-        chatTitleView.text = chatTitle
-        if (chatDescription.isNotBlank()) {
-            chatDescriptionView.text = chatDescription
-            chatDescriptionView.visibility = View.VISIBLE
-        } else chatDescriptionView.visibility = View.GONE
-
-        // Avatars
-
         avatarViews = listOf(
             findViewById(R.id.botAvatar1ImageView),
             findViewById(R.id.botAvatar2ImageView),
@@ -161,71 +87,102 @@ class MainActivity : AppCompatActivity() {
             findViewById(R.id.botAvatar4ImageView)
         )
 
+        // Intent data
+        chatId = intent.getStringExtra("CHAT_ID")
+        characterId = intent.getStringExtra("CHARACTER_ID")
+        sessionId = intent.getStringExtra("SESSION_ID") ?: error("SESSION_ID missing")
 
-// 2) Extract the characterIds array
-        val charArr = profileObj.optJSONArray("characterIds") ?: JSONArray()
-        Log.d("Debug", "Character IDs in fullProfilesJson: $charArr")
+        val sessionProfileJson = intent.getStringExtra("SESSION_PROFILE_JSON") ?: "{}"
+        Log.d(TAG, "SESSION_PROFILE_JSON raw: $sessionProfileJson")
 
-// 3) Build your two helper lists **right here**, before the parser
-        val charNames: List<String> = (0 until charArr.length()).map { idx ->
-            val charId = charArr.optString(idx)
-            val charJson = getSharedPreferences("characters", Context.MODE_PRIVATE)
-                .getString(charId, null)
-                ?: return@map "B${idx + 1}"
-            JSONObject(charJson).optString("name", "B${idx + 1}")
+        // Parse sessionProfile directly
+        sessionProfile = Gson().fromJson(sessionProfileJson, SessionProfile::class.java)
+
+        // Use sessionProfile fields for UI
+        chatTitleView.text = sessionProfile.title ?: "Untitled"
+        val summary = sessionProfile.recentSummary ?: ""
+        if (summary.isNotBlank()) {
+            chatDescriptionView.text = summary
+            chatDescriptionView.visibility = View.VISIBLE
+        } else {
+            chatDescriptionView.visibility = View.GONE
         }
 
-        this.charAvatarUris = (0 until charArr.length()).map { idx ->
-            val charId = charArr.optString(idx)
-            this.loadAvatarUriForCharacter(charId)
+        chatMode = try {
+            ChatMode.valueOf(sessionProfile.chatMode)
+        } catch (e: Exception) {
+            ChatMode.SANDBOX
         }
 
+        // Avatars: update or hide based on slotRoster (if you store avatarUri in SlotInfo or CharacterProfile)
+        val slotList = sessionProfile.slotRoster
+        slotList.forEachIndexed { idx, slotInfo ->
+            val charId = slotInfo.id
+            loadAvatarUriForCharacter(charId) { uri ->
+                if (!uri.isNullOrBlank() && idx < avatarViews.size) {
+                    avatarViews[idx].setImageURI(Uri.parse(uri))
+                    avatarViews[idx].visibility = View.VISIBLE
+                } else if (idx < avatarViews.size) {
+                    avatarViews[idx].setImageDrawable(null)
+                    avatarViews[idx].visibility = View.INVISIBLE
+                }
+            }
+        }
 
         // Recycler setup
         chatRecycler.layoutManager = LinearLayoutManager(this)
         chatAdapter = ChatAdapter(mutableListOf()) { pos ->
             val msg = chatAdapter.getMessages()[pos]
-            Log.d(TAG, "onNewMessage callback: scrolling to position $pos, sender: ${msg.sender}")
-
-            // Example: Update avatar based on the sender's latest message
-            val emotions = mapOf(msg.sender to "neutral") // or track real emotion elsewhere
+            val emotions = mapOf(msg.sender to "neutral")
             onNewMessage(msg.sender, emotions)
             chatRecycler.smoothScrollToPosition(pos)
         }
         chatRecycler.adapter = chatAdapter
 
-
-
-        // Send button
+        // Send button logic
         sendButton.setOnClickListener {
+            Log.d(TAG, "Send button clicked!")
             val text = messageEditText.text.toString().trim()
             if (text.isEmpty()) return@setOnClickListener
 
-            // 1) Immediately show it (now with unique ID!)
             val userMsg = ChatMessage(
-                id = UUID.randomUUID().toString(),   // <-- THIS LINE
+                id = UUID.randomUUID().toString(),
                 sender = "You",
                 messageText = text,
                 timestamp = Timestamp.now()
             )
+            val parentChatId = chatId
+            if (parentChatId.isNullOrBlank() || sessionId.isNullOrBlank()) {
+                Log.e(
+                    TAG,
+                    "No valid chatId or sessionId to send message, chatId=$chatId, sessionId=$sessionId"
+                )
+                return@setOnClickListener
+            }
 
-            // 2) Persist it
-            SessionManager.sendMessage(chatId, sessionId, userMsg)
-            prefs = getSharedPreferences("characters", Context.MODE_PRIVATE)
-            // 3) Kick off the AI
+            Log.d(TAG, "About to call sendMessage: chatId=$chatId sessionId=$sessionId, userMsg=$userMsg")
+            SessionManager.sendMessage(chatId!!, sessionId, userMsg)
+            Log.d(TAG, "sendMessage called")
             sendToAI(text)
-
             messageEditText.text.clear()
         }
-
     }
 
-    // Helper to get the last message timestamp for a given sender (bot slot)
-    fun getLastMessageTimestampForSender(sender: String): Long {
-        return chatAdapter.getMessages()
-            .filter { it.sender == sender }
-            .maxOfOrNull { it.timestamp as Long } ?: 0L
+    private fun loadAvatarUriForCharacter(charId: String, onUriLoaded: (String?) -> Unit) {
+        val userId = FirebaseAuth.getInstance().currentUser?.uid ?: return onUriLoaded(null)
+        FirebaseFirestore.getInstance()
+            .collection("users")
+            .document(userId)
+            .collection("characters")
+            .document(charId)
+            .get()
+            .addOnSuccessListener { doc ->
+                val uri = doc.getString("avatarUri")
+                onUriLoaded(uri)
+            }
+            .addOnFailureListener { onUriLoaded(null) }
     }
+
 
     // On message received:
     fun onNewMessage(speakerSlot: String, emotions: Map<String, String>) {
@@ -271,18 +228,12 @@ class MainActivity : AppCompatActivity() {
         updateAvatars(emotions)
     }
 
-    // Updates the avatarViews according to the botSlotToAvatarIndex and emotions map
     fun updateAvatars(emotions: Map<String, String>) {
+        // Example: update all avatarViews to visible (customize for your design)
         avatarViews.forEachIndexed { idx, imageView ->
-            if (idx < charAvatarUris.size) {
-                val uri = charAvatarUris[idx]
-                if (!uri.isNullOrEmpty()) {
-                    imageView.visibility = View.VISIBLE
-                    imageView.setImageURI(Uri.parse(uri))
-                } else {
-                    imageView.visibility = View.INVISIBLE
-                    imageView.setImageDrawable(null)
-                }
+            if (idx < sessionProfile.slotRoster.size) {
+                imageView.visibility = View.VISIBLE
+                // You might update the avatar here based on emotion
             } else {
                 imageView.visibility = View.INVISIBLE
                 imageView.setImageDrawable(null)
@@ -297,75 +248,71 @@ class MainActivity : AppCompatActivity() {
             .replace("\\\"", "\"")
             .trim()
     }
+    /**
+     * Fetches a CharacterProfile document from Firestore by its ID.
+     * Call this from within a coroutine (e.g. in sendToAI).
+     */
+    private suspend fun fetchCharacterProfile(userId: String, charId: String): CharacterProfile =
+        suspendCancellableCoroutine { cont ->
+            if (charId.isBlank() || userId.isBlank()) {
+                cont.resumeWithException(IllegalArgumentException("Invalid userId/charId"))
+                return@suspendCancellableCoroutine
+            }
+            FirebaseFirestore
+                .getInstance()
+                .collection("users")
+                .document(userId)
+                .collection("characters")
+                .document(charId)
+                .get()
+                .addOnSuccessListener { doc ->
+                    val profile = doc.toObject(CharacterProfile::class.java)
+                    if (profile != null) cont.resume(profile, onCancellation = null)
+                    else cont.resumeWithException(
+                        RuntimeException("Character $charId not found for user $userId")
+                    )
+                }
+                .addOnFailureListener { e ->
+                    cont.resumeWithException(e)
+                }
+        }
+
+    private var facilitatorNotes: String = ""
 
     private fun sendToAI(userInput: String) = lifecycleScope.launch {
         Log.d(TAG, "sendToAI() called with input: $userInput")
 
-        // 1) Build common history string
+        // 1) Build chat history
         val historyStr = buildTrimmedHistory(chatAdapter.getMessages(), 500)
 
-
-        // Parse the fullProfilesJson raw response to extract the actual session data from 'content'
-        if (!this@MainActivity::fullProfilesJson.isInitialized) {
-            Log.e(TAG, "fullProfilesJson is not initialized before sendToAI call!")
+        // Make sure sessionProfile is available
+        if (!::sessionProfile.isInitialized) {
+            Log.e(TAG, "sessionProfile is not initialized before sendToAI call!")
             return@launch
         }
 
-        val outerJson = JSONObject(fullProfilesJson)
-        val contentStr = outerJson.optJSONArray("choices")
-            ?.optJSONObject(0)
-            ?.optJSONObject("message")
-            ?.optString("content")
-            ?: ""
-
-        if (contentStr.isBlank()) {
-            Log.e(TAG, "Content string from facilitator response is empty!")
-            return@launch
-        }
-
-        val contentJson = JSONObject(contentStr)
-
-        // Extract chatMode and update
-        val chatModeStr = contentJson.optString("chatMode", "SANDBOX")
+        // Use chat mode from sessionProfile
         chatMode = try {
-            ChatMode.valueOf(chatModeStr)
+            ChatMode.valueOf(sessionProfile.chatMode)
         } catch (e: Exception) {
             ChatMode.SANDBOX
         }
-        Log.d(TAG, "Extracted and parsed chatMode: $chatMode")
+        Log.d(TAG, "ChatMode in sendToAI: $chatMode")
 
-        // Extract character IDs from characterSummaries array
-        val charArr = contentJson.optJSONArray("characterSummaries")
-            ?.let { summaries ->
-                JSONArray().apply {
-                    for (i in 0 until summaries.length()) {
-                        val charId = summaries.optJSONObject(i)?.optString("id")
-                        if (!charId.isNullOrBlank()) {
-                            put(charId)
-                        }
-                    }
-                }
-            } ?: JSONArray()
-
-        // Map slots for characters B1, B2, ...
-        val defaultSlots = (1..charArr.length()).map { idx -> "B$idx" }
+        // Figure out which character (bot) to send to, and which persona (player/user)
+        val botSlotInfo = sessionProfile.slotRoster.find { it.slot.startsWith("B") }
+        val userSlotInfo = sessionProfile.slotRoster.find { it.slot.startsWith("P") }
 
         when (chatMode) {
             ChatMode.ONE_ON_ONE -> {
-                if (charArr.length() == 0) {
-                    Log.e(TAG, "No character IDs found for ONE_ON_ONE mode!")
+                if (botSlotInfo == null) {
+                    Log.e(TAG, "No bot slot found in ONE_ON_ONE mode!")
                     return@launch
                 }
+                // Load full character info from Firestore, or use cached if you want to optimize
+                val character = fetchCharacterProfile(botSlotInfo.id)
 
-                val charId = charArr.optString(0).orEmpty()
-                if (charId.isBlank()) {
-                    Log.e(TAG, "Character ID is blank for ONE_ON_ONE mode!")
-                    return@launch
-                }
-
-                val character = fetchCharacterProfile(charId)  // suspend helper
-
-                // ---- Facilitator prompt ----
+                // Facilitator prompt (for advanced stuff, e.g. updating notes)
                 val oneFacPrompt = buildOneOnOneFacilitatorPrompt(
                     userInput = userInput,
                     history = historyStr,
@@ -387,17 +334,15 @@ class MainActivity : AppCompatActivity() {
                     ?.optJSONObject("message")
                     ?.optString("content")
                     .orEmpty()
-
-                val facContentJson =
-                    if (facContentStr.isNotBlank()) JSONObject(facContentStr) else null
+                val facContentJson = if (facContentStr.isNotBlank()) JSONObject(facContentStr) else null
                 facilitatorNotes = facContentJson?.optString("notes", "") ?: ""
 
-                // ---- AI prompt ----
+                // AI prompt
                 val oneAiPrompt = buildOneOnOneAiPrompt(
                     userInput = userInput,
                     history = historyStr,
                     facilitatorNotes = facilitatorNotes,
-                    characterName = character.name,   // or whatever your variable is
+                    characterName = character.name,
                     emotionTags = character.emotionTags,
                     maxTokens = 300
                 )
@@ -405,13 +350,11 @@ class MainActivity : AppCompatActivity() {
 
                 val chatPayload = JSONObject().apply {
                     put("model", "mistralai/mixtral-8x7b-instruct")
-                    put(
-                        "messages", JSONArray().put(
-                            JSONObject()
-                                .put("role", "system")
-                                .put("content", oneAiPrompt)
-                        )
-                    )
+                    put("messages", JSONArray().put(
+                        JSONObject()
+                            .put("role", "system")
+                            .put("content", oneAiPrompt)
+                    ))
                     put("max_tokens", 300)
                 }.toString()
                 Log.d(TAG, "One-on-One payload JSON:\n$chatPayload")
@@ -435,69 +378,28 @@ class MainActivity : AppCompatActivity() {
             }
 
             else -> {
-                // ---- Sandbox flow ----
-                val sandboxFac = buildSandboxFacilitatorPrompt(
-                    history = historyStr,
-                    summariesJson = summariesJson,
-                    facilitatorState = facilitatorNotes,
-                    availableSlots = defaultSlots
-                )
-                val facJson = ModelClient.callModel(
-                    promptJson = sandboxFac,
-                    forFacilitator = true,
-                    openAiKey = BuildConfig.OPENAI_API_KEY,
-                    mixtralKey = BuildConfig.MIXTRAL_API_KEY
-                )
-                Log.d(TAG, "Chat mode: $chatMode")
-                Log.d(TAG, "Facilitator prompt:\n$sandboxFac")
-
-                facilitatorNotes = facJson.optString("notes", "")
-                val contentStrSandbox = facJson.optJSONArray("choices")
-                    ?.optJSONObject(0)
-                    ?.optJSONObject("message")
-                    ?.optString("content")
-                    .orEmpty()
-
-                val sessionProfileObjSandbox =
-                    if (contentStrSandbox.isNotBlank()) JSONObject(contentStrSandbox) else null
-                val chatModeStrSandbox =
-                    sessionProfileObjSandbox?.optString("chatMode", "SANDBOX") ?: "SANDBOX"
-                chatMode = try {
-                    ChatMode.valueOf(chatModeStrSandbox)
-                } catch (e: Exception) {
-                    ChatMode.SANDBOX
-                }
-
-                Log.d(TAG, "Extracted and parsed chatMode: $chatMode")
-
-                val activeBots = facJson.optJSONArray("activeBots")
-                    ?.let { arr ->
-                        (0 until arr.length())
-                            .mapNotNull { i -> arr.optString(i).takeIf(String::isNotBlank) }
-                    }
-                    ?: defaultSlots
-
-                val activeProfilesJson = JSONArray(activeBots).toString()
+                // GROUP/SANDBOX flow
+                // Build bot list JSON, etc. from sessionProfile.slotRoster
+                val botProfilesJson = Gson().toJson(sessionProfile.slotRoster.filter { it.slot.startsWith("B") })
 
                 val sandboxAi = buildSandboxAiPrompt(
-                    userInput = userInput,
-                    history = historyStr,
-                    activeProfilesJson = activeProfilesJson,
-                    summariesJson = summariesJson,
-                    facilitatorNotes = facilitatorNotes,
-                    chatDescription = chatDescription,
-                    availableSlots = activeBots
+                    userMessage = userInput,
+                    recentHistory = historyStr,
+                    botProfilesJson = botProfilesJson,
+                    summaryJson = summariesJson,
+                    facilitatorState = facilitatorNotes,
+                    chatInfo = sessionProfile.recentSummary ?: "",
+                    openSlots = sessionProfile.slotRoster.map { it.slot }
                 )
+                Log.d(TAG, "Sandbox AI prompt:\n$sandboxAi")
 
                 val sandboxPayload = JSONObject().apply {
                     put("model", "mistralai/mixtral-8x7b-instruct")
-                    put(
-                        "messages", JSONArray().put(
-                            JSONObject()
-                                .put("role", "system")
-                                .put("content", sandboxAi)
-                        )
-                    )
+                    put("messages", JSONArray().put(
+                        JSONObject()
+                            .put("role", "system")
+                            .put("content", sandboxAi)
+                    ))
                     put("max_tokens", 300)
                 }.toString()
 
@@ -507,8 +409,8 @@ class MainActivity : AppCompatActivity() {
                     openAiKey = BuildConfig.OPENAI_API_KEY,
                     mixtralKey = BuildConfig.MIXTRAL_API_KEY
                 )
-
                 Log.d(TAG, "AI raw JSON: $aiJson")
+
                 val rawContent = aiJson.optJSONArray("choices")
                     ?.optJSONObject(0)
                     ?.optJSONObject("message")
@@ -529,7 +431,6 @@ class MainActivity : AppCompatActivity() {
             chatAdapter.clearMessages()
             true
         }
-
         else -> super.onOptionsItemSelected(item)
     }
 
@@ -550,32 +451,3 @@ class MainActivity : AppCompatActivity() {
         return trimmed.asReversed().joinToString("\n")
     }
 }
-
-/**
- * Fetches a CharacterProfile document from Firestore by its ID.
- * Call this from within a coroutine (e.g. in sendToAI).
- */
-private suspend fun fetchCharacterProfile(charId: String): CharacterProfile =
-    suspendCancellableCoroutine { cont ->
-        if (charId.isBlank()) {
-            cont.resumeWithException(IllegalArgumentException("Invalid character ID: '$charId'"))
-            return@suspendCancellableCoroutine
-        }
-
-        FirebaseFirestore
-            .getInstance()
-            .collection("characters")
-            .document(charId)
-            .get()
-            .addOnSuccessListener { doc ->
-                val profile = doc.toObject(CharacterProfile::class.java)
-                if (profile != null) cont.resume(profile, onCancellation = null)
-                else cont.resumeWithException(
-                    RuntimeException("Character $charId not found")
-                )
-            }
-            .addOnFailureListener { e ->
-                cont.resumeWithException(e)
-            }
-    }
-

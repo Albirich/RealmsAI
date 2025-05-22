@@ -28,10 +28,13 @@ Your output will be consumed by both the app and by the AI roleplayer. You are r
 - sfwOnly: boolean flag
 - startedAt: ISO timestamp or current date/time string
 
-**Slot Logic:**
-- In ONE_ON_ONE mode: assign the player as "P1" and the single bot as "B1".
-- In group chats: assign each character to "B1"..."B8" and player(s) as "P1" etc. (never more than 10 slots total; one must be a player).
-- Assign each slot the character/user’s ID, and the bot/player’s name.
+**Slot Assignment:**
+Assign each persona/profile to a session slot based on their "profileType" field:
+- Assign "player" profiles to slots "P1", "P2", etc.
+- Assign "bot" or "npc" profiles to slots "B1", "B2", etc.
+- If only one player, use "P1" for that player.
+- If only one bot, use "B1" for that bot.
+
 
 **ActiveProfiles for Bots (slotRoster):**
 - For every bot assigned a slot, fill an object with:
@@ -60,7 +63,7 @@ Your output will be consumed by both the app and by the AI roleplayer. You are r
 
 **Backgrounds and Chat Description:**
 - Use background fields from the chat or character profile as "backgroundUri".
-- Use the chat description and all relevant background fields to compose a "recentSummary" (<= 100 tokens) summarizing what the chat is about.
+- Use the chat description and all relevant background fields to compose a "sessionDescription" (<= 100 tokens) summarizing what the chat is about.
 
 **Tagged Memory System:**
 - Build a list "taggedMemories". Each memory is a short (<= 20 tokens) summary of an important fact, event, or relationship, tagged with relevant character IDs or slot names.
@@ -71,10 +74,17 @@ Your output will be consumed by both the app and by the AI roleplayer. You are r
 3. Follow the slot assignment logic above strictly—do NOT assign more than 10 total slots, and always include at least one player.
 4. For every bot or player, include both an activeProfile (for slotRoster) and an inactiveProfile (for personaProfiles).
 5. Fill in lists of outfits and pose names/keys as described.
-6. For the recentSummary, combine chat description and any initial scenario information.
+6. For the sessionDescription, combine chat description and any initial scenario information.
 7. For taggedMemories, provide at least 1-3 key facts using names and tags.
 8. Output only a single, valid, minified JSON object for SessionProfile. No markdown, commentary, or code fencing.
 9. **Do NOT invent field names, skip fields, or change data types.**
+
+ROLE ASSIGNMENT INSTRUCTIONS:
+- The following personaProfile is the PLAYER/USER: [insert the player's personaProfile name and ID here].
+- The following characterProfile is the AI/BOT: [insert the bot's characterProfile name and ID here].
+- Always assign the player’s personaProfile to slot "P1".
+- Always assign the AI-controlled characterProfile to slot "B1".
+- Do NOT swap these or guess based on order.
 
 **INPUT DATA:**
 
@@ -95,7 +105,6 @@ SFW Only: ${if (sfwOnly) "true" else "false"}
 ---
 Now, generate a single, valid JSON object matching the SessionProfile class, following the instructions above.
 """.trimIndent()
-
 
 
 // --- SANDBOX / GROUP MODES ---
@@ -147,21 +156,23 @@ Guidelines:
 """.trimIndent()
 
 fun buildSandboxAiPrompt(
-    userInput: String,
-    history: String,
-    facilitatorNotes: String,
-    activeBots: List<String>,            // E.g., ["B2", "B4"]
-    allBotPoseTags: List<String>,        // List of allowed poses (can also be Map<BotId, List<String>> if custom)
+    userMessage: String,
+    recentHistory: String,
+    botProfilesJson: String,      // you may rename or remove if unused
+    summaryJson: String,          // you may rename or remove if unused
+    facilitatorState: String,
+    chatInfo: String,
+    openSlots: List<String>,      // changed from Int to List<String> to match usage of activeBots below
     maxTokens: Int = 350
 ): String = """
-You are writing ONLY the roleplay for a multi-character chat between the user (never as a speaker), the narrator (N0), and the active bots: ${activeBots.joinToString()}.
+You are writing ONLY the roleplay for a multi-character chat between the user (never as a speaker), the narrator (N0), and the active bots: ${openSlots.joinToString()}.
 Your output MUST follow the format and rules below, or it will be rejected.
 
 ---
 
 ROLES ALLOWED:
 - Narrator (N0): For narration, scene setting, describing all non-player characters (NPCs), and describing actions. Narrator can quote or paraphrase NPCs within narration (e.g., Jim says, "Look out!"), but may NEVER narrate actions or dialogue for the user or "You".
-- ${activeBots.joinToString(", ") { bot -> "$bot" }}: Only these bots may speak as [B#,<pose>,<timing>]. Never write for any other bots in the bracketed speaker format.
+- ${openSlots.joinToString(", ")}: Only these bots may speak as [B#,<pose>,<timing>]. Never write for any other bots in the bracketed speaker format.
 
 ---
 STRICT RULES:
@@ -174,7 +185,7 @@ STRICT FORMAT:
 [B#,<pose>,<timing>] Active bot's direct dialogue or internal monologue
 
 Where:
-- <pose>: One of ${allBotPoseTags.joinToString(", ")}. You must use one of these poses.
+- <pose>: One of ${summaryJson.split(",").joinToString(", ")}. You must use one of these poses.
 - <timing>: 0 (normal), 1 (fast/interrupt), 2 (slow/pause).
 
 NEVER generate a line for any other character, or for the user. NEVER output any text outside this strict bracketed format.
@@ -187,12 +198,12 @@ CONTEXT SECTIONS:
 - USER INPUT: The real-world player's message, question, or action request. NEVER repeat or include this as dialogue, narration, or inner thought in your output. Respond to the user's intention through roleplay, not by quoting or restating the input.
 
 RECENT HISTORY:
-$history
+$recentHistory
 
 FACILITATOR NOTES:
-$facilitatorNotes
+$facilitatorState
 
-USER INPUT: "$userInput"
+USER INPUT: "$userMessage"
 
 ---
 
@@ -211,7 +222,7 @@ OUTPUT INSTRUCTIONS:
 
 POSES EXPLANATIONS:
 - Poses describe the character’s physical/emotional expression, not their action or dialogue content.
-- ONLY use one of the following poses: ${allBotPoseTags.joinToString(", ")}
+- ONLY use one of the following poses: ${summaryJson.split(",").joinToString(", ")}
 - ANGRY: used when the character is mad, yelling, in an argument, etc.
 - EMBARRASSED: used when the character is acting shy, bashful, embarrassed, awkward, etc.
 - EXASPERATED: used when the character is annoyed, flabbergasted, in shock at the audacity of something, etc.

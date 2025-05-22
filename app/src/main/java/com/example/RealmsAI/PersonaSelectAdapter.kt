@@ -12,21 +12,16 @@ import com.example.RealmsAI.models.PersonaProfile
 class PersonaSelectAdapter(
     private val personas: List<PersonaProfile>,
     private val selectedIds: MutableSet<String>,
-    private val onToggle: (String, Boolean) -> Unit
+    private val onToggle: (String, Boolean) -> Unit,
+    private val loadAvatar: (ImageView, String?) -> Unit // add this parameter
 ) : RecyclerView.Adapter<PersonaSelectAdapter.VH>() {
-
     inner class VH(itemView: View) : RecyclerView.ViewHolder(itemView) {
         val avatar: ImageView = itemView.findViewById(R.id.itemPersonaAvatar)
         val name:   TextView  = itemView.findViewById(R.id.itemPersonaName)
 
         fun bind(persona: PersonaProfile) {
-            if (!persona.avatarUri.isNullOrEmpty()) {
-                avatar.setImageURI(Uri.parse(persona.avatarUri))
-            } else {
-                avatar.setImageResource(R.drawable.placeholder_avatar)
-            }
+            loadAvatar(avatar, persona.avatarUri)
             name.text = persona.name
-
             itemView.isSelected = selectedIds.contains(persona.id)
             itemView.alpha = if (itemView.isSelected) 1f else 0.5f
 
