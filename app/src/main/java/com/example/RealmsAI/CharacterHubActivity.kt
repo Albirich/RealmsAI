@@ -15,6 +15,7 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
 import com.google.gson.Gson
+import kotlin.math.log
 
 class CharacterHubActivity : BaseActivity() {
     private lateinit var sortSpinner: Spinner
@@ -48,7 +49,7 @@ class CharacterHubActivity : BaseActivity() {
                     userId = userId,
                     onResult = { sessionId ->
                         if (sessionId != null) {
-                            // Session found: go straight to MainActivity with session info
+                            Log.d("CharacterHub", "Navigating to MainActivity with sessionId: $sessionId")
                             startActivity(Intent(this, MainActivity::class.java).apply {
                                 putExtra("SESSION_ID", sessionId)
                                 putExtra("CHARACTER_ID", preview.id)
@@ -110,8 +111,6 @@ class CharacterHubActivity : BaseActivity() {
         }
 
         FirebaseFirestore.getInstance()
-            .collection("users")
-            .document(userId)
             .collection("characters")
             .orderBy(orderBy, Query.Direction.DESCENDING)
             .get()

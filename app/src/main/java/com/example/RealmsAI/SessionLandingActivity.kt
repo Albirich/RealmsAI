@@ -32,6 +32,7 @@ class SessionLandingActivity : AppCompatActivity() {
 
     companion object {
         private const val SLOT_COUNT = 6
+        private const val PERSONA_SLOT_COUNT = 1 // Set to more when multi-persona is supported
         private const val RELATIONSHIP_REQ_CODE = 2345
     }
 
@@ -42,10 +43,14 @@ class SessionLandingActivity : AppCompatActivity() {
 
     private var selectedSlotIndex = 0
     private val selectedCharIds = MutableList<String?>(SLOT_COUNT) { null }
-    private var selectedPersonaId: String? = null
-    private lateinit var personaSelectLauncher: ActivityResultLauncher<Intent>
+    private val selectedPersonaIds = MutableList<String?>(PERSONA_SLOT_COUNT) { null }
+    private lateinit var personaSelectLaunchers: List<ActivityResultLauncher<Intent>>
     private var currentSessionRelationships = mutableListOf<Relationship>()
     private val currentUserId = FirebaseAuth.getInstance().currentUser?.uid ?: ""
+
+    // These will store loaded profile data after Firestore fetch
+    private var loadedCharacterProfiles = listOf<CharacterProfile>()
+    private var loadedPersonaProfiles = listOf<PersonaProfile>()
 
     private val charSelectLauncher = registerForActivityResult(StartActivityForResult()) { res ->
         if (res.resultCode == Activity.RESULT_OK) {
@@ -73,24 +78,29 @@ class SessionLandingActivity : AppCompatActivity() {
             findViewById(R.id.charButton6),
         )
 
-        // Persona picker logic
-        val initialPersonaId = intent.getStringExtra("INITIAL_PERSONA_ID")
-        if (!initialPersonaId.isNullOrBlank()) {
-            selectedPersonaId = initialPersonaId
-            updatePersonaUI(initialPersonaId)
-        } else {
-            setPlaceholderPersonaUI()
-        }
-        personaSelectLauncher = registerForActivityResult(StartActivityForResult()) { result ->
-            if (result.resultCode == Activity.RESULT_OK) {
-                val personaId = result.data?.getStringExtra("SELECTED_PERSONA_ID") ?: return@registerForActivityResult
-                selectedPersonaId = personaId
-                updatePersonaUI(personaId)
+        // --- Persona picker(s) ---
+        personaSelectLaunchers = List(PERSONA_SLOT_COUNT) { personaIdx ->
+            registerForActivityResult(StartActivityForResult()) { result ->
+                if (result.resultCode == Activity.RESULT_OK) {
+                    val personaId = result.data?.getStringExtra("SELECTED_PERSONA_ID") ?: return@registerForActivityResult
+                    selectedPersonaIds[personaIdx] = personaId
+                    updatePersonaUI(personaIdx, personaId)
+                }
             }
         }
-        findViewById<LinearLayout>(R.id.personaPickerSlot).setOnClickListener {
+
+        // Single persona UI example (expand as needed)
+        val personaSlot = findViewById<LinearLayout>(R.id.personaPickerSlot)
+        setPlaceholderPersonaUI(0)
+        personaSlot.setOnClickListener {
             val intent = Intent(this, PersonaSelectionActivity::class.java)
-            personaSelectLauncher.launch(intent)
+            personaSelectLaunchers[0].launch(intent)
+        }
+        // Pre-fill from intent if needed
+        val initialPersonaId = intent.getStringExtra("INITIAL_PERSONA_ID")
+        if (!initialPersonaId.isNullOrBlank()) {
+            selectedPersonaIds[0] = initialPersonaId
+            updatePersonaUI(0, initialPersonaId)
         }
 
         sfwToggle = findViewById(R.id.sfwToggle)
@@ -142,42 +152,60 @@ class SessionLandingActivity : AppCompatActivity() {
 
         // Relationship editor (works for group only, does nothing in 1-on-1)
         relationshipEditor.setOnClickListener {
+            val safeCharIds = selectedCharIds.filterNotNull()
+            val safePersonaIds = selectedPersonaIds.filterNotNull()
+            val allParticipantIds = ArrayList<String>()
+            allParticipantIds.addAll(safeCharIds)
+            allParticipantIds.addAll(safePersonaIds)
+
+            Log.d("Relationship", "Selected char IDs: $safeCharIds")
+            Log.d("Relationship", "Selected persona IDs: $safePersonaIds")
+            Log.d("Relationship", "All participants: $allParticipantIds")
+
             val intent = Intent(this, SessionRelationshipActivity::class.java)
-            intent.putStringArrayListExtra("PARTICIPANT_IDS", ArrayList(selectedCharIds.filterNotNull()))
+            intent.putStringArrayListExtra("PARTICIPANT_IDS", allParticipantIds)
             startActivityForResult(intent, RELATIONSHIP_REQ_CODE)
         }
 
         // ---- SESSION START: Gather everything you need ----
         startSessionBtn.setOnClickListener {
+            val safeCharIds = selectedCharIds.filterNotNull()
+            val safePersonaIds = selectedPersonaIds.filterNotNull()
             val sessionLandingProfile = SessionLandingProfile(
                 relationships = currentSessionRelationships,
-                participants = selectedCharIds.filterNotNull(),
+                participants = safeCharIds + safePersonaIds,
                 sfwOnly = sfwToggle.isChecked
             )
             val sessionLandingJson = Gson().toJson(sessionLandingProfile)
-            val firestore = FirebaseFirestore.getInstance()
 
             // Collect PersonaProfile(s)
-            val personaIds = selectedPersonaId?.let { listOf(it) } ?: emptyList()
+            val personaIds = safePersonaIds
             val personaTasks = personaIds.map { personaId ->
-                firestore.collection("users").document(currentUserId)
-                    .collection("personas").document(personaId).get()
+                firestore.collection("personas").document(personaId).get()
             }
-            val playerPersonaId = selectedPersonaId
-            val botCharacterId = selectedCharIds[0]
 
             // 1) GROUP CHAT: Fetch all character profiles, then personas, then send
             if (!chatProfileJson.isNullOrBlank()) {
                 val characterIds = chatProfile!!.characterIds.filterNotNull()
                 val characterTasks = characterIds.map { id -> firestore.collection("characters").document(id).get() }
                 Tasks.whenAllSuccess<DocumentSnapshot>(characterTasks).addOnSuccessListener { docs ->
-                    val characterProfiles = docs.mapNotNull { it.toObject(CharacterProfile::class.java) }
-                    val characterProfilesJson = Gson().toJson(characterProfiles)
+                    val rawProfiles = docs.mapNotNull { it.toObject(CharacterProfile::class.java) }
+                    // **Inject relationships here**
+                    loadedCharacterProfiles = rawProfiles.map { profile ->
+                        profile.copy(
+                            relationships = currentSessionRelationships.filter { it.fromId == profile.id }
+                        )
+                    }
+                    val characterProfilesJson = Gson().toJson(loadedCharacterProfiles)
 
-                    // Fetch persona(s) (currently just selectedPersonaId, but could be expanded to all users in future)
                     Tasks.whenAllSuccess<DocumentSnapshot>(personaTasks).addOnSuccessListener { personaDocs ->
-                        val personaProfiles = personaDocs.mapNotNull { it.toObject(PersonaProfile::class.java) }
-                        val personaProfilesJson = Gson().toJson(personaProfiles)
+                        val rawPersonas = personaDocs.mapNotNull { it.toObject(PersonaProfile::class.java) }
+                        loadedPersonaProfiles = rawPersonas.map { profile ->
+                            profile.copy(
+                                relationships = currentSessionRelationships.filter { it.fromId == profile.id }
+                            )
+                        }
+                        val personaProfilesJson = Gson().toJson(loadedPersonaProfiles)
 
                         sendPromptAndStartSession(
                             chatProfileJson = chatProfileJson,
@@ -190,11 +218,21 @@ class SessionLandingActivity : AppCompatActivity() {
             }
             // 2) ONE-ON-ONE: Only one character profile (already in memory), fetch persona, then send
             else if (characterProfile != null) {
-                val characterProfilesJson = Gson().toJson(listOf(characterProfile))
+                loadedCharacterProfiles = listOf(
+                    characterProfile.copy(
+                        relationships = currentSessionRelationships.filter { it.fromId == characterProfile.id }
+                    )
+                )
+                val characterProfilesJson = Gson().toJson(loadedCharacterProfiles)
 
                 Tasks.whenAllSuccess<DocumentSnapshot>(personaTasks).addOnSuccessListener { personaDocs ->
-                    val personaProfiles = personaDocs.mapNotNull { it.toObject(PersonaProfile::class.java) }
-                    val personaProfilesJson = Gson().toJson(personaProfiles)
+                    loadedPersonaProfiles = personaDocs.mapNotNull { it.toObject(PersonaProfile::class.java) }
+                        .map { profile ->
+                            profile.copy(
+                                relationships = currentSessionRelationships.filter { it.fromId == profile.id }
+                            )
+                        }
+                    val personaProfilesJson = Gson().toJson(loadedPersonaProfiles)
 
                     sendPromptAndStartSession(
                         chatProfileJson = "",
@@ -204,6 +242,16 @@ class SessionLandingActivity : AppCompatActivity() {
                     )
                 }
             }
+        }
+    }
+
+    // Place onActivityResult as a **top-level override**, NOT inside onCreate!
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == RELATIONSHIP_REQ_CODE && resultCode == Activity.RESULT_OK && data != null) {
+            val relationshipsJson = data.getStringExtra("RELATIONSHIPS_JSON")
+            val newRelationships = Gson().fromJson(relationshipsJson, Array<Relationship>::class.java).toList()
+            currentSessionRelationships = newRelationships.toMutableList()
         }
     }
 
@@ -232,6 +280,16 @@ class SessionLandingActivity : AppCompatActivity() {
                 Log.d("FacilitatorPrompt", "Sending prompt to facilitator:\n$facilitatorPrompt")
                 Log.d("FacilitatorResponse", sessionProfileJsonRaw)
 
+                val safeCharIds = selectedCharIds.filterNotNull()
+                val safePersonaIds = selectedPersonaIds.filterNotNull()
+                val someListOfExtraPlayerUserIds = listOf(currentUserId)
+
+                val allUserParticipants = mutableListOf<String>()
+                allUserParticipants.add(currentUserId)
+                allUserParticipants.addAll(someListOfExtraPlayerUserIds)
+
+                val allCharacterAndPersonaIds = safeCharIds + safePersonaIds
+
                 val sessionProfile = Gson().fromJson(sessionProfileJsonRaw, SessionProfile::class.java)
                 SessionManager.createSession(
                     sessionProfile = sessionProfile,
@@ -239,6 +297,7 @@ class SessionLandingActivity : AppCompatActivity() {
                     userId = currentUserId,
                     characterProfilesJson = characterProfilesJson,
                     characterId = selectedCharIds.firstOrNull { it != currentUserId } ?: "",
+                    extraParticipants = allUserParticipants, // <<------ PASS YOURS HERE
                     onResult = { sessionId ->
                         startActivity(Intent(this, MainActivity::class.java).apply {
                             putExtra("CHAT_ID", sessionProfile.chatId)
@@ -258,19 +317,16 @@ class SessionLandingActivity : AppCompatActivity() {
         )
     }
 
-    private fun setPlaceholderPersonaUI() {
+    private fun setPlaceholderPersonaUI(personaIdx: Int) {
         val personaAvatar = findViewById<ImageView>(R.id.personaAvatar)
         val personaName = findViewById<TextView>(R.id.personaName)
         personaAvatar.setImageResource(R.drawable.placeholder_avatar)
         personaName.text = "Select Persona"
     }
 
-    private fun updatePersonaUI(personaId: String) {
+    private fun updatePersonaUI(personaIdx: Int, personaId: String) {
         val firestore = FirebaseFirestore.getInstance()
-        val currentUserId = FirebaseAuth.getInstance().currentUser?.uid ?: return
-        firestore.collection("users")
-            .document(currentUserId)
-            .collection("personas")
+        firestore.collection("personas")
             .document(personaId)
             .get()
             .addOnSuccessListener { doc ->

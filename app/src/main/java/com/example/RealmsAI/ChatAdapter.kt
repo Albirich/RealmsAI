@@ -89,9 +89,6 @@ class ChatAdapter(
         // Log for debug
         Log.d("ChatAdapter", "Trying to add message ID: ${newMsg.id}")
 
-        // Check for duplicate by unique ID (as long as ID is not blank)
-
-
         // Add message to the adapter’s list
         messages.add(newMsg)
         Log.d("ChatAdapter", "addMessage: Added message '${newMsg.messageText.take(30)}...' at position ${messages.size - 1}")

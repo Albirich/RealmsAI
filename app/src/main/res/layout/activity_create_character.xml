@@ -105,6 +105,13 @@
             android:layout_marginTop="16dp"
             android:text="Wardrobe" />
 
+        <Button
+            android:id="@+id/relationshipBtn"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Relationships"/>
+
         <!-- Background Selector -->
         <TextView
             android:layout_width="wrap_content"

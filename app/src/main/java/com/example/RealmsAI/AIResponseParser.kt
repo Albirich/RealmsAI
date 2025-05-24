@@ -18,7 +18,6 @@ class AIResponseParser(
     private val chatRecycler: RecyclerView,
     private val updateAvatar: (speakerId: String, emotion: String) -> Unit,
     private val onNewMessage: (speakerId: String, emotions: Map<String, String>) -> Unit,
-    private val loadName: (speakerId: String) -> String,
     private val chatId: String,
     private val sessionId: String,
 

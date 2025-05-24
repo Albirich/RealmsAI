@@ -6,7 +6,7 @@ data class SessionProfile(
     val sessionId: String = "",
     val chatId: String = "",
     val title: String = "",
-    val recentSummary: String = "",
+    val sessionDescription: String = "",
     val backgroundUri: String? = null,
     val chatMode: String = "SANDBOX", // or enum, but use String to match JSON
     val startedAt: String? = null,
@@ -15,11 +15,10 @@ data class SessionProfile(
 
     val slotRoster: List<SlotInfo> = emptyList(),
     val lastMessages: List<MessageSummary>? = null,
-    val taggedMemories: List<TaggedMemory>? = null,
+    val tags: List<String> = emptyList(),
+    val taggedMemories: List<TaggedMemory> = emptyList(),
 
-    val personaProfiles: List<PersonaProfile> = emptyList(),
-
-    val tags: List<String>? = null
+    val personaProfiles: List<PersonaProfile> = emptyList()
 )
 
 data class SlotInfo(
@@ -41,7 +40,6 @@ data class MessageSummary(
 )
 
 data class TaggedMemory(
-    val label: String = "",     // e.g., "Naruto|Sasuke|Chunin Exams"
-    val summary: String = "",   // Short fact/description
-    val relatedSlots: List<String> = emptyList() // e.g., ["B1", "B2"]
+    val summary: String = "",
+    val tags: List<String> = emptyList()
 )

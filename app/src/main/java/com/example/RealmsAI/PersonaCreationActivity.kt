@@ -68,7 +68,8 @@ class PersonaCreationActivity : AppCompatActivity() {
             val intent = Intent(this, WardrobeActivity::class.java)
             startActivityForResult(intent, WARDROBE_REQUEST)
         }
-
+        val ageStr = ageEt.text.toString().trim()
+        val age = ageStr.toIntOrNull() ?: 0 // or any sensible default/validation
         // Save
         saveBtn.setOnClickListener {
             val userId = FirebaseAuth.getInstance().currentUser?.uid
@@ -80,7 +81,7 @@ class PersonaCreationActivity : AppCompatActivity() {
             val persona = PersonaProfile(
                 id          = System.currentTimeMillis().toString(),
                 name        = nameEt.text.toString().trim(),
-                age         = ageEt.text.toString().trim(),
+                age         = age,
                 gender      = genderEt.text.toString().trim(),
                 height      = heightEt.text.toString().trim(),
                 hair        = hairEt.text.toString().trim(),
@@ -98,8 +99,6 @@ class PersonaCreationActivity : AppCompatActivity() {
     private fun savePersona(persona: PersonaProfile) {
         // Write to Firestore (under user collection for isolation)
         FirebaseFirestore.getInstance()
-            .collection("users")
-            .document(persona.author)
             .collection("personas")
             .document(persona.id)
             .set(persona)

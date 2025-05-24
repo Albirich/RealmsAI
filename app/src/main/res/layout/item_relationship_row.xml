@@ -9,13 +9,14 @@
     android:paddingTop="2dp"
     android:paddingBottom="2dp">
 
-    <TextView
-        android:id="@+id/relationshipToName"
-        android:layout_width="0dp"
+    <EditText
+        android:id="@+id/relationshipToNameEdit"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_weight="1"
-        android:text="To Name"
-        android:textSize="16sp" />
+        android:hint="With (Name)"
+        android:textSize="16sp"
+        android:inputType="textPersonName" />
 
     <TextView
         android:id="@+id/relationshipType"
@@ -41,6 +42,7 @@
         android:layout_width="28dp"
         android:layout_height="28dp"
         android:background="?android:selectableItemBackgroundBorderless"
+        android:scaleType="fitCenter"
         android:src="@drawable/ic_delete"
         android:contentDescription="Delete"
         android:layout_marginStart="4dp"/>

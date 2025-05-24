@@ -19,15 +19,11 @@ data class CharacterProfile(
     val outfits            : List<Outfit>        = emptyList(),
     val currentOutfit      : String              = "",
     val createdAt          : Timestamp?          = null,
-    val age                : Double? = null,
-    val weight             : Double? = null,
+    var height             : String              = "",
+    var weight             : String              = "",
+    var age                : Int                 =0,
     val eyeColor           : String              = "",
     val hairColor          : String              = "",
+    val relationships: List<Relationship> = emptyList(),
     val profileType        : String = "bot"
-){
-    val weightStr: String
-        get() = weight?.toString() ?: "Unknown"
-    val ageStr: String
-        get() = age?.toString() ?: "Unknown"
-
-}
+)

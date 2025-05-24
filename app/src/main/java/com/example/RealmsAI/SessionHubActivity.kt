@@ -38,9 +38,9 @@ class SessionHubActivity : BaseActivity() {
             return
         }
 
-        db.collection("sessions")
-            .whereEqualTo("userId", userId)
-            .orderBy("timestamp", Query.Direction.DESCENDING)
+        db.collectionGroup("sessions")
+            .whereArrayContains("participants", userId)
+            .orderBy("startedAt", Query.Direction.DESCENDING)
             .get()
             .addOnSuccessListener { snap ->
                 val previews = snap.documents.mapNotNull { doc ->
@@ -49,7 +49,7 @@ class SessionHubActivity : BaseActivity() {
                         id = doc.id,
                         title = data["title"] as? String ?: "(Untitled Session)",
                         chatId = data["chatId"] as? String ?: "",
-                        timestamp = (data["timestamp"] as? com.google.firebase.Timestamp)?.seconds ?: 0L,
+                        timestamp = (data["startedAt"] as? com.google.firebase.Timestamp)?.seconds ?: 0L,
                         rawJson = Gson().toJson(data)
                     )
                 }
@@ -87,6 +87,7 @@ class SessionHubActivity : BaseActivity() {
                             .show()
                     }
                 )
+
 
             }
             .addOnFailureListener { e ->

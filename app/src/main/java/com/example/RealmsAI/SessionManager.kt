@@ -1,22 +1,22 @@
 package com.example.RealmsAI
 
 import android.util.Log
-import androidx.recyclerview.widget.RecyclerView
 import com.example.RealmsAI.models.ChatMessage
 import com.example.RealmsAI.models.SessionProfile
 import com.google.firebase.firestore.DocumentChange
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.Query
 import org.json.JSONObject
-import java.util.UUID
 
 object SessionManager {
     private val db = FirebaseFirestore.getInstance()
 
     /**
-     * Finds or creates a session under /chats/{chatId}/sessions.
+     * Creates a session under /chats/{chatId}/sessions and ensures 'participants' is a list of UIDs
+     * (including the current user). Calls onResult with the new sessionId on success.
+     *
+     * This does **not** start any Activities! Pass your navigation code in the onResult callback.
      */
     fun createSession(
         sessionProfile: SessionProfile,
@@ -24,20 +24,26 @@ object SessionManager {
         userId: String,
         characterProfilesJson: String,
         characterId: String,
+        extraParticipants: List<String> = emptyList(), // Optional, future-proof!
         onResult: (sessionId: String) -> Unit,
         onError: (Exception) -> Unit = {}
     ) {
-        // Parse chatId from chatProfileJson if needed
         val chatId = try {
             JSONObject(chatProfileJson).optString("id", sessionProfile.chatId)
         } catch (e: Exception) {
             sessionProfile.chatId
         }
 
-        // Prepare session data to write
+        // Combine: SessionProfile participants, current user, and any extras from UI
+        val participants = (
+                (sessionProfile.participants ?: emptyList()) +
+                        userId +
+                        extraParticipants
+                ).filterNotNull().toSet()
+
         val sessionData = hashMapOf(
             "chatId" to chatId,
-            "participants" to sessionProfile.participants,
+            "participants" to participants.toList(),
             "characterId" to characterId,
             "sessionId" to sessionProfile.sessionId,
             "startedAt" to com.google.firebase.Timestamp.now(),
@@ -45,9 +51,8 @@ object SessionManager {
             "title" to sessionProfile.title,
             "backgroundUri" to sessionProfile.backgroundUri,
             "chatMode" to sessionProfile.chatMode,
-            "slotRoster" to sessionProfile.slotRoster, // you might want to serialize this properly
-            "personaProfiles" to sessionProfile.personaProfiles, // same here
-            // Add any other needed sessionProfile fields here
+            "slotRoster" to sessionProfile.slotRoster,
+            "personaProfiles" to sessionProfile.personaProfiles,
             "characterProfilesJson" to characterProfilesJson
         )
 
@@ -60,9 +65,8 @@ object SessionManager {
     }
 
 
-
     /**
-     * Loads chat history from Firestore and patches missing IDs.
+     * Loads chat history (all ChatMessages) for the given chat/session.
      */
     fun loadHistory(
         chatId: String,
@@ -83,13 +87,16 @@ object SessionManager {
             .addOnFailureListener(onError)
     }
 
+    /**
+     * Finds the most recent session for this chatId/userId combo.
+     * Calls onResult with the sessionId or null if not found.
+     */
     fun findSessionForUser(
         chatId: String,
         userId: String,
         onResult: (sessionId: String?) -> Unit,
         onError: (Exception) -> Unit = {}
-    )
-    {
+    ) {
         db.collection("chats")
             .document(chatId)
             .collection("sessions")
@@ -101,13 +108,15 @@ object SessionManager {
                 val sessionId = snap.documents.firstOrNull()?.id
                 onResult(sessionId)
             }
-            .addOnFailureListener { e -> onResult(null) }
+            .addOnFailureListener { e ->
+                onError(e)
+            }
     }
 
-
-
     /**
-     * Listen to new messages in real time.
+     * Listen for new ChatMessages in real time for a session.
+     * Passes each new ChatMessage to onNew as they're added.
+     * Returns the ListenerRegistration so you can stop listening.
      */
     fun listenMessages(
         chatId: String,
@@ -131,7 +140,7 @@ object SessionManager {
     }
 
     /**
-     * Send a ChatMessage to Firestore.
+     * Sends a single ChatMessage to Firestore for the given session.
      */
     fun sendMessage(chatId: String, sessionId: String, chatMessage: ChatMessage) {
         val msgMap = mapOf(
@@ -153,6 +162,4 @@ object SessionManager {
                 Log.e("SessionManager", "Failed to send message", e)
             }
     }
-
-
 }

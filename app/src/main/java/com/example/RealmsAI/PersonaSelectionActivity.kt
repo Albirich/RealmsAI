@@ -24,7 +24,7 @@ class PersonaSelectionActivity : AppCompatActivity() {
         // 1) Load all personas from prefs or Firestore
         fun loadPersonas(userId: String, onLoaded: (List<PersonaProfile>) -> Unit) {
             val db = FirebaseFirestore.getInstance()
-            db.collection("users").document(userId).collection("personas")
+            db.collection("personas")
                 .get()
                 .addOnSuccessListener { snapshot ->
                     val personas = snapshot.documents.mapNotNull { doc ->

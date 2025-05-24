@@ -10,10 +10,15 @@
         android:layout_height="wrap_content"
         android:text="With:"
         android:paddingTop="2dp" />
-    <Spinner
-        android:id="@+id/relationshipToSpinner"
+    <EditText
+        android:id="@+id/relationshipToNameEdit"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content" />
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:hint="With (Name)"
+        android:textSize="16sp"
+        android:inputType="textPersonName" />
+
 
     <TextView
         android:layout_width="wrap_content"

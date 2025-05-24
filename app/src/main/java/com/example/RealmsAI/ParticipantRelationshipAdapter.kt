@@ -3,6 +3,7 @@ package com.example.RealmsAI
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.EditText
 import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.TextView
@@ -11,7 +12,6 @@ import com.example.RealmsAI.models.ParticipantPreview
 import com.example.RealmsAI.models.Relationship
 import com.example.RealmsAI.R
 
-
 class ParticipantRelationshipAdapter(
     val participants: List<ParticipantPreview>,
     val relationships: MutableList<Relationship>,
@@ -19,7 +19,7 @@ class ParticipantRelationshipAdapter(
     val onDeleteRelationship: (Relationship) -> Unit
 ) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
 
-    // Calculate flat list for adapter: [header, rel, rel, header, rel...]
+    // Flatten for adapter: [header, rel, rel, header, rel...]
     private val items = mutableListOf<Any>()
     init { buildItemList() }
     private fun buildItemList() {
@@ -64,27 +64,22 @@ class ParticipantRelationshipAdapter(
         private val btnAdd = view.findViewById<ImageButton>(R.id.btnAddRelationship)
         fun bind(participant: ParticipantPreview) {
             name.text = participant.name
-            // Load avatar URI if you want (Glide/Picasso/Coil)
             btnAdd.setOnClickListener { onAddRelationship(participant.id) }
         }
     }
 
     inner class RelationshipRowHolder(view: View) : RecyclerView.ViewHolder(view) {
-        private val toName = view.findViewById<TextView>(R.id.relationshipToName)
+        private val toNameEdit = view.findViewById<EditText>(R.id.relationshipToNameEdit)
         private val type = view.findViewById<TextView>(R.id.relationshipType)
         private val summary = view.findViewById<TextView>(R.id.relationshipSummary)
         private val btnDelete = view.findViewById<ImageButton>(R.id.btnDeleteRelationship)
         fun bind(rel: Relationship) {
-            toName.text = findParticipantName(rel.toId)
+            toNameEdit.setText(rel.toName)  // <--- Display arbitrary name
             type.text = rel.type
             summary.text = rel.description
             btnDelete.setOnClickListener { onDeleteRelationship(rel) }
         }
     }
-
-
-    private fun findParticipantName(id: String) =
-        participants.find { it.id == id }?.name ?: "Unknown"
 
     fun refresh() {
         buildItemList()

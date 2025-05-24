@@ -19,9 +19,7 @@ Your output will be consumed by both the app and by the AI roleplayer. You are r
 - AI-ready fields for character, outfit, pose, and relationship data, as described below.
 
 **System-Required Fields:**
-- sessionId: unique string (generate a UUID or use chatId+timestamp if not provided)
 - chatId: taken from the chat profile
-- participants: list of all user and bot IDs
 - chatMode: e.g. "ONE_ON_ONE", "SANDBOX", etc.
 - title: name of the chat, or character name for one-on-one
 - backgroundUri: pulled from the chat or character profile
@@ -65,8 +63,17 @@ Assign each persona/profile to a session slot based on their "profileType" field
 - Use background fields from the chat or character profile as "backgroundUri".
 - Use the chat description and all relevant background fields to compose a "sessionDescription" (<= 100 tokens) summarizing what the chat is about.
 
-**Tagged Memory System:**
-- Build a list "taggedMemories". Each memory is a short (<= 20 tokens) summary of an important fact, event, or relationship, tagged with relevant character IDs or slot names.
+**Tagged Memories and Tags:**
+- Each memory is a short (≤ 20 tokens) summary of an important fact, event, or relationship.
+- Each memory must include a `tags` field: a list of one or more participant IDs, slot names, or descriptive tags (e.g., ["P1", "B1"], ["Inome Yamanaka", "test"], ["friendship"], etc).
+- All tags referenced in any memory must be included in a top-level "tags" array (List<String>) on the SessionProfile.
+- Do NOT invent unrelated tags—use only participant names, slot IDs, or meaningful groupings.
+- Example:
+    {
+      "summary": "Inome and test share a close bond.",
+      "tags": ["Inome Yamanaka", "test", "friendship"]
+    }
+- Populate 1-3 tagged memories, ensuring each memory's `tags` list accurately reflects the participants or concepts involved.
 
 **Instructions:**
 1. Parse the input JSONs below for all relevant fields.

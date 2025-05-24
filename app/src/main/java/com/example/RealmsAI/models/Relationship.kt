@@ -1,10 +1,10 @@
 package com.example.RealmsAI.models
 
 data class Relationship(
-    val fromId: String,      // Who has the relationship
-    val toId: String,        // Who the relationship is with
-    val type: String,        // E.g. "rival", "mentor", "friend"
-    val description: String = ""
+    var fromId: String,      // Who has the relationship
+    var toName: String,        // Who the relationship is with
+    var type: String,        // E.g. "rival", "mentor", "friend"
+    var description: String = ""
 )
 
 data class ParticipantPreview(
@@ -21,7 +21,7 @@ val RELATIONSHIP_TYPES = listOf(
     "Protege",
     "Parent",
     "Child",
-    "Romantic",
+    "Lover",
     "Teammate",
     "Ally",
     "Enemy"
