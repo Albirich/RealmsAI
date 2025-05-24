@@ -4,6 +4,7 @@ import android.content.ContentValues.TAG
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import androidx.compose.ui.res.stringResource
 import androidx.recyclerview.widget.RecyclerView
 import com.example.RealmsAI.ChatAdapter
 import com.example.RealmsAI.models.ChatMessage
@@ -27,7 +28,7 @@ class AIResponseParser(
     fun handle(raw: String) {
         Log.d("AIResponseParser", "handle() called with chatMode: $chatMode")
         when (chatMode) {
-            ChatMode.ONE_ON_ONE -> handleOneOnOne(raw)
+            ChatMode.ONE_ON_ONE -> handleOneOnOne(raw, characterName = String())
             ChatMode.SANDBOX -> handleSandbox(raw)
             ChatMode.RPG -> handleRpg(raw)
             ChatMode.VISUAL_NOVEL -> handleVn(raw)
@@ -38,15 +39,19 @@ class AIResponseParser(
     // ONE-ON-ONE handler
     private val oneOnOneRe = Regex("""\[\s*([\w\s]+)\s*,\s*(\w+)\s*,\s*(\d+)\s*]\s*["“]?(.+?)["”]?$""")
 
-    fun handleOneOnOne(raw: String) {
+    fun handleOneOnOne(raw: String, characterName: String) {
         val parsedMessages = mutableListOf<ParsedMessage>()
 
         raw.lineSequence()
             .map { it.trim() }
             .filter { it.isNotEmpty() }
-            .forEachIndexed { index, line ->
+            .forEach { line ->
                 oneOnOneRe.matchEntire(line)?.destructured?.let { (slot, pose, timing, text) ->
-                    val displayName = if (slot.equals("N0", ignoreCase = true)) "Narrator" else slot.capitalizeWords()
+                    val displayName = when (slot) {
+                        "N0" -> "Narrator"
+                        "B1" -> characterName
+                        else -> slot
+                    }
                     parsedMessages.add(
                         ParsedMessage(
                             speakerId = displayName,
@@ -62,6 +67,7 @@ class AIResponseParser(
             renderParsedWithSpeed(parsedMessages)
         }
     }
+
 
 
     // SANDBOX / GROUP handler
@@ -165,22 +171,22 @@ class AIResponseParser(
             val chatMsg = ChatMessage(
                 id = UUID.randomUUID().toString(),
                 sender = displayName,
-                messageText = parsedMessage.text
+                messageText = parsedMessage.text,
+                timestamp = Timestamp.now()
             )
 
+
+                updateAvatar(displayName, parsedMessage.emotion)
             parsedMessage.others.forEach { (otherId, emo) ->
                 updateAvatar(otherId, emo)
             }
                 SessionManager.sendMessage(chatId, sessionId, chatMsg)
-                chatRecycler.smoothScrollToPosition(chatAdapter.itemCount - 1)
+                chatAdapter.addMessage(chatMsg)
 
                 Log.d(TAG, "Posting [${displayName}] ${parsedMessage.text} with delay $cumulativeDelay")
         },cumulativeDelay)
     }
 }
-
-
-
 
 
     // Placeholder: update game state (stub)

@@ -315,19 +315,22 @@ Your output MUST follow the strict format and rules below, or it will be rejecte
 
 ROLES ALLOWED:
 - Narrator (N0): For narration, scene setting, describing all non-player characters (NPCs), and describing actions. Narrator can quote or paraphrase NPCs within narration (e.g., Jim says, "Look out!"), but may NEVER narrate actions or dialogue for the user or "You".
-- $characterName: The only character who can speak directly as [$characterName,<pose>,<timing>].
+- $characterName: The only character who can speak directly as [B1,<pose>,<timing>].
 
 ---
 STRICT RULES:
-- Never write a line beginning with "You:" or "User:". Only output lines in the bracketed format: [N0,POSE,TIMING] or [$characterName,POSE,TIMING].
+- You MUST ONLY use the following pose names exactly as written (no variations, no invented new poses): ${emotionTags.keys.joinToString(", ") { "\"$it\"" }}
+- Never write a line beginning with "You:" or "User:". Only output lines in the bracketed format: [N0,POSE,TIMING] or [B1,POSE,TIMING].
 - Any user action, dialogue, or reaction must be described by the Narrator ([N0,...]) only, and never as user speech.
+- Never invent or use any pose name not in the allowed list above.
+- When formatting character lines, ALWAYS use [B1,<pose>,<timing>] for $characterName, NEVER their actual name.
 
 STRICT FORMAT:
 [N0,<pose>,<timing>] Narration, description, or NPC action/speech (in narration only)
-[$characterName,<pose>,<timing>] $characterName's direct dialogue or inner thoughts
+[B1,<pose>,<timing>] $characterName's direct dialogue or inner thoughts
 
 Where:
-- <pose>: Must be exactly one of the following: ${emotionTags.keys.joinToString(", ") { "\"$it\"" }}
+- <pose>: MUST be one of ONLY these: ${emotionTags.keys.joinToString(", ") { "\"$it\"" }}
 - <timing>: 0 (normal), 1 (fast/interrupt), 2 (slow/pause)
 
 Never generate a line for any other character, or for the user. Never output any text outside this strict bracketed format.
@@ -345,11 +348,12 @@ USER INPUT: "$userInput"
 
 ---
 
-POSES/EMOTIONS EXPLANATION:
+POSES/EMOTIONS DEFINITIONS:
 ${emotionTags.entries.joinToString("\n") { (k, v) -> "- $k: $v" }}
 
 IMPORTANT:
-- ONLY use [N0,<pose>,<timing>] and [$characterName,<pose>,<timing>] lines.
+- You may ONLY use [N0,<pose>,<timing>] and [B1,<pose>,<timing>] lines.
+- You may ONLY use poses from the allowed list. DO NOT invent or use any pose not listed above, or your output will be rejected.
 - Narrator may quote or paraphrase NPCs, but never as bracketed speakers.
 - DO NOT include lines for "User", "You", or any character besides $characterName and N0.
 - DO NOT output any system messages, commentary, or extra formatting.
@@ -364,15 +368,17 @@ IMPORTANT:
 EXAMPLES:
 
 [N0,neutral,1] The alley is quiet. Jim glances over his shoulder and whispers, "We should leave."
-[$characterName,surprised,0] "Jim... what happened to your arm?"
+[B0,surprised,0] "Jim... what happened to your arm?"
 [N0,thinking,0] Jim shrugs. "Had a run-in with the wrong crowd," he mutters, avoiding your gaze.
-[$characterName,angry,1] "If anyone else tries to hurt you, they'll have to get through me first."
+[B1,angry,1] "If anyone else tries to hurt you, they'll have to get through me first."
 
 ---
 
-ONLY generate lines in this exact format. If you include anything else, the output will be rejected.
+ONLY generate lines in this exact format. If you include anything else, or use any pose name not in the allowed list, the output will be rejected.
 
 """.trimIndent()
+
+
 
 
 

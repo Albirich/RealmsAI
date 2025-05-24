@@ -20,6 +20,7 @@ import com.example.RealmsAI.ai.AIResponseParser
 import com.example.RealmsAI.ai.buildOneOnOneAiPrompt
 import com.example.RealmsAI.ai.buildOneOnOneFacilitatorPrompt
 import com.example.RealmsAI.ai.buildSandboxAiPrompt
+import com.example.RealmsAI.ai.buildSandboxFacilitatorPrompt
 import com.example.RealmsAI.models.*
 import com.example.RealmsAI.network.ModelClient
 import com.google.firebase.Timestamp
@@ -211,8 +212,6 @@ class MainActivity : AppCompatActivity() {
     private fun loadAvatarUriForCharacter(charId: String, onUriLoaded: (String?) -> Unit) {
         val userId = FirebaseAuth.getInstance().currentUser?.uid ?: return onUriLoaded(null)
         FirebaseFirestore.getInstance()
-            .collection("users")
-            .document(userId)
             .collection("characters")
             .document(charId)
             .get()
@@ -345,11 +344,52 @@ class MainActivity : AppCompatActivity() {
                     .orEmpty()
                 Log.d(TAG, "Parsed rawContent: $rawContent")
 
-                parser.handleOneOnOne(rawContent)
+                parser.handleOneOnOne(rawContent, character.name)
             }
             else -> {
+                // 1. Build and call the facilitator for the sandbox/multi-bot mode
                 val botSlotInfos = sessionProfile.slotRoster.filter { it.slot.startsWith("B") }
                 val botProfilesJson = Gson().toJson(botSlotInfos)
+                val characterListJson = Gson().toJson(botSlotInfos)
+
+                // For relationships, create a JSON array/list if you have relationship info, otherwise pass null or "".
+                // If you don't track inter-bot relationships yet, just set to null or an empty array as a string:
+                val relationshipListJson: String? = null // or Gson().toJson(emptyList<Relationship>())
+
+                // Tagged memories as JSON (build as needed for your scenario)
+                val taggedMemoriesJson = Gson().toJson(sessionProfile.taggedMemories)
+
+                // Session summary (scene/setting/etc)
+                val sessionSummary = sessionProfile.sessionDescription ?: ""
+                val sandboxFacPrompt = buildSandboxFacilitatorPrompt(
+                    sessionSummary = sessionSummary,
+                    recentHistory = historyStr,
+                    characterListJson = characterListJson,
+                    relationshipListJson = relationshipListJson,
+                    taggedMemoriesJson = taggedMemoriesJson
+                )
+                Log.d(TAG, "Sandbox Facilitator prompt:\n$sandboxFacPrompt")
+
+                val facJson = ModelClient.callModel(
+                    promptJson = sandboxFacPrompt,
+                    forFacilitator = true,
+                    openAiKey = BuildConfig.OPENAI_API_KEY,
+                    mixtralKey = BuildConfig.MIXTRAL_API_KEY
+                )
+                Log.d(TAG, "Sandbox Facilitator response JSON: $facJson")
+
+                val facContentStr = facJson.optJSONArray("choices")
+                    ?.optJSONObject(0)
+                    ?.optJSONObject("message")
+                    ?.optString("content")
+                    .orEmpty()
+                val facContentJson = if (facContentStr.isNotBlank()) JSONObject(facContentStr) else null
+                facilitatorNotes = facContentJson?.optString("notes", "") ?: ""
+
+                // (OPTIONAL: parse allowedPoses, selectedOutfit, etc. from facilitator if needed)
+                // val allowedPoses = facContentJson?.optJSONArray("allowedPoses")?.let { ... }
+
+                // 2. Now build the sandbox AI prompt, using the new facilitatorNotes
                 val sandboxAi = buildSandboxAiPrompt(
                     userMessage = userInput,
                     recentHistory = historyStr,
@@ -358,6 +398,7 @@ class MainActivity : AppCompatActivity() {
                     facilitatorState = facilitatorNotes,
                     chatInfo = sessionProfile.sessionDescription ?: "",
                     openSlots = sessionProfile.slotRoster.map { it.slot }
+                    // Optionally pass allowedPoses if your prompt format supports it
                 )
                 Log.d(TAG, "Sandbox AI prompt:\n$sandboxAi")
 
@@ -416,8 +457,6 @@ class MainActivity : AppCompatActivity() {
         }
         FirebaseFirestore
             .getInstance()
-            .collection("users")
-            .document(userId)
             .collection("characters")
             .document(charId)
             .get()
