@@ -27,8 +27,8 @@ class ChatAdapter(
     private fun getSenderStyle(sender: String): MessageStyle {
         return when (sender) {
             "You"   -> MessageStyle(0xaa0000FF.toInt(), 0xaaFFFFFF.toInt())
-            "Bot 1" -> MessageStyle(0xaaFFA500.toInt(), 0xaa008000.toInt())
-            "Bot 2" -> MessageStyle(0xaa800080.toInt(), 0xaaFFC0CB.toInt())
+            "B1" -> MessageStyle(0xaaFFA500.toInt(), 0xaa008000.toInt())
+            "B2" -> MessageStyle(0xaa800080.toInt(), 0xaaFFC0CB.toInt())
             else    -> MessageStyle(0xaaCCCCCC.toInt(), 0xaa000000.toInt())
         }
     }

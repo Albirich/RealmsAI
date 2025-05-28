@@ -9,7 +9,7 @@ data class PersonaProfile(
     var age: Int = 0,
     var hair: String = "",
     val eyes: String = "",
-    val description: String = "",
+    val physicaldescription: String = "",
     val relationships: List<Relationship> = emptyList(),
     val images: List<String> = emptyList(),
     val author: String = "",

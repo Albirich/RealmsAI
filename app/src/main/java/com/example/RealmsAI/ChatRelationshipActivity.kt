@@ -20,7 +20,7 @@ import com.example.RealmsAI.models.Relationship
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.gson.Gson
 
-class SessionRelationshipActivity : AppCompatActivity() {
+class ChatRelationshipActivity : AppCompatActivity() {
     private lateinit var recyclerView: RecyclerView
     private lateinit var adapter: ParticipantRelationshipAdapter
     private val participants = mutableListOf<ParticipantPreview>()
@@ -29,7 +29,6 @@ class SessionRelationshipActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_relationships)
-        val fromScreen = intent.getStringExtra("SOURCE_SCREEN") ?: "CHAT_CREATION"
 
         recyclerView = findViewById(R.id.relationshipRecycler)
         recyclerView.layoutManager = LinearLayoutManager(this)
@@ -37,12 +36,6 @@ class SessionRelationshipActivity : AppCompatActivity() {
         // Get participant character IDs from intent (could be personas/characters/bots)
         val ids = intent.getStringArrayListExtra("PARTICIPANT_IDS") ?: emptyList()
         Log.d("Relationships", "IDs from intent: $ids")
-
-        val relationshipsJson = intent.getStringExtra("RELATIONSHIPS_JSON") ?: "[]"
-        relationships.clear()
-        relationships.addAll(
-            Gson().fromJson(relationshipsJson, Array<Relationship>::class.java).toList()
-        )
 
         fetchParticipantPreviewsGlobal(ids) { loadedPreviews ->
             participants.clear()
@@ -67,7 +60,7 @@ class SessionRelationshipActivity : AppCompatActivity() {
             val data = Intent().apply {
                 putExtra("RELATIONSHIPS_JSON", Gson().toJson(relationships))
             }
-            setResult(Activity.RESULT_OK, data)
+            setResult(RESULT_OK, data)
             finish()
         }
     }

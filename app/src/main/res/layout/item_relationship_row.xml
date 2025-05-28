@@ -4,16 +4,15 @@
     android:layout_height="wrap_content"
     android:orientation="horizontal"
     android:gravity="center_vertical"
-    android:paddingStart="54dp"
+    android:paddingStart="8dp"
     android:paddingEnd="8dp"
     android:paddingTop="2dp"
     android:paddingBottom="2dp">
 
     <EditText
         android:id="@+id/relationshipToNameEdit"
-        android:layout_width="match_parent"
+        android:layout_width="100dp"
         android:layout_height="wrap_content"
-        android:layout_weight="1"
         android:hint="With (Name)"
         android:textSize="16sp"
         android:inputType="textPersonName" />
@@ -26,15 +25,24 @@
         android:textColor="@android:color/darker_gray"
         android:textSize="15sp"
         android:layout_marginStart="6dp"/>
-
-    <TextView
-        android:id="@+id/relationshipSummary"
+    <Spinner
+        android:id="@+id/relationshipTypeSpinner"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Short desc"
-        android:textColor="@android:color/darker_gray"
+        android:layout_marginStart="6dp"
+        android:spinnerMode="dropdown" />
+
+    <EditText
+        android:id="@+id/relationshipSummaryEdit"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:hint="Short desc"
         android:textSize="14sp"
-        android:layout_marginStart="10dp"/>
+        android:layout_marginStart="10dp"
+        android:layout_weight="2"
+        android:inputType="textCapSentences|textMultiLine"
+        />
+
 
     <!-- Optionally, add a delete button -->
     <ImageButton

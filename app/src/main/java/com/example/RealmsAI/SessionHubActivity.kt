@@ -15,8 +15,6 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
 import com.google.gson.Gson
 import com.example.RealmsAI.models.SlotInfo
-import com.example.RealmsAI.models.MessageSummary
-import com.example.RealmsAI.models.TaggedMemory
 import com.example.RealmsAI.models.PersonaProfile
 
 
@@ -99,8 +97,7 @@ class SessionHubActivity : BaseActivity() {
 
     private fun fetchSessionAndLaunchMain(preview: SessionPreview) {
         // Get the full session document from Firestore
-        db.collection("chats").document(preview.chatId)
-            .collection("sessions").document(preview.id)
+        db.collection("sessions").document(preview.id)
             .get()
             .addOnSuccessListener { docSnap ->
                 if (!docSnap.exists()) {
@@ -116,6 +113,7 @@ class SessionHubActivity : BaseActivity() {
                     intent.putExtra("SESSION_ID", preview.id)
                     intent.putExtra("CHAT_ID", preview.chatId)
                     intent.putExtra("SESSION_JSON", gson.toJson(data)) // fallback
+                    intent.putExtra("ENTRY_MODE", "LOAD")
                     startActivity(intent)
                 } catch (e: Exception) {
                     Log.e("SessionHub", "Error parsing SessionProfile: $e")
@@ -143,32 +141,6 @@ class SessionHubActivity : BaseActivity() {
         } ?: emptyList()
     }
 
-    // Parse lastMessages list
-    private fun parseLastMessages(raw: Any?): List<MessageSummary> {
-        return (raw as? List<*>)?.mapNotNull { item ->
-            (item as? Map<*, *>)?.let { map ->
-                MessageSummary(
-                    senderSlot = map["senderSlot"] as? String ?: "",
-                    text = map["text"] as? String ?: "",
-                    pose = map["pose"] as? String ?: "",
-                    timestamp = map["timestamp"] as? Timestamp
-                )
-            }
-        } ?: emptyList()
-    }
-
-    // Parse taggedMemories list
-    private fun parseTaggedMemories(raw: Any?): List<TaggedMemory> {
-        return (raw as? List<*>)?.mapNotNull { item ->
-            (item as? Map<*, *>)?.let { map ->
-                TaggedMemory(
-                    summary = map["summary"] as? String ?: "",
-                    tags = map["tags"] as? List<String> ?: emptyList()
-                )
-            }
-        } ?: emptyList()
-    }
-
     // Parse personaProfiles list
     private fun parsePersonaProfiles(raw: Any?): List<PersonaProfile> {
         return (raw as? List<*>)?.mapNotNull { item ->
@@ -177,7 +149,7 @@ class SessionHubActivity : BaseActivity() {
                     age = (map["age"] as? Number)?.toInt() ?: 0,
                     author = map["author"] as? String ?: "",
                     avatarUri = map["avatarUri"] as? String ?: "",
-                    description = map["description"] as? String ?: "",
+                    physicaldescription = map["description"] as? String ?: "",
                     eyes = map["eyes"] as? String ?: "",
                     gender = map["gender"] as? String ?: "",
                     hair = map["hair"] as? String ?: "",
@@ -206,13 +178,9 @@ class SessionHubActivity : BaseActivity() {
             sfwOnly = data["sfwOnly"] as? Boolean ?: true,
             participants = data["participants"] as? List<String> ?: emptyList(),
             slotRoster = parseSlotRoster(data["slotRoster"]),
-            lastMessages = parseLastMessages(data["lastMessages"]),
-            tags = data["tags"] as? List<String> ?: emptyList(),
-            taggedMemories = parseTaggedMemories(data["taggedMemories"]),
             personaProfiles = parsePersonaProfiles(data["personaProfiles"])
         )
 
     }
-
 
 }

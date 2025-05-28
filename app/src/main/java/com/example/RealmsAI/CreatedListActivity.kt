@@ -9,7 +9,6 @@ import android.widget.ArrayAdapter
 import android.widget.Spinner
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
-import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.example.RealmsAI.models.ChatProfile
@@ -23,7 +22,6 @@ import com.google.firebase.ktx.Firebase
 import com.google.firebase.firestore.ktx.firestore
 import com.google.gson.Gson
 import org.json.JSONObject
-import com.example.RealmsAI.PersonaPreview
 
 
 class CreatedListActivity : BaseActivity() {
@@ -277,7 +275,7 @@ class CreatedListActivity : BaseActivity() {
                     PersonaPreview(
                         id = pp.id,
                         name = pp.name,
-                        description = pp.description,
+                        description = pp.physicaldescription,
                         avatarUri = pp.images.firstOrNull(),
                         avatarResId = R.drawable.icon_01,
                         author = currentUserId // Or pp.author if present

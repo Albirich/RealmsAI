@@ -9,7 +9,6 @@ import android.widget.*
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import com.example.RealmsAI.models.PersonaProfile
-import com.google.android.material.button.MaterialButton
 import com.google.gson.Gson
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.auth.FirebaseAuth
@@ -86,7 +85,7 @@ class PersonaCreationActivity : AppCompatActivity() {
                 height      = heightEt.text.toString().trim(),
                 hair        = hairEt.text.toString().trim(),
                 eyes        = eyesEt.text.toString().trim(),
-                description = descEt.text.toString().trim(),
+                physicaldescription = descEt.text.toString().trim(),
                 images      = wardrobeImages,
                 author      = userId,
                 avatarUri   = avatarStringUri

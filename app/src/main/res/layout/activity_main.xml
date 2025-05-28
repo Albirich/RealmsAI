@@ -77,12 +77,11 @@
 
         <!-- Back left (Bot 3) -->
         <ImageView
-            android:id="@+id/botAvatar3ImageView"
+            android:id="@+id/botAvatar2ImageView"
             android:layout_width="0dp"
             android:layout_height="0dp"
-            android:layout_marginBottom="90dp"
             app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintEnd_toStartOf="@id/botAvatar1ImageView"
+            app:layout_constraintEnd_toStartOf="@id/botAvatar0ImageView"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent"
             android:translationX="30dp"
@@ -90,17 +89,16 @@
             app:layout_constraintHeight_percent="0.55"
             android:scaleType="fitCenter"
             android:src="@drawable/default_01"
-            android:alpha="0.85"
+            android:alpha="0.80"
             android:scaleX="-1" />
 
         <!-- Back right (Bot 4) -->
         <ImageView
-            android:id="@+id/botAvatar4ImageView"
+            android:id="@+id/botAvatar3ImageView"
             android:layout_width="0dp"
             android:layout_height="0dp"
-            android:layout_marginBottom="90dp"
             app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintStart_toEndOf="@id/botAvatar2ImageView"
+            app:layout_constraintStart_toEndOf="@id/botAvatar1ImageView"
             android:translationX="-30dp"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintTop_toTopOf="parent"
@@ -108,46 +106,51 @@
             app:layout_constraintHeight_percent="0.55"
             android:scaleType="fitCenter"
             android:src="@drawable/default_01"
-            android:alpha="0.85" />
+            android:alpha="0.80" />
 
         <!-- Front left (Bot 1) -->
         <ImageView
-            android:id="@+id/botAvatar1ImageView"
+            android:id="@+id/botAvatar0ImageView"
             android:layout_width="0dp"
             android:layout_height="0dp"
             app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintEnd_toStartOf="@id/botAvatar2ImageView"
+            app:layout_constraintEnd_toStartOf="@id/botAvatar1ImageView"
             app:layout_constraintStart_toStartOf="parent"
             android:translationX="15dp"
-            app:layout_constraintHorizontal_chainStyle="packed"
             app:layout_constraintWidth_percent="0.48"
             app:layout_constraintHeight_percent="0.75"
-
             android:scaleType="fitCenter"
             android:src="@drawable/default_01"
             android:scaleX="-1" />
 
         <!-- Front right (Bot 2) -->
         <ImageView
-            android:id="@+id/botAvatar2ImageView"
+            android:id="@+id/botAvatar1ImageView"
             android:layout_width="0dp"
             android:layout_height="0dp"
             app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintStart_toEndOf="@id/botAvatar1ImageView"
+            app:layout_constraintStart_toEndOf="@id/botAvatar0ImageView"
             app:layout_constraintEnd_toEndOf="parent"
             android:translationX="-15dp"
-            app:layout_constraintHorizontal_chainStyle="packed"
             app:layout_constraintWidth_percent="0.48"
             app:layout_constraintHeight_percent="0.75"
             android:scaleType="fitCenter"
             android:src="@drawable/default_01" />
-
+        <ImageButton
+            android:id="@+id/toggleChatInputButton"
+            android:layout_width="30dp"
+            android:layout_height="30dp"
+            android:layout_marginBottom="250dp"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent"
+            android:translationZ="10dp"
+            android:background="?android:selectableItemBackgroundBorderless"
+            android:scaleType="fitCenter"
+            android:src="@drawable/ic_visible"/>
     </androidx.constraintlayout.widget.ConstraintLayout>
-
-
-
     <!-- User Message Display -->
     <FrameLayout
+        android:id="@+id/topOverlay"
         android:layout_width="match_parent"
         android:layout_height="150dp"
         android:orientation="horizontal"
@@ -155,11 +158,13 @@
         android:background="#DA222222">
     </FrameLayout>
     <FrameLayout
+        android:id="@+id/chatOverlayContainer"
         android:layout_width="match_parent"
         android:layout_height="200dp"
         android:orientation="horizontal"
         android:layout_marginTop="-250dp">
         <View
+            android:id="@+id/fadeTop"
             android:layout_width="match_parent"
             android:layout_height="100dp"
             android:layout_gravity="top"

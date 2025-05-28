@@ -8,33 +8,44 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        xmlns:app="http://schemas.android.com/apk/res-auto"
         android:orientation="vertical">
 
         <!-- Name Input -->
-        <EditText
-            android:id="@+id/characterNameInput"
+        <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="Enter character name"
-            android:textSize="18sp" />
+            android:padding="8dp">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/characterNameInput"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="Enter personality"
+                android:inputType="textMultiLine"/>
+        </com.google.android.material.textfield.TextInputLayout>
 
         <!-- Summary -->
-        <EditText
-            android:id="@+id/etSummary"
+        <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="Short summary (1–2 lines)"
-            android:maxLines="2"
-            android:inputType="textCapSentences|textMultiLine"/>
+            android:padding="8dp">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/etSummary"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="Short summary (1–2 lines)"
+                android:maxLines="2"
+                android:inputType="textCapSentences|textMultiLine"/>
+        </com.google.android.material.textfield.TextInputLayout>
 
         <!-- Personality Input-->
         <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:padding="8dp"
             app:counterEnabled="true"
-            app:counterMaxLength="1000">
-
+            app:counterMaxLength="2000">
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/characterPersonalityInput"
                 android:layout_width="match_parent"
@@ -48,6 +59,7 @@
         <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:padding="8dp"
             app:counterEnabled="true"
             app:counterMaxLength="200"
             app:helperText="Tell the AI what its first message should be. Talk to it like you're speaking to the characters as a director.">
@@ -61,14 +73,42 @@
                 android:hint="Enter Greeting (First Message)"
                 android:inputType="textMultiLine"/>
         </com.google.android.material.textfield.TextInputLayout>
-
-        <EditText
-            android:id="@+id/characterprivateDescriptionInput"
+        <!-- Backstory Input -->
+        <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="Enter private information (for creator)"
-            app:counterMaxLength="300"/>
+            android:padding="8dp"
+            app:counterEnabled="true"
+            app:counterMaxLength="2000"
+            app:helperText="Write the character's history, lore, and past in detail.">
 
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/backstoryEditText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:counterEnabled="true"
+                app:counterMaxLength="2000"
+                android:maxLines="5"
+                android:hint="Character Backstory"
+                android:inputType="textMultiLine" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <!-- private Input -->
+        <com.google.android.material.textfield.TextInputLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:padding="8dp"
+            app:counterEnabled="true"
+            app:counterMaxLength="400"
+            app:helperText="Write the character's history, lore, and past in detail.">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/characterprivateDescriptionInput"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="Enter private information (for creator)"
+                app:counterMaxLength="400"/>
+        </com.google.android.material.textfield.TextInputLayout>
         <!-- Tags Input -->
         <EditText
             android:id="@+id/characterTagsInput"
@@ -106,7 +146,7 @@
             android:text="Wardrobe" />
 
         <Button
-            android:id="@+id/relationshipBtn"
+            android:id="@+id/charrelationshipBtn"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_weight="1"
@@ -115,7 +155,7 @@
         <!-- Background Selector -->
         <TextView
             android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
+            android:layout_height="1dp"
             android:layout_marginTop="12dp"
             android:text="Background"
             android:textStyle="bold" />
@@ -177,7 +217,11 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:hint="Age"/>
-
+            <EditText
+                android:id="@+id/genderEditText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="Pronouns"/>
             <EditText
                 android:id="@+id/heightEditText"
                 android:layout_width="match_parent"
@@ -201,7 +245,34 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:hint="Hair Color"/>
+            <EditText
+                android:id="@+id/physicalDescriptionEditText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="Physical Description"/>
         </LinearLayout>
+
+        <!-- Bubble Color Picker -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Bubble Color"
+            android:paddingTop="8dp"/>
+        <Spinner
+            android:id="@+id/bubbleColorSpinner"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"/>
+
+        <!-- Text Color Picker -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Text Color"
+            android:paddingTop="8dp"/>
+        <Spinner
+            android:id="@+id/textColorSpinner"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"/>
 
         <!-- Save Button -->
         <com.google.android.material.button.MaterialButton

@@ -166,40 +166,26 @@ class CropperActivity : AppCompatActivity() {
         val transX = values[Matrix.MTRANS_X]
         val transY = values[Matrix.MTRANS_Y]
 
-        val viewWidth = userImage.width.toFloat()
-        val viewHeight = userImage.height.toFloat()
+        // Step 1: Create full transparent canvas
+        val canvasBitmap = Bitmap.createBitmap(OUTPUT_WIDTH, OUTPUT_HEIGHT, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(canvasBitmap)
+        canvas.drawARGB(0, 0, 0, 0) // Transparent
 
-        // Your "safe area" box:
-        val cropLeftView = viewWidth * 0.33f
-        val cropTopView = viewHeight * 0.15f
-        val cropRightView = viewWidth
-        val cropBottomView = viewHeight
+        // Step 2: Draw transformed bitmap into full canvas
+        val drawMatrix = Matrix()
+        drawMatrix.setValues(values)
+        canvas.setMatrix(drawMatrix)
+        canvas.drawBitmap(originalBitmap, 0f, 0f, null)
 
-        // Map to bitmap coords:
-        fun toBitmapX(viewX: Float): Float = (viewX - transX) / scaleX
-        fun toBitmapY(viewY: Float): Float = (viewY - transY) / scaleY
+        // Step 3: Crop only the "safe zone" area from canvas
+        val cropLeft = (OUTPUT_WIDTH * 0.33f).toInt()    // Left 33% cropped
+        val cropTop = (OUTPUT_HEIGHT * 0.15f).toInt()    // Top 15% cropped
+        val cropWidth = (OUTPUT_WIDTH * 0.67f).toInt()   // Remaining 67%
+        val cropHeight = (OUTPUT_HEIGHT * 0.75f).toInt() // Bottom 75%
 
-        val srcLeft = toBitmapX(cropLeftView)
-        val srcTop = toBitmapY(cropTopView)
-        val srcRight = toBitmapX(cropRightView)
-        val srcBottom = toBitmapY(cropBottomView)
+        val croppedBitmap = Bitmap.createBitmap(canvasBitmap, cropLeft, cropTop, cropWidth, cropHeight)
 
-        val srcRect = android.graphics.RectF(srcLeft, srcTop, srcRight, srcBottom)
-        val outBitmap = Bitmap.createBitmap(OUTPUT_WIDTH, OUTPUT_HEIGHT, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(outBitmap)
-        canvas.drawARGB(0, 0, 0, 0) // transparent background
-
-        val dstRect = android.graphics.RectF(0f, 0f, OUTPUT_WIDTH.toFloat(), OUTPUT_HEIGHT.toFloat())
-        val srcRectInt = android.graphics.Rect(
-            srcRect.left.toInt(),
-            srcRect.top.toInt(),
-            srcRect.right.toInt(),
-            srcRect.bottom.toInt()
-        )
-        canvas.drawBitmap(originalBitmap, srcRectInt, dstRect, null)
-
-
-        return outBitmap
+        return croppedBitmap
     }
 
 

@@ -49,12 +49,12 @@ class CharacterRelationshipActivity : AppCompatActivity() {
         }
 
         // Add Relationship Button
-        findViewById<Button>(R.id.btnAddRelationship).setOnClickListener {
+        findViewById<Button>(R.id.btnAddCharRelationship).setOnClickListener {
             showAddRelationshipDialog()
         }
 
         // Done Button
-        findViewById<Button>(R.id.btnDoneRelationships).setOnClickListener {
+        findViewById<Button>(R.id.btnDone).setOnClickListener {
             // Return to caller with relationships as JSON
             val data = Intent().apply {
                 putExtra("RELATIONSHIPS_JSON", Gson().toJson(relationships))

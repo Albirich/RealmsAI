@@ -12,12 +12,9 @@ data class SessionProfile(
     val startedAt: String? = null,
     val sfwOnly: Boolean = true,
     val participants: List<String> = emptyList(),
+    val relationships: List<Relationship> = emptyList(),
 
     val slotRoster: List<SlotInfo> = emptyList(),
-    val lastMessages: List<MessageSummary>? = null,
-    val tags: List<String> = emptyList(),
-    val taggedMemories: List<TaggedMemory> = emptyList(),
-
     val personaProfiles: List<PersonaProfile> = emptyList()
 )
 
@@ -31,15 +28,3 @@ data class SlotInfo(
     val relationships: List<Relationship> = emptyList()
 )
 
-
-data class MessageSummary(
-    val senderSlot: String = "", // e.g., "B1", "P1"
-    val text: String = "",
-    val pose: String = "",       // If available
-    val timestamp: Timestamp? = null
-)
-
-data class TaggedMemory(
-    val summary: String = "",
-    val tags: List<String> = emptyList()
-)

@@ -2,7 +2,6 @@ package com.example.RealmsAI
 
 import android.app.Activity
 import android.content.Intent
-import android.net.Uri
 import android.os.Bundle
 import android.util.Log
 import android.view.View
@@ -13,13 +12,14 @@ import androidx.activity.result.contract.ActivityResultContracts.StartActivityFo
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.bumptech.glide.Glide
-import com.example.RealmsAI.ai.buildSessionFacilitatorPrompt
+import com.example.RealmsAI.ai.PromptBuilder
 import com.example.RealmsAI.models.CharacterProfile
 import com.example.RealmsAI.models.ChatProfile
 import com.example.RealmsAI.models.PersonaProfile
 import com.example.RealmsAI.models.Relationship
 import com.example.RealmsAI.models.SessionLandingProfile
 import com.example.RealmsAI.models.SessionProfile
+import com.example.RealmsAI.models.SlotInfo
 import com.example.RealmsAI.network.ModelClient
 import com.google.android.gms.tasks.Tasks
 import com.google.firebase.auth.FirebaseAuth
@@ -27,6 +27,7 @@ import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.gson.Gson
 import kotlinx.coroutines.launch
+import java.io.FileDescriptor.err
 
 class SessionLandingActivity : AppCompatActivity() {
 
@@ -105,7 +106,7 @@ class SessionLandingActivity : AppCompatActivity() {
 
         sfwToggle = findViewById(R.id.sfwToggle)
         startSessionBtn = findViewById(R.id.startSessionBtn)
-        relationshipEditor = findViewById(R.id.relationshipBtn)
+        relationshipEditor = findViewById(R.id.sessrelationshipBtn)
 
         // --- Main logic: either chatProfile OR characterProfile ---
         val firestore = FirebaseFirestore.getInstance()
@@ -143,6 +144,9 @@ class SessionLandingActivity : AppCompatActivity() {
             slotButtonsContainer.visibility = View.GONE
             chatDescriptionView.text = characterProfile.personality.ifBlank { characterProfile.privateDescription }
             selectedCharIds[0] = characterProfile.id // slot 0 will be the single bot/partner
+            if (currentSessionRelationships.isEmpty() && characterProfile.relationships.isNotEmpty()) {
+                currentSessionRelationships = characterProfile.relationships.toMutableList()
+            }
         } else {
             // Error fallback: neither provided
             slotButtonsContainer.visibility = View.GONE
@@ -164,8 +168,12 @@ class SessionLandingActivity : AppCompatActivity() {
 
             val intent = Intent(this, SessionRelationshipActivity::class.java)
             intent.putStringArrayListExtra("PARTICIPANT_IDS", allParticipantIds)
+            intent.putExtra("SOURCE_SCREEN", "SESSION_LANDING")
+            // 🟢 Pass the latest session relationships here!
+            intent.putExtra("RELATIONSHIPS_JSON", Gson().toJson(currentSessionRelationships))
             startActivityForResult(intent, RELATIONSHIP_REQ_CODE)
         }
+
 
         // ---- SESSION START: Gather everything you need ----
         startSessionBtn.setOnClickListener {
@@ -207,13 +215,16 @@ class SessionLandingActivity : AppCompatActivity() {
                         }
                         val personaProfilesJson = Gson().toJson(loadedPersonaProfiles)
 
-                        sendPromptAndStartSession(
+                        StartSession(
                             chatProfileJson = chatProfileJson,
                             characterProfilesJson = characterProfilesJson,
                             personaProfilesJson = personaProfilesJson,
                             sessionLandingJson = sessionLandingJson
                         )
                     }
+                }
+                if (currentSessionRelationships.isEmpty() && chatProfile.relationships.isNotEmpty()) {
+                    currentSessionRelationships = chatProfile.relationships.toMutableList()
                 }
             }
             // 2) ONE-ON-ONE: Only one character profile (already in memory), fetch persona, then send
@@ -234,7 +245,7 @@ class SessionLandingActivity : AppCompatActivity() {
                         }
                     val personaProfilesJson = Gson().toJson(loadedPersonaProfiles)
 
-                    sendPromptAndStartSession(
+                    StartSession(
                         chatProfileJson = "",
                         characterProfilesJson = characterProfilesJson,
                         personaProfilesJson = personaProfilesJson,
@@ -255,67 +266,8 @@ class SessionLandingActivity : AppCompatActivity() {
         }
     }
 
-    private fun sendPromptAndStartSession(
-        chatProfileJson: String,
-        characterProfilesJson: String,
-        personaProfilesJson: String,
-        sessionLandingJson: String
-    ) {
-        Log.d("SessionLanding", "chatProfileJson: $chatProfileJson")
-        Log.d("SessionLanding", "characterProfilesJson: $characterProfilesJson")
-        Log.d("SessionLanding", "personaProfilesJson: $personaProfilesJson")
-        Log.d("SessionLanding", "sessionLandingJson: $sessionLandingJson")
 
-        val facilitatorPrompt = buildSessionFacilitatorPrompt(
-            chatProfileJson = chatProfileJson,
-            characterProfilesJson = characterProfilesJson,
-            personaProfileJson = personaProfilesJson,
-            sessionLandingJson = sessionLandingJson,
-            sfwOnly = sfwToggle.isChecked
-        )
 
-        runFacilitator(
-            prompt = facilitatorPrompt,
-            onResult = { sessionProfileJsonRaw ->
-                Log.d("FacilitatorPrompt", "Sending prompt to facilitator:\n$facilitatorPrompt")
-                Log.d("FacilitatorResponse", sessionProfileJsonRaw)
-
-                val safeCharIds = selectedCharIds.filterNotNull()
-                val safePersonaIds = selectedPersonaIds.filterNotNull()
-                val someListOfExtraPlayerUserIds = listOf(currentUserId)
-
-                val allUserParticipants = mutableListOf<String>()
-                allUserParticipants.add(currentUserId)
-                allUserParticipants.addAll(someListOfExtraPlayerUserIds)
-
-                val allCharacterAndPersonaIds = safeCharIds + safePersonaIds
-
-                val sessionProfile = Gson().fromJson(sessionProfileJsonRaw, SessionProfile::class.java)
-                SessionManager.createSession(
-                    sessionProfile = sessionProfile,
-                    chatProfileJson = chatProfileJson,
-                    userId = currentUserId,
-                    characterProfilesJson = characterProfilesJson,
-                    characterId = selectedCharIds.firstOrNull { it != currentUserId } ?: "",
-                    extraParticipants = allUserParticipants, // <<------ PASS YOURS HERE
-                    onResult = { sessionId ->
-                        startActivity(Intent(this, MainActivity::class.java).apply {
-                            putExtra("CHAT_ID", sessionProfile.chatId)
-                            putExtra("SESSION_ID", sessionId)
-                            putExtra("SESSION_PROFILE_JSON", sessionProfileJsonRaw)
-                        })
-                        finish()
-                    },
-                    onError = {
-                        Toast.makeText(this, "Failed to start session.", Toast.LENGTH_SHORT).show()
-                    }
-                )
-            },
-            onError = { error ->
-                Toast.makeText(this, "Failed to start session: $error", Toast.LENGTH_SHORT).show()
-            }
-        )
-    }
 
     private fun setPlaceholderPersonaUI(personaIdx: Int) {
         val personaAvatar = findViewById<ImageView>(R.id.personaAvatar)
@@ -353,6 +305,126 @@ class SessionLandingActivity : AppCompatActivity() {
             }
     }
 
+    private fun StartSession(
+        chatProfileJson: String,
+        characterProfilesJson: String,
+        personaProfilesJson: String,
+        sessionLandingJson: String
+    ) {
+        // Parse profiles as before
+        val chatProfile = if (chatProfileJson.isNotBlank()) Gson().fromJson(chatProfileJson, ChatProfile::class.java) else null
+        val characterProfiles = Gson().fromJson(characterProfilesJson, Array<CharacterProfile>::class.java).toList()
+        val sessionLandingProfile = Gson().fromJson(sessionLandingJson, SessionLandingProfile::class.java)
+        val slotRoster = buildSlotRoster(sessionLandingProfile, chatProfile, characterProfiles)
+        val sessionDescription = chatProfile?.description ?: characterProfiles.getOrNull(0)?.summary ?: ""
+
+
+
+        // --- 1. Get initial greeting ---
+        val greeting: String = when {
+            chatProfile != null && !chatProfile.firstmessage.isNullOrBlank() -> chatProfile.firstmessage
+            characterProfiles.isNotEmpty() && !characterProfiles[0].greeting.isNullOrBlank() -> characterProfiles[0].greeting
+            else -> "Welcome!" // fallback
+        }
+
+        // 2. Pick which bot is the speaker (e.g., "B1" for slot 0)
+        val poseImageUrls = slotRoster.associate { slotInfo ->
+            val charProfile = characterProfiles.find { it.id == slotInfo.id }
+            slotInfo.slot to (
+                    charProfile?.outfits?.find { it.name == charProfile.currentOutfit }?.poseUris
+                        ?: emptyMap()
+                    )
+        }
+        val outfitsBySlot = slotRoster.associate { slotInfo ->
+            val charProfile = characterProfiles.find { it.id == slotInfo.id }
+            slotInfo.slot to (charProfile?.currentOutfit ?: charProfile?.outfits?.firstOrNull()?.name ?: "default")
+        }
+        // Colors: optional, use defaults for now
+        val colorMap = characterProfiles.associate { it.id to "#FFFFFF" }
+
+        val facilitatorPrompt = PromptBuilder.buildFacilitatorPrompt(
+            slotRoster = slotRoster,
+            outfits = outfitsBySlot,
+            poseImageUrls = poseImageUrls,
+            sessionDescription = sessionDescription,
+            history = "", // No chat history yet
+            facilitatorNotes = null,
+            userInput = greeting,
+            backgroundImage = chatProfile?.backgroundUri,
+            availableColors = colorMap
+        )
+
+        // --- 3. Run facilitator with greeting prompt ---
+        runFacilitator(
+            prompt = facilitatorPrompt,
+            onResult = { facilitatorResponse ->
+                // --- 3. On facilitator result, proceed to build the session as before ---
+                val sessionProfile = SessionProfile(
+                    sessionId = "", // fill as needed
+                    chatId = chatProfile?.id ?: "",
+                    title = chatProfile?.title ?: characterProfiles.getOrNull(0)?.name ?: "",
+                    sessionDescription = chatProfile?.description ?: characterProfiles.getOrNull(0)?.summary ?: "",
+                    backgroundUri = chatProfile?.backgroundUri,
+                    chatMode = chatProfile?.mode?.name ?: "ONE_ON_ONE",
+                    startedAt = null,
+                    sfwOnly = sessionLandingProfile.sfwOnly,
+                    participants = sessionLandingProfile.participants,
+                    relationships = sessionLandingProfile.relationships,
+                    slotRoster = buildSlotRoster(sessionLandingProfile, chatProfile, characterProfiles),
+                    personaProfiles = listOf() // fill as needed
+                )
+
+                // Pass the facilitatorResponse as the initial message for MainActivity
+                SessionManager.createSession(
+                    sessionProfile = sessionProfile,
+                    chatProfileJson = chatProfileJson,
+                    userId = currentUserId,
+                    characterProfilesJson = characterProfilesJson,
+                    characterId = selectedCharIds.firstOrNull { it != currentUserId } ?: "",
+                    extraParticipants = listOf(currentUserId),
+                    onResult = { sessionId ->
+                        startActivity(Intent(this, MainActivity::class.java).apply {
+                            putExtra("CHAT_ID", sessionProfile.chatId)
+                            putExtra("SESSION_ID", sessionId)
+                            putExtra("SESSION_PROFILE_JSON", Gson().toJson(sessionProfile))
+                            putExtra("INITIAL_MESSAGE", facilitatorResponse) // <-- pass here!
+                        })
+                        finish()
+                    },
+                    onError = {
+                        Toast.makeText(this, "Failed to start session.", Toast.LENGTH_SHORT).show()
+                    }
+                )
+            },
+            onError = { err: Throwable ->
+                Log.e("SessionLanding", "Facilitator error: ${err.message}", err)
+                Toast.makeText(this, "Failed to generate greeting: ${err.message}", Toast.LENGTH_LONG).show()
+            }
+
+        )
+    }
+
+    private fun buildSlotRoster(
+        sessionLandingProfile: SessionLandingProfile,
+        chatProfile: ChatProfile?,
+        characterProfiles: List<CharacterProfile>
+    ): List<SlotInfo> {
+        val slotLabels = listOf("B1", "B2", "B3", "B4", "P1", "P2")
+        return sessionLandingProfile.participants.mapIndexed { idx, participantId ->
+            val profile = characterProfiles.find { it.id == participantId }
+            SlotInfo(
+                name = profile?.name ?: "",
+                slot = slotLabels.getOrElse(idx) { "S$idx" },
+                summary = profile?.summary ?: "",
+                id = participantId,
+                outfits = profile?.outfits?.map { it.name } ?: emptyList(),
+                poses = profile?.outfits?.firstOrNull()?.poseUris
+                    ?.mapValues { listOf(it.value) } // Convert String to List<String>
+                    ?: emptyMap(),
+                relationships = sessionLandingProfile.relationships.filter { it.fromId == participantId }
+            )
+        }
+    }
     private fun runFacilitator(
         prompt: String,
         onResult: (String) -> Unit,
@@ -362,11 +434,13 @@ class SessionLandingActivity : AppCompatActivity() {
             try {
                 val payload = org.json.JSONObject().apply {
                     put("model", "gpt-4.1-nano-2025-04-14")
-                    put("messages", org.json.JSONArray().put(
-                        org.json.JSONObject()
-                            .put("role", "system")
-                            .put("content", prompt)
-                    ))
+                    put(
+                        "messages", org.json.JSONArray().put(
+                            org.json.JSONObject()
+                                .put("role", "system")
+                                .put("content", prompt)
+                        )
+                    )
                     put("max_tokens", 300)
                 }.toString()
 
@@ -393,12 +467,15 @@ class SessionLandingActivity : AppCompatActivity() {
             }
         }
     }
-
     private fun updateSlotButtonAvatar(idx: Int) {
         val charId = selectedCharIds[idx] ?: return
         loadAvatarUriForCharacter(charId) { uri ->
             if (!uri.isNullOrBlank()) {
-                slotButtons[idx].setImageURI(Uri.parse(uri))
+                Glide.with(this)
+                    .load(uri)
+                    .placeholder(R.drawable.placeholder_avatar)
+                    .error(R.drawable.placeholder_avatar)
+                    .into(slotButtons[idx])
             }
         }
     }

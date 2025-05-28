@@ -1,5 +1,6 @@
 package com.example.RealmsAI
 
+import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -16,6 +17,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.example.RealmsAI.models.ChatMode
 import com.example.RealmsAI.models.ChatProfile
+import com.example.RealmsAI.models.Relationship
 import com.google.firebase.Timestamp
 import com.google.gson.Gson
 import org.json.JSONObject
@@ -35,6 +37,9 @@ class ChatCreationActivity : AppCompatActivity() {
     private lateinit var charSlots: List<ImageButton>
     private lateinit var tagsEt: EditText
     private lateinit var createBtn: Button
+    private lateinit var relationshipBtn: Button
+    private var chatRelationships: List<Relationship> = emptyList()
+
 
     // State
     private var selectedBackgroundUri: Uri? = null
@@ -57,6 +62,10 @@ class ChatCreationActivity : AppCompatActivity() {
     private val selectedCharIds = MutableList<String?>(6) { null }
     private var currentCharSlot = 0
     private lateinit var charSelectLauncher: ActivityResultLauncher<Intent>
+
+    companion object {
+        private const val RELATIONSHIP_REQ_CODE = 8080 // or any unique number
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -169,12 +178,23 @@ class ChatCreationActivity : AppCompatActivity() {
             }
         }
 
+        relationshipBtn = findViewById(R.id.chatrelationshipBtn)
+        relationshipBtn.setOnClickListener {
+            val intent = Intent(this, SessionRelationshipActivity::class.java)
+            intent.putExtra("SOURCE_SCREEN", "CHAT_CREATION")
+            intent.putExtra("PARTICIPANT_IDS", ArrayList(selectedCharIds))
+            intent.putExtra("RELATIONSHIPS_JSON", Gson().toJson(chatRelationships))
+            startActivityForResult(intent, RELATIONSHIP_REQ_CODE)
+        }
+
         fun saveAndLaunchChat() {
+
             val chatId = System.currentTimeMillis().toString()
             val title = titleEt.text.toString().trim().takeIf { it.isNotEmpty() } ?: run {
                 titleEt.error = "Required"; return
             }
             val desc = descEt.text.toString().trim()
+            val firstMsg = descEt.text.toString().trim()
             val tags = tagsEt.text.toString()
                 .split(",").map(String::trim).filter(String::isNotEmpty)
             val sfwOnly = sfwSwitch.isChecked
@@ -192,11 +212,13 @@ class ChatCreationActivity : AppCompatActivity() {
                 title = title,
                 description = desc,
                 tags = tags,
+                firstmessage = firstMsg,
                 mode = mode,
                 backgroundUri = bgUriString,
                 backgroundResId = bgResId,
                 sfwOnly = sfwOnly,
                 characterIds = chars,
+                relationships = chatRelationships,
                 rating = 0f,
                 timestamp = Timestamp.now(),
                 author = authorId
@@ -208,6 +230,7 @@ class ChatCreationActivity : AppCompatActivity() {
                 "description"   to profile.description,
                 "tags"          to profile.tags,
                 "mode"          to profile.mode.name,
+                "firstmessage"  to profile.firstmessage,
                 "backgroundUri" to (bgUriString ?: ""),
                 "backgroundResId" to bgResId,
                 "sfwOnly"       to sfwOnly,
@@ -215,7 +238,8 @@ class ChatCreationActivity : AppCompatActivity() {
                 "author"        to profile.author,
                 "timestamp"     to Timestamp.now(),
                 "lastMessage"   to "",
-                "lastTimestamp" to FieldValue.serverTimestamp()
+                "lastTimestamp" to FieldValue.serverTimestamp(),
+                "relationships" to chatRelationships
             )
 
             val db = FirebaseFirestore.getInstance()
@@ -250,6 +274,7 @@ class ChatCreationActivity : AppCompatActivity() {
             val chars = selectedCharIds.filterNotNull()
             val bgUri = selectedBackgroundUri?.toString()
             val bgResId = selectedBackgroundResId
+
 
             // 2) Early‐return validation
             when {
@@ -291,6 +316,16 @@ class ChatCreationActivity : AppCompatActivity() {
 
     }
 
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == RELATIONSHIP_REQ_CODE && resultCode == Activity.RESULT_OK && data != null) {
+            val relJson = data.getStringExtra("RELATIONSHIPS_JSON")
+            if (!relJson.isNullOrEmpty()) {
+                chatRelationships = Gson().fromJson(relJson, Array<Relationship>::class.java).toList()
+                Toast.makeText(this, "Loaded ${chatRelationships.size} chat relationships", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
 
     /** Helper to pull the saved avatarUri from a Character’s prefs entry */
     fun loadAvatarUriForCharacter(charId: String): String {

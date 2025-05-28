@@ -71,7 +71,7 @@ class ParticipantRelationshipAdapter(
     inner class RelationshipRowHolder(view: View) : RecyclerView.ViewHolder(view) {
         private val toNameEdit = view.findViewById<EditText>(R.id.relationshipToNameEdit)
         private val type = view.findViewById<TextView>(R.id.relationshipType)
-        private val summary = view.findViewById<TextView>(R.id.relationshipSummary)
+        private val summary = view.findViewById<TextView>(R.id.relationshipSummaryEdit)
         private val btnDelete = view.findViewById<ImageButton>(R.id.btnDeleteRelationship)
         fun bind(rel: Relationship) {
             toNameEdit.setText(rel.toName)  // <--- Display arbitrary name

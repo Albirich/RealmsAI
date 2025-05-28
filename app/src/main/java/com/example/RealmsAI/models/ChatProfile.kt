@@ -10,10 +10,12 @@ data class ChatProfile(
     val id: String = "",
     val title: String = "",
     val description: String = "",
+    val firstmessage: String = "",
     val characterIds: List<String> = emptyList(),
     val backgroundUri: String? = null,
     val backgroundResId: Int? = null,
     val mode: ChatMode = ChatMode.SANDBOX,
+    val relationships: List<Relationship> = emptyList(),
     val rating: Float = 0f,
     @ServerTimestamp
     val timestamp: Timestamp? = null,

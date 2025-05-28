@@ -35,6 +35,8 @@
         <activity android:name=".CropperActivity" />
         <activity android:name=".SessionLandingActivity" />
         <activity android:name=".SessionRelationshipActivity"/>
+        <activity android:name=".ChatRelationshipActivity"/>
+        <activity android:name=".CharacterRelationshipActivity"/>
 
     </application>
     <uses-permission android:name="android.permission.INTERNET"/>

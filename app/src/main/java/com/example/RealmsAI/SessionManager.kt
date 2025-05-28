@@ -3,6 +3,7 @@ package com.example.RealmsAI
 import android.util.Log
 import com.example.RealmsAI.models.ChatMessage
 import com.example.RealmsAI.models.SessionProfile
+import com.google.firebase.Timestamp
 import com.google.firebase.firestore.DocumentChange
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
@@ -28,12 +29,6 @@ object SessionManager {
         onResult: (sessionId: String) -> Unit,
         onError: (Exception) -> Unit = {}
     ) {
-        val chatId = try {
-            JSONObject(chatProfileJson).optString("id", sessionProfile.chatId)
-        } catch (e: Exception) {
-            sessionProfile.chatId
-        }
-
         // Combine: SessionProfile participants, current user, and any extras from UI
         val participants = (
                 (sessionProfile.participants ?: emptyList()) +
@@ -41,11 +36,22 @@ object SessionManager {
                         extraParticipants
                 ).filterNotNull().toSet()
 
+        // Generate a unique sessionId if not provided
+        val sessionId = if (sessionProfile.sessionId.isNullOrBlank()) {
+            db.collection("sessions").document().id
+        } else {
+            sessionProfile.sessionId
+        }
+
         val sessionData = hashMapOf(
-            "chatId" to chatId,
+            "sessionId" to sessionId,
             "participants" to participants.toList(),
             "characterId" to characterId,
-            "sessionId" to sessionProfile.sessionId,
+            "chatId" to try {
+                JSONObject(chatProfileJson).optString("id", sessionProfile.chatId)
+            } catch (e: Exception) {
+                sessionProfile.chatId
+            },
             "startedAt" to com.google.firebase.Timestamp.now(),
             "sfwOnly" to sessionProfile.sfwOnly,
             "title" to sessionProfile.title,
@@ -56,36 +62,47 @@ object SessionManager {
             "characterProfilesJson" to characterProfilesJson
         )
 
-        val sessionsRef = db.collection("chats").document(chatId).collection("sessions")
-        val newSessionRef = sessionsRef.document() // auto-generate session ID
+        // Sessions are now top-level documents
+        val sessionRef = db.collection("sessions").document(sessionId)
 
-        newSessionRef.set(sessionData)
-            .addOnSuccessListener { onResult(newSessionRef.id) }
-            .addOnFailureListener(onError)
+        sessionRef.set(sessionData)
+            .addOnSuccessListener {
+                Log.d("SessionManager", "Successfully saved session: $sessionId")
+                onResult(sessionId)
+            }
+            .addOnFailureListener { e ->
+                Log.e("SessionManager", "Failed to save session with sessionId=$sessionId", e)
+                onError(e)
+            }
     }
 
 
     /**
      * Loads chat history (all ChatMessages) for the given chat/session.
      */
-    fun loadHistory(
-        chatId: String,
-        sessionId: String,
-        onResult: (List<ChatMessage>) -> Unit,
-        onError: (Exception) -> Unit = {}
-    ) {
-        db.collection("chats").document(chatId)
-            .collection("sessions").document(sessionId)
-            .collection("messages")
-            .orderBy("timestamp", Query.Direction.ASCENDING)
-            .get()
-            .addOnSuccessListener { snap ->
-                val all = snap.documents
-                    .mapNotNull { it.toObject(ChatMessage::class.java) }
-                onResult(all)
-            }
-            .addOnFailureListener(onError)
-    }
+        fun loadHistory(
+            sessionId: String,
+            onResult: (List<ChatMessage>) -> Unit,
+            onError: (Exception) -> Unit = {}
+        ) {
+            Log.d("SessionManager", "Calling loadHistory for session $sessionId")
+
+            db.collection("sessions").document(sessionId)
+                .collection("messages")
+                .orderBy("timestamp", Query.Direction.ASCENDING)
+                .get()
+                .addOnSuccessListener { snap ->
+                    Log.d("SessionManager", "Messages fetched: ${snap.documents.size}")
+                    val all = snap.documents
+                        .mapNotNull { it.toObject(ChatMessage::class.java) }
+                    onResult(all)
+                }
+                .addOnFailureListener {
+                    Log.e("SessionManager", "Failed to load messages", it)
+                    onError(it)
+                }
+        }
+
 
     /**
      * Finds the most recent session for this chatId/userId combo.
@@ -97,9 +114,7 @@ object SessionManager {
         onResult: (sessionId: String?) -> Unit,
         onError: (Exception) -> Unit = {}
     ) {
-        db.collection("chats")
-            .document(chatId)
-            .collection("sessions")
+        db.collection("sessions")
             .whereArrayContains("participants", userId)
             .orderBy("startedAt", Query.Direction.DESCENDING)
             .limit(1)
@@ -119,12 +134,10 @@ object SessionManager {
      * Returns the ListenerRegistration so you can stop listening.
      */
     fun listenMessages(
-        chatId: String,
         sessionId: String,
         onNew: (ChatMessage) -> Unit
     ): ListenerRegistration {
-        val collRef = db.collection("chats").document(chatId)
-            .collection("sessions").document(sessionId)
+        val collRef = db.collection("sessions").document(sessionId)
             .collection("messages")
         return collRef
             .orderBy("timestamp", Query.Direction.ASCENDING)
@@ -147,11 +160,9 @@ object SessionManager {
             "id" to chatMessage.id,
             "sender" to chatMessage.sender,
             "messageText" to chatMessage.messageText,
-            "timestamp" to chatMessage.timestamp
+            "timestamp" to (chatMessage.timestamp ?: Timestamp.now())
         )
-        db.collection("chats")
-            .document(chatId)
-            .collection("sessions")
+        db.collection("sessions")
             .document(sessionId)
             .collection("messages")
             .add(msgMap)

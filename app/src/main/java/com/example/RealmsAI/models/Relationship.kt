@@ -1,9 +1,9 @@
 package com.example.RealmsAI.models
 
 data class Relationship(
-    var fromId: String,      // Who has the relationship
-    var toName: String,        // Who the relationship is with
-    var type: String,        // E.g. "rival", "mentor", "friend"
+    var fromId: String = "",
+    var toName: String = "",
+    var type: String = "",
     var description: String = ""
 )
 
