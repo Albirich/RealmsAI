@@ -2,6 +2,7 @@ package com.example.RealmsAI
 
 import android.content.Intent
 import android.os.Bundle
+import android.util.Log
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -9,7 +10,8 @@ import com.bumptech.glide.Glide
 import com.google.android.material.button.MaterialButton
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
-import org.json.JSONObject
+import androidx.recyclerview.widget.GridLayoutManager
+import com.example.RealmsAI.models.CharacterProfile
 
 class CharacterSelectionActivity : AppCompatActivity() {
     private val selectedIds = mutableSetOf<String>()
@@ -21,16 +23,16 @@ class CharacterSelectionActivity : AppCompatActivity() {
         // 1) Load all chars from prefs
         fun loadCharactersFromFirestore(
             userId: String,
-            onLoaded: (List<Character>) -> Unit,
+            onLoaded: (List<CharacterProfile>) -> Unit,
             onError: (Exception) -> Unit = {}
-        ) {
+        ){
             val db = FirebaseFirestore.getInstance()
-            db.collection("users")
-                .document(userId)
-                .collection("characters")
+            db.collection("characters")
                 .get()
                 .addOnSuccessListener { snapshot ->
-                    val chars = snapshot.documents.mapNotNull { it.toObject(Character::class.java) }
+                    val chars = snapshot.documents.mapNotNull { doc ->
+                        doc.toObject(CharacterProfile::class.java)
+                    }
                     onLoaded(chars)
                 }
                 .addOnFailureListener(onError)
@@ -44,7 +46,7 @@ class CharacterSelectionActivity : AppCompatActivity() {
 
         // 3) Setup RecyclerView + adapter
         val recycler = findViewById<RecyclerView>(R.id.characterRecycler)
-        recycler.layoutManager = LinearLayoutManager(this)
+        recycler.layoutManager = GridLayoutManager(this, 2)
 
         loadCharactersFromFirestore(userId = currentUserId ?: "",
             onLoaded = { allChars ->
@@ -52,9 +54,15 @@ class CharacterSelectionActivity : AppCompatActivity() {
                     allChars,
                     selectedIds,
                     onToggle = { charId, isSelected ->
-                        if (isSelected) selectedIds += charId else selectedIds -= charId
+                        if (isSelected) {
+                            selectedIds.add(charId)
+                            Log.d("CharacterSelection", "Selected $charId")
+                        } else {
+                            selectedIds.remove(charId)
+                            Log.d("CharacterSelection", "Deselected $charId")
+                        }
                     },
-                    loadAvatar = { imageView, avatarUri ->
+                            loadAvatar = { imageView, avatarUri ->
                         if (!avatarUri.isNullOrEmpty()) {
                             Glide.with(imageView.context)
                                 .load(avatarUri)
@@ -67,13 +75,15 @@ class CharacterSelectionActivity : AppCompatActivity() {
                     }
                 )
                 recycler.adapter = adapter
-
             }
         )
 
 
+
+
         // 4) Done → return list
         findViewById<MaterialButton>(R.id.doneButton).setOnClickListener {
+            Log.d("CharacterSelection", "Returning selected IDs: $selectedIds")
             setResult(
                 RESULT_OK,
                 Intent().apply {
@@ -82,5 +92,6 @@ class CharacterSelectionActivity : AppCompatActivity() {
             )
             finish()
         }
+
     }
 }

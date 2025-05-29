@@ -112,19 +112,30 @@ bubble_colors: { background: "#FF8800", text: "#2277FF" }
 
 """.trimIndent()
 
+    }
 
-        fun buildActivationPrompt(
-            slotRoster: List<SlotInfo>,
-            sessionDescription: String?,
-            history: String,
-            facilitatorNotes: String?,
-            userInput: String
-        ): String {
-            val participantList =
-                slotRoster.joinToString("\n") { "- ${it.name}: ${it.summary.orEmpty()}" }
-            return """
-# Participants
-$participantList
+
+
+    fun buildActivationPrompt(
+        slotRoster: List<SlotInfo>,
+        sessionDescription: String?,
+        history: String,
+        slotIdToCharacterProfile: Map<String, CharacterProfile>
+    ): String {
+        val participantsInfo = slotRoster.joinToString("\n\n") { slot ->
+            val profile = slotIdToCharacterProfile[slot.slot] ?: return@joinToString "No profile for ${slot.name}"
+            """
+        - ${slot.name}:
+          Personality: ${profile.personality}
+          Relationships: ${profile.relationships.joinToString { "${it.type} to ${it.toName}" }}
+          Tags: ${profile.tags.joinToString()}
+          Summary: ${slot.summary.orEmpty()}
+        """.trimIndent()
+        }
+
+        return """
+    # Participants
+    $participantsInfo
 
 # Session Summary
 ${sessionDescription.orEmpty()}
@@ -132,27 +143,26 @@ ${sessionDescription.orEmpty()}
 # Chat History
 $history
 
-# Facilitator Notes
-${facilitatorNotes.orEmpty()}
-
-# Latest User Input
-"$userInput"
-
 ---
 
-## SYSTEM:
-Given the above, decide which characters ("bots") should respond this turn.
-For each, output:
-  - name: <display name>
-  - nsfw: true/false (should their response be NSFW if allowed by session/character rules?)
+## SYSTEM INSTRUCTIONS:
+Your task is to carefully read the entire chat history and session summary above.
+Decide which characters should respond this turn based ONLY on their relevance to the chat history and ongoing plot.
+Do NOT activate any characters who are not relevant to the current conversation or story context.
+Only include characters that you judge necessary to respond this turn.
 
-Example:
-bots_to_activate:
+For each activated characters, output:
+  - name: <display name>
+  - nsfw: true/false (indicate if their response should be NSFW, respecting session and character settings)
+
+Example output format:
+characters_to_activate:
   - name: Naruto
     nsfw: false
   - name: Sakura
     nsfw: false
 """.trimIndent()
-        }
     }
+
 }
+

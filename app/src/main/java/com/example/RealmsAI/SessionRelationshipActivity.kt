@@ -125,27 +125,29 @@ class SessionRelationshipActivity : AppCompatActivity() {
         }
         Log.d("Relationship", "Checking ID: $id in characters and personas")
         ids.forEach { id ->
-            db.collection("characters").document(id).get()
-                .addOnSuccessListener { charDoc ->
-                    if (charDoc.exists()) {
-                        val name = charDoc.getString("name") ?: id
-                        val avatarUri = charDoc.getString("avatarUri") ?: ""
-                        previews.add(ParticipantPreview(id, name, avatarUri))
-                        checkDone()
-                    } else {
-                        db.collection("personas").document(id).get()
-                            .addOnSuccessListener { personaDoc ->
-                                if (personaDoc.exists()) {
-                                    val name = personaDoc.getString("name") ?: id
-                                    val avatarUri = personaDoc.getString("avatarUri") ?: ""
-                                    previews.add(ParticipantPreview(id, name, avatarUri))
+            if (!id.isNullOrEmpty()) {
+                db.collection("characters").document(id).get()
+                    .addOnSuccessListener { charDoc ->
+                        if (charDoc.exists()) {
+                            val name = charDoc.getString("name") ?: id
+                            val avatarUri = charDoc.getString("avatarUri") ?: ""
+                            previews.add(ParticipantPreview(id, name, avatarUri))
+                            checkDone()
+                        } else {
+                            db.collection("personas").document(id).get()
+                                .addOnSuccessListener { personaDoc ->
+                                    if (personaDoc.exists()) {
+                                        val name = personaDoc.getString("name") ?: id
+                                        val avatarUri = personaDoc.getString("avatarUri") ?: ""
+                                        previews.add(ParticipantPreview(id, name, avatarUri))
+                                    }
+                                    checkDone()
                                 }
-                                checkDone()
-                            }
-                            .addOnFailureListener { checkDone() }
+                                .addOnFailureListener { checkDone() }
+                        }
                     }
-                }
-                .addOnFailureListener { checkDone() }
+                    .addOnFailureListener { checkDone() }
+            }
         }
     }
 }

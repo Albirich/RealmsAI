@@ -49,20 +49,11 @@ class ChatHubActivity : BaseActivity() {
                         chatId = preview.id,
                         userId = userId,
                         onResult = { sessionId ->
-                            if (sessionId != null) {
-                                // Session found: go directly to MainActivity with session info
-                                startActivity(Intent(this, MainActivity::class.java).apply {
-                                    putExtra("SESSION_ID", sessionId)
-                                    putExtra("CHAT_ID", preview.id)
-                                    putExtra("CHAT_PROFILE_JSON", preview.rawJson)
-                                })
-                            } else {
-                                // No session: go to SessionLandingActivity to start/setup
+
                                 startActivity(Intent(this, SessionLandingActivity::class.java).apply {
                                     putExtra("CHAT_ID", preview.id)
                                     putExtra("CHAT_PROFILE_JSON", preview.rawJson)
                                 })
-                            }
                         },
                         onError = {
                             // Handle error (show a message, retry, etc)

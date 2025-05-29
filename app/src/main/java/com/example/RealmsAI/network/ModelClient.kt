@@ -11,7 +11,7 @@ import org.json.JSONObject
 
 object ModelClient {
     private const val OPENAI_URL     = "https://api.openai.com/v1/chat/completions"
-    private const val OPENAI_MODEL   = "gpt-3.5-turbo"
+    private const val OPENAI_MODEL   = "gpt-4.1-nano-2025-04-14"
     private const val MIXTRAL_URL    = "https://openrouter.ai/api/v1/chat/completions"
 
     private val http = OkHttpClient()

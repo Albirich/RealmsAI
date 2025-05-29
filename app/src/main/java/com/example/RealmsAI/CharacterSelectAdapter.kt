@@ -7,6 +7,7 @@ import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
+import com.example.RealmsAI.models.CharacterProfile
 
 /**
  * @param characters   list of all Character items
@@ -14,53 +15,40 @@ import androidx.recyclerview.widget.RecyclerView
  * @param onToggle     callback invoked (charId, isNowSelected) when user taps an item
  */
 class CharacterSelectAdapter(
-    private val characters: List<Character>,
-    private val selectedIds: MutableSet<String>,
+    private val characters: List<CharacterProfile>,
+    private val selectedIds: Set<String>,
     private val onToggle: (String, Boolean) -> Unit,
     private val loadAvatar: (ImageView, String?) -> Unit
-) : RecyclerView.Adapter<CharacterSelectAdapter.VH>() {
+) : RecyclerView.Adapter<CharacterSelectAdapter.ViewHolder>() {
 
-    inner class VH(itemView: View) : RecyclerView.ViewHolder(itemView) {
-        val avatar: ImageView = itemView.findViewById(R.id.itemCharAvatar)
-        val name: TextView = itemView.findViewById(R.id.itemCharName)
+    inner class ViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
+        val avatar: ImageView = itemView.findViewById(R.id.chatAvatar1)
+        val name: TextView = itemView.findViewById(R.id.chatTitle)
+        val summary: TextView = itemView.findViewById(R.id.chatPreview)
 
-        fun bind(char: Character) {
-            loadAvatar(avatar, char.avatarUri)
-            name.text = char.name
-            itemView.isSelected = selectedIds.contains(char.id)
-            itemView.alpha = if (itemView.isSelected) 1f else 0.5f
-            itemView.setOnClickListener {
-                val now = !selectedIds.contains(char.id)
-                if (now) selectedIds += char.id else selectedIds -= char.id
-                notifyItemChanged(adapterPosition)
-                onToggle(char.id, now)
-            }
+        fun bind(character: CharacterProfile) {
+            loadAvatar(avatar, character.avatarUri)
+            name.text = character.name
+            summary.text = character.summary ?: character.personality.take(40)
 
-            name.text = char.name
-
-            // highlight if selected
-            itemView.isSelected = selectedIds.contains(char.id)
-            itemView.alpha = if (itemView.isSelected) 1f else 0.5f
+            val isSelected = selectedIds.contains(character.id)
+            itemView.isSelected = isSelected
 
             itemView.setOnClickListener {
-                val now = !selectedIds.contains(char.id)
-                if (now) selectedIds += char.id else selectedIds -= char.id
+                onToggle(character.id, !isSelected)
                 notifyItemChanged(adapterPosition)
-                onToggle(char.id, now)
             }
         }
     }
 
-
-    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
-        val v = LayoutInflater.from(parent.context)
-            .inflate(R.layout.item_select_character, parent, false)
-        return VH(v)
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
+        val v = LayoutInflater.from(parent.context).inflate(R.layout.character_preview_item, parent, false)
+        return ViewHolder(v)
     }
 
-    override fun getItemCount() = characters.size
-
-    override fun onBindViewHolder(holder: VH, position: Int) {
+    override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         holder.bind(characters[position])
     }
+
+    override fun getItemCount(): Int = characters.size
 }

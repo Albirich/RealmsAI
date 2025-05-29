@@ -236,57 +236,60 @@ class MainActivity : AppCompatActivity() {
         sendToAI(text)
     }
 
+    private var activationRound = 0
+    private val maxActivationRounds = 3
+
     private fun sendToAI(userInput: String) {
+        activationRound = 0
+        processActivationRound(userInput, chatAdapter.getMessages())
+    }
+
+    // Recursive/looping function to process activation and facilitator steps
+    private fun processActivationRound(
+        input: String,
+        chatHistory: List<ChatMessage>,
+        prevFacilitatorNotes: String = ""
+    ) {
+        if (activationRound >= maxActivationRounds) return
+        activationRound++
+
+        // 1. Build activation prompt (selects which characters act this round)
+        val activationPrompt = PromptBuilder.buildActivationPrompt(
+            slotRoster = sessionProfile.slotRoster,
+            sessionDescription = sessionProfile.sessionDescription,
+            history = buildTrimmedHistory(chatHistory, maxChars = 800),
+            slotIdToCharacterProfile = slotIdToCharacterProfile
+        )
+
+        // 2. Send activation prompt to correct models for each character
+        // This should return List<ChatMessage> (one per active character)
         lifecycleScope.launch(Dispatchers.IO) {
             try {
-                // --- 1. Build facilitator prompt for this turn ---
-                // 1. Build pose image urls per character
-                val poseImageUrls = sessionProfile.slotRoster.associate { slotInfo ->
-                    val charProfile = slotIdToCharacterProfile[slotInfo.slot]
-                    slotInfo.slot to (
-                            charProfile?.outfits?.find { it.name == charProfile.currentOutfit }?.poseUris
-                                ?: emptyMap()
-                            )
-                }
-                val outfitsBySlot = sessionProfile.slotRoster.associate { slotInfo ->
-                    val charProfile = slotIdToCharacterProfile[slotInfo.slot]
-                    slotInfo.slot to (charProfile?.currentOutfit ?: charProfile?.outfits?.firstOrNull()?.name ?: "default")
-                }
-                val colorMap = sessionProfile.slotRoster.associate { slotInfo ->
-                    val charProfile = slotIdToCharacterProfile[slotInfo.slot]
-                    slotInfo.slot to (charProfile?.bubbleColor ?: "#FFFFFF")
-                }
-                // Optionally add a textColor map if needed
-
-                val facilitatorPrompt = PromptBuilder.buildFacilitatorPrompt(
-                    slotRoster = sessionProfile.slotRoster,
-                    outfits = outfitsBySlot,
-                    poseImageUrls = poseImageUrls,
-                    sessionDescription = sessionProfile.sessionDescription,
-                    history = buildTrimmedHistory(chatAdapter.getMessages(), maxChars = 800), // or whatever limit you want
-                    facilitatorNotes = facilitatorNotes,
-                    userInput = userInput,
-                    backgroundImage = sessionProfile.backgroundUri,
-                    availableColors = colorMap
-                )
-
-                // --- 2. Send to facilitator ---
-                val facilitatorResult = Facilitator.handleUserMessage(
-                    userInput = userInput,
-                    sessionProfile = sessionProfile,
-                    chatHistory = chatAdapter.getMessages(),
-                    facilitatorNotes = facilitatorNotes,
-                    slotIdToCharacterProfile = slotIdToCharacterProfile,
+                val characterResponses: List<ChatMessage> = Facilitator.handleActivationPrompt(
+                    activationPrompt = activationPrompt,
                     openAiKey = BuildConfig.OPENAI_API_KEY,
-                    mixtralKey = BuildConfig.MIXTRAL_API_KEY
+                    mixtralKey = BuildConfig.MIXTRAL_API_KEY,
+                    slotIdToCharacterProfile = slotIdToCharacterProfile
                 )
-
-                // --- 3. Update UI with facilitator output ---
+                // 3. Facilitator: write to Firestore, update UI, manage history, prepare next round
                 withContext(Dispatchers.Main) {
-                    facilitatorResult.forEach { aiMsg ->
-                        chatAdapter.addMessage(aiMsg)
-                    }
+                    // Write messages to Firestore (implement this function as needed)
+                    FirestoreHelper.saveMessages(sessionId, characterResponses)
+
+                    // Add new messages to chat UI
+                    characterResponses.forEach { aiMsg -> chatAdapter.addMessage(aiMsg) }
                     chatRecycler.smoothScrollToPosition(chatAdapter.itemCount - 1)
+
+                    // Merge new responses into chat history
+                    val updatedHistory = chatAdapter.getMessages()
+
+                    // Recursively call for next round (if not done)
+                    if (activationRound < maxActivationRounds) {
+                        processActivationRound(
+                            input = "", // You might want to clear userInput after the first round
+                            chatHistory = updatedHistory
+                        )
+                    }
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "AI call failed", e)
@@ -294,6 +297,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
     }
+
 
 
     private fun loadAvatarUriForCharacter(charId: String, onUriLoaded: (String?) -> Unit) {

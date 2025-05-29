@@ -15,6 +15,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
+import com.example.RealmsAI.models.CharacterProfile
 import com.example.RealmsAI.models.ChatMode
 import com.example.RealmsAI.models.ChatProfile
 import com.example.RealmsAI.models.Relationship
@@ -38,8 +39,6 @@ class ChatCreationActivity : AppCompatActivity() {
     private lateinit var tagsEt: EditText
     private lateinit var createBtn: Button
     private lateinit var relationshipBtn: Button
-    private var chatRelationships: List<Relationship> = emptyList()
-
 
     // State
     private var selectedBackgroundUri: Uri? = null
@@ -58,21 +57,23 @@ class ChatCreationActivity : AppCompatActivity() {
         R.drawable.bg_woods
     )
 
-    // for character‐slot picking
     private val selectedCharIds = MutableList<String?>(6) { null }
     private var currentCharSlot = 0
     private lateinit var charSelectLauncher: ActivityResultLauncher<Intent>
+    private var allLoadedCharacters: List<CharacterProfile> = emptyList()
+
+    // Relationships for the chat
+    private var chatRelationships: MutableList<Relationship> = mutableListOf()
 
     companion object {
-        private const val RELATIONSHIP_REQ_CODE = 8080 // or any unique number
+        private const val RELATIONSHIP_REQ_CODE = 8080
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // **NO** bottom nav here
         setContentView(R.layout.activity_create_chat)
 
-        // 1) bind all views
+        // Bind views
         titleEt = findViewById(R.id.titleEditText)
         modeSpinner = findViewById(R.id.modeSpinner)
         descEt = findViewById(R.id.descriptionEditText)
@@ -82,6 +83,7 @@ class ChatCreationActivity : AppCompatActivity() {
         sfwSwitch = findViewById(R.id.sfwSwitch)
         tagsEt = findViewById(R.id.tagsEditText)
         createBtn = findViewById(R.id.createChatButton)
+        relationshipBtn = findViewById(R.id.chatrelationshipBtn)
 
         charSlots = listOf(
             findViewById(R.id.charButton1),
@@ -92,7 +94,7 @@ class ChatCreationActivity : AppCompatActivity() {
             findViewById(R.id.charButton6)
         )
 
-        // 2) Spinner: load your array from resources
+        // Spinner setup
         ArrayAdapter.createFromResource(
             this, R.array.chat_creation_modes,
             android.R.layout.simple_spinner_item
@@ -101,21 +103,20 @@ class ChatCreationActivity : AppCompatActivity() {
             modeSpinner.adapter = adapter
         }
 
-        // 3) Custom gallery‐picker for background
+        // Background picker
         bgPicker = registerForActivityResult(GetContent()) { uri: Uri? ->
             uri?.let {
-                selectedBackgroundUri = null
-                selectedBackgroundResId = R.drawable.bg_forest
-                bgButton.setImageResource(R.drawable.bg_forest)
+                selectedBackgroundUri = it
+                selectedBackgroundResId = null
+                bgButton.setImageURI(it)
             }
         }
         bgButton.setOnClickListener {
             bgPicker.launch("image/*")
         }
 
-        // 4) Preset backgrounds recycler
-        bgRecycler.layoutManager =
-            LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
+        // Preset backgrounds recycler
+        bgRecycler.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
         bgRecycler.adapter = object : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
             override fun getItemCount() = presetBackgrounds.size
             override fun onCreateViewHolder(parent: ViewGroup, viewType: Int) =
@@ -131,7 +132,6 @@ class ChatCreationActivity : AppCompatActivity() {
                 (holder.itemView as ImageView).apply {
                     setImageResource(resId)
                     setOnClickListener {
-                        // choose this preset
                         selectedBackgroundUri = null
                         selectedBackgroundResId = resId
                         bgButton.setImageResource(resId)
@@ -140,179 +140,76 @@ class ChatCreationActivity : AppCompatActivity() {
             }
         }
 
-        // 5) Character‐slot launcher
+        // 5) Load all characters from Firestore and store in allLoadedCharacters
+        loadCharactersFromFirestore(
+            onLoaded = { chars ->
+                allLoadedCharacters = chars
+            }
+        )
+
+        // Character slot launcher
         charSelectLauncher = registerForActivityResult(StartActivityForResult()) { res ->
             if (res.resultCode == RESULT_OK) {
-                val list = res.data
-                    ?.getStringArrayListExtra("SELECTED_CHARS")
-                    ?: return@registerForActivityResult
+                val list = res.data?.getStringArrayListExtra("SELECTED_CHARS")
+                Log.d("ChatCreation", "Returned selected chars: $list")
+                if (list.isNullOrEmpty()) {
+                    Toast.makeText(this, "No characters selected", Toast.LENGTH_SHORT).show()
+                    return@registerForActivityResult
+                }
                 selectedCharIds[currentCharSlot] = list.firstOrNull()
-                // load its avatar right on the slot button
-                selectedCharIds[currentCharSlot]?.let { id ->
-                    val uri = loadAvatarUriForCharacter(id)
-                    val imageView = charSlots[currentCharSlot]
 
-                    if (uri.isNotEmpty()) {
-                        Glide.with(this)
-                            .load(uri)
-                            .placeholder(R.drawable.placeholder_avatar)
-                            .error(R.drawable.placeholder_avatar)
-                            .into(imageView)
-                    } else {
-                        imageView.setImageResource(R.drawable.placeholder_avatar)
-                    }
+                val selectedId = selectedCharIds[currentCharSlot]
+                val selectedCharacter = allLoadedCharacters.find { it.id == selectedId }
+                val uri = selectedCharacter?.avatarUri ?: ""
+
+                val imageView = charSlots[currentCharSlot]
+                if (uri.isNotEmpty()) {
+                    Glide.with(this)
+                        .load(uri)
+                        .placeholder(R.drawable.placeholder_avatar)
+                        .error(R.drawable.placeholder_avatar)
+                        .into(imageView)
+                } else {
+                    imageView.setImageResource(R.drawable.placeholder_avatar)
                 }
             }
         }
+
         charSlots.forEachIndexed { idx, btn ->
             btn.setOnClickListener {
                 currentCharSlot = idx
                 val intent = Intent(this, CharacterSelectionActivity::class.java)
-                // pre-select existing if any
                 selectedCharIds[idx]?.let {
-                    intent.putStringArrayListExtra(
-                        "PRESELECTED_CHARS", arrayListOf(it)
-                    )
+                    intent.putStringArrayListExtra("PRESELECTED_CHARS", arrayListOf(it))
                 }
                 charSelectLauncher.launch(intent)
             }
         }
 
-        relationshipBtn = findViewById(R.id.chatrelationshipBtn)
+        // Relationship button click launches ChatRelationshipActivity with current chars & relationships
         relationshipBtn.setOnClickListener {
-            val intent = Intent(this, SessionRelationshipActivity::class.java)
-            intent.putExtra("SOURCE_SCREEN", "CHAT_CREATION")
-            intent.putExtra("PARTICIPANT_IDS", ArrayList(selectedCharIds))
+            val safeCharIds = selectedCharIds.filterNotNull()
+            chatRelationships = aggregateRelationshipsFromSelectedChars() // <-- important
+
+            val intent = Intent(this, ChatRelationshipActivity::class.java)
+            intent.putStringArrayListExtra("PARTICIPANT_IDS", ArrayList(safeCharIds))
             intent.putExtra("RELATIONSHIPS_JSON", Gson().toJson(chatRelationships))
             startActivityForResult(intent, RELATIONSHIP_REQ_CODE)
         }
 
-        fun saveAndLaunchChat() {
-
-            val chatId = System.currentTimeMillis().toString()
-            val title = titleEt.text.toString().trim().takeIf { it.isNotEmpty() } ?: run {
-                titleEt.error = "Required"; return
-            }
-            val desc = descEt.text.toString().trim()
-            val firstMsg = descEt.text.toString().trim()
-            val tags = tagsEt.text.toString()
-                .split(",").map(String::trim).filter(String::isNotEmpty)
-            val sfwOnly = sfwSwitch.isChecked
-            val modeLabel = modeSpinner.selectedItem as String
-            val mode = ChatMode.valueOf(modeLabel.uppercase().replace(' ', '_'))
-            val bgUriString = selectedBackgroundUri?.toString()
-                ?: selectedBackgroundResId?.let { "android.resource://${packageName}/$it" }
-            val chars = selectedCharIds.filterNotNull()
-            val bgResId = selectedBackgroundResId
-            val authorId = getSharedPreferences("user", MODE_PRIVATE)
-                .getString("userId", "") ?: ""
-
-            val profile = ChatProfile(
-                id = chatId,
-                title = title,
-                description = desc,
-                tags = tags,
-                firstmessage = firstMsg,
-                mode = mode,
-                backgroundUri = bgUriString,
-                backgroundResId = bgResId,
-                sfwOnly = sfwOnly,
-                characterIds = chars,
-                relationships = chatRelationships,
-                rating = 0f,
-                timestamp = Timestamp.now(),
-                author = authorId
-            )
-
-            val chatData = mapOf(
-                "id"            to profile.id,
-                "title"         to profile.title,
-                "description"   to profile.description,
-                "tags"          to profile.tags,
-                "mode"          to profile.mode.name,
-                "firstmessage"  to profile.firstmessage,
-                "backgroundUri" to (bgUriString ?: ""),
-                "backgroundResId" to bgResId,
-                "sfwOnly"       to sfwOnly,
-                "characterIds"  to profile.characterIds,
-                "author"        to profile.author,
-                "timestamp"     to Timestamp.now(),
-                "lastMessage"   to "",
-                "lastTimestamp" to FieldValue.serverTimestamp(),
-                "relationships" to chatRelationships
-            )
-
-            val db = FirebaseFirestore.getInstance()
-            db.collection("chats")
-                .document(chatId)
-                .set(chatData)
-                .addOnSuccessListener {
-                    Log.d("ChatCreation", "New chat persisted to Firestore: $chatId")
-                    Toast.makeText(this, "Chat created!", Toast.LENGTH_SHORT).show()
-                    // Return to CreationHubActivity (or whatever your chat hub is called)
-                    val intent = Intent(this, CreationHubActivity::class.java)
-                    intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
-                    startActivity(intent)
-                    finish()
-                }
-                .addOnFailureListener { e ->
-                    Log.e("ChatCreation", "Failed to persist chat", e)
-                    Toast.makeText(this, "Could not create chat", Toast.LENGTH_SHORT).show()
-                    // Optionally return to CreationHubActivity anyway
-                    finish()
-                }
-        }
-
-
-
-        // 6) Finally: “Create Chat” button
         createBtn.setOnClickListener {
-            // 1) Gather your inputs
             val title = titleEt.text.toString().trim()
-            val desc = descEt.text.toString().trim()
-            val firstMsg = firstMsgEt.text.toString().trim()
-            val chars = selectedCharIds.filterNotNull()
-            val bgUri = selectedBackgroundUri?.toString()
-            val bgResId = selectedBackgroundResId
-
-
-            // 2) Early‐return validation
-            when {
-                title.isEmpty() -> {
-                    Toast.makeText(this, "Chat title is required", Toast.LENGTH_SHORT).show()
-                    return@setOnClickListener
-                }
-
-                desc.isEmpty() -> {
-                    Toast.makeText(this, "Please enter a description", Toast.LENGTH_SHORT).show()
-                    return@setOnClickListener
-                }
-
-                firstMsg.isEmpty() -> {
-                    Toast.makeText(this, "You must supply an opening message", Toast.LENGTH_SHORT)
-                        .show()
-                    return@setOnClickListener
-                }
-
-                chars.isEmpty() -> {
-                    Toast.makeText(this, "Please select at least one character", Toast.LENGTH_SHORT)
-                        .show()
-                    return@setOnClickListener
-                }
-                // **THIS** is now a proper when‐branch, not an `if` inside your `when`
-                (bgUri == null && bgResId == null) -> {
-                    Toast.makeText(this, "Please select a background", Toast.LENGTH_SHORT).show()
-                    return@setOnClickListener
-                }
-
-                else -> {
-                    // all validations passed, fall through to saving
-                }
+            Log.d("ChatCreation", "Title entered: '$title'")
+            if (title.isEmpty()) {
+                Log.d("ChatCreation", "Validation failed: title empty")
+                Toast.makeText(this, "Chat title is required", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
             }
-
-            // 3) Everything’s good – now save & launch
+            // Similar for other fields...
+            Log.d("ChatCreation", "Validation passed, saving chat")
             saveAndLaunchChat()
         }
+
 
     }
 
@@ -321,16 +218,113 @@ class ChatCreationActivity : AppCompatActivity() {
         if (requestCode == RELATIONSHIP_REQ_CODE && resultCode == Activity.RESULT_OK && data != null) {
             val relJson = data.getStringExtra("RELATIONSHIPS_JSON")
             if (!relJson.isNullOrEmpty()) {
-                chatRelationships = Gson().fromJson(relJson, Array<Relationship>::class.java).toList()
+                chatRelationships = Gson().fromJson(relJson, Array<Relationship>::class.java).toMutableList()
                 Toast.makeText(this, "Loaded ${chatRelationships.size} chat relationships", Toast.LENGTH_SHORT).show()
             }
         }
     }
 
+    private fun saveAndLaunchChat() {
+        val chatId = System.currentTimeMillis().toString()
+        val title = titleEt.text.toString().trim().takeIf { it.isNotEmpty() } ?: run {
+            titleEt.error = "Required"
+            return
+        }
+        val desc = descEt.text.toString().trim()
+        val firstMsg = firstMsgEt.text.toString().trim()
+        val tags = tagsEt.text.toString().split(",").map(String::trim).filter(String::isNotEmpty)
+        val sfwOnly = sfwSwitch.isChecked
+        val modeLabel = modeSpinner.selectedItem as String
+        val mode = ChatMode.valueOf(modeLabel.uppercase().replace(' ', '_'))
+        val bgUriString = selectedBackgroundUri?.toString()
+            ?: selectedBackgroundResId?.let { "android.resource://${packageName}/$it" }
+        val chars = selectedCharIds.filterNotNull()
+        val bgResId = selectedBackgroundResId
+        val authorId = getSharedPreferences("user", MODE_PRIVATE).getString("userId", "") ?: ""
+
+        val profile = ChatProfile(
+            id = chatId,
+            title = title,
+            description = desc,
+            tags = tags,
+            firstmessage = firstMsg,
+            mode = mode,
+            backgroundUri = bgUriString,
+            backgroundResId = bgResId,
+            sfwOnly = sfwOnly,
+            characterIds = chars,
+            relationships = chatRelationships,
+            rating = 0f,
+            timestamp = Timestamp.now(),
+            author = authorId
+        )
+
+        val chatData = mapOf(
+            "id" to profile.id,
+            "title" to profile.title,
+            "description" to profile.description,
+            "tags" to profile.tags,
+            "mode" to profile.mode.name,
+            "firstmessage" to profile.firstmessage,
+            "backgroundUri" to (bgUriString ?: ""),
+            "backgroundResId" to bgResId,
+            "sfwOnly" to sfwOnly,
+            "characterIds" to profile.characterIds,
+            "author" to profile.author,
+            "timestamp" to Timestamp.now(),
+            "lastMessage" to "",
+            "lastTimestamp" to FieldValue.serverTimestamp(),
+            "relationships" to chatRelationships
+        )
+
+        FirebaseFirestore.getInstance()
+            .collection("chats")
+            .document(chatId)
+            .set(chatData)
+            .addOnSuccessListener {
+                Log.d("ChatCreation", "New chat persisted to Firestore: $chatId")
+                Toast.makeText(this, "Chat created!", Toast.LENGTH_SHORT).show()
+                val intent = Intent(this, CreationHubActivity::class.java)
+                intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                startActivity(intent)
+                finish()
+            }
+            .addOnFailureListener { e ->
+                Log.e("ChatCreation", "Failed to persist chat", e)
+                Toast.makeText(this, "Could not create chat", Toast.LENGTH_SHORT).show()
+                finish()
+            }
+    }
+
+    fun loadCharactersFromFirestore(
+        onLoaded: (List<CharacterProfile>) -> Unit,
+        onError: (Exception) -> Unit = {}
+    ) {
+        val db = FirebaseFirestore.getInstance()
+        db.collection("characters")
+            .get()
+            .addOnSuccessListener { snapshot ->
+                val chars = snapshot.documents.mapNotNull { doc ->
+                    doc.toObject(CharacterProfile::class.java)
+                }
+                onLoaded(chars)
+            }
+            .addOnFailureListener(onError)
+    }
+
     /** Helper to pull the saved avatarUri from a Character’s prefs entry */
     fun loadAvatarUriForCharacter(charId: String): String {
         val prefs = getSharedPreferences("characters", Context.MODE_PRIVATE)
-        val json  = prefs.getString(charId, null) ?: return ""
-        return JSONObject(json).optString("avatarUri","")
+        val json = prefs.getString(charId, null)
+        Log.d("ChatCreation", "Loading avatar for $charId: $json")
+        return if (json != null) JSONObject(json).optString("avatarUri", "") else ""
+    }
+    private fun aggregateRelationshipsFromSelectedChars(): MutableList<Relationship> {
+        val selectedChars = allLoadedCharacters.filter { selectedCharIds.contains(it.id) }
+        val combined = mutableListOf<Relationship>()
+        selectedChars.forEach { char ->
+            combined.addAll(char.relationships)
+        }
+        return combined
     }
 }

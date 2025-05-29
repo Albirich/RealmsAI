@@ -1,110 +1,125 @@
 package com.example.RealmsAI.ai
 
+import android.graphics.Color
+import android.util.Log
 import com.example.RealmsAI.models.*
-import com.example.RealmsAI.network.ModelClient
+import com.google.firebase.Timestamp
+import java.util.UUID
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import org.json.JSONArray
-import org.json.JSONObject
-import com.example.RealmsAI.StaticAIResponseParser
-
+import com.example.RealmsAI.network.ApiClients
 
 object Facilitator {
 
-    // Place your API keys somewhere secure, not hardcoded! (Pass them as params or use BuildConfig)
-    private const val OPENAI_MODEL = "gpt-4.1-nano-2025-04-14" // or "gpt-4o" if you have access
-    private const val MIXTRAL_MODEL = "mistralai/mixtral-8x7b-instruct"
-
-    suspend fun handleUserMessage(
-        userInput: String,
-        sessionProfile: SessionProfile,
-        chatHistory: List<ChatMessage>,
-        facilitatorNotes: String,
-        slotIdToCharacterProfile: Map<String, CharacterProfile>,
+    // Main entry point: handle activation prompt and return ChatMessages from activated bots
+    suspend fun handleActivationPrompt(
+        activationPrompt: String,
         openAiKey: String,
-        mixtralKey: String
-    ): List<ChatMessage> = withContext(Dispatchers.IO) {
+        mixtralKey: String,
+        slotIdToCharacterProfile: Map<String, CharacterProfile>
+    ): List<ChatMessage> {
+        Log.d("Facilitator", "ActivationPrompt:\n$activationPrompt")
 
-        // 1. Prepare all info for the facilitator
-        val slotRoster = sessionProfile.slotRoster
+        // Step 1: Send prompt to Activation AI using your existing OpenAiService
+        val activationAiResponse = callActivationAI(activationPrompt, openAiKey)
 
-        // Outfits per slot (currentOutfit in CharacterProfile if present, else first outfit or "default")
-        val outfits: Map<String, String> = slotRoster.associate { slot ->
-            val profile = slotIdToCharacterProfile[slot.slot]
-            val currOutfit = profile?.currentOutfit?.takeIf { it.isNotEmpty() }
-                ?: profile?.outfits?.firstOrNull()?.name
-                ?: "default"
-            slot.slot to currOutfit
+        Log.d("Facilitator", "Raw Activation AI Response:\n$activationAiResponse")
+
+        // Step 2: Parse the raw response for bots to activate and NSFW flags
+        val activatedSlots = parseActivatedSlotsFromResponse(activationAiResponse, slotIdToCharacterProfile)
+
+        Log.d("Facilitator", "Activated bots this round: ${activatedSlots.joinToString()}")
+
+        // Step 3: For each activated bot, call their AI and build ChatMessages
+        val responses = mutableListOf<ChatMessage>()
+        for ((slotId, isNSFW) in activatedSlots) {
+            val charPrompt = buildCharPromptForSlot(activationPrompt, slotId)
+            Log.d("Facilitator", "Slot $slotId (${if (isNSFW) "Mixtral" else "OpenAI"}): Prompt = $charPrompt")
+
+            val aiResponseText = if (isNSFW) {
+                callMixtralApi(charPrompt, mixtralKey)
+            } else {
+                callOpenAiApi(charPrompt, openAiKey)
+            }
+
+            Log.d("Facilitator", "Slot $slotId Response: $aiResponseText")
+
+            val charProfile = slotIdToCharacterProfile[slotId]
+            val chatMsg = ChatMessage(
+                id = generateMsgId(),
+                sender = getCharacterNameForSlot(slotId, slotIdToCharacterProfile),
+                messageText = aiResponseText,
+                timestamp = Timestamp.now(),
+                bubbleBackgroundColor = Color.parseColor(charProfile?.bubbleColor ?: "#FFFFFF"),
+                bubbleTextColor = Color.parseColor(charProfile?.textColor ?: "#000000")
+            )
+            Log.d("Facilitator", "ChatMessage: ${chatMsg.sender}: ${chatMsg.messageText}")
+
+            responses.add(chatMsg)
         }
 
-        // Build poseImageUrls: Map<slotId, Map<poseName, url>>
-        val poseImageUrls: Map<String, Map<String, String>> = slotRoster.associate { slot ->
-            val profile = slotIdToCharacterProfile[slot.slot]
-            val outfit = profile?.outfits?.find { it.name == (outfits[slot.slot] ?: "default") }
-            // If outfit is present, use its poseUris, otherwise fall back to an empty map
-            slot.slot to (outfit?.poseUris ?: emptyMap())
-        }
-
-        // Bubble/message colors: for now, fallback to defaults or assign as needed
-        val availableColors: Map<String, String> = slotRoster.associate { slot ->
-            // Use slot, id, or name for key—choose whatever is consistent in your system
-            slot.slot to "#FFFFFF" // fallback white; can change this to be dynamic later
-        }
-
-        // Compose background image (can be null)
-        val backgroundImage: String? = sessionProfile.backgroundUri
-
-        // Prepare scene/summary (session description)
-        val sessionDescription = sessionProfile.sessionDescription
-
-        // Compile recent history (as plain string)
-        val history = chatHistory.takeLast(15).joinToString("\n") { "${it.sender}: ${it.messageText}" }
-
-        // Faciltiator notes: leave empty if not used
-        // val facilitatorNotes = facilitatorNotes
-
-        // 2. Build the facilitator prompt (calls your PromptBuilder)
-        val facilitatorPrompt = PromptBuilder.buildFacilitatorPrompt(
-            slotRoster = slotRoster,
-            outfits = outfits,
-            poseImageUrls = poseImageUrls,
-            sessionDescription = sessionDescription,
-            history = history,
-            facilitatorNotes = facilitatorNotes,
-            userInput = userInput,
-            backgroundImage = backgroundImage,
-            availableColors = availableColors
-        )
-
-        // 3. Package prompt for OpenAI/Mixtral (always use OpenAI for facilitator!)
-        val promptJson = JSONObject().apply {
-            put("model", "gpt-4-turbo") // Facilitator should always be GPT-4 (OpenAI)
-            put("messages", JSONArray().put(
-                JSONObject().put("role", "user").put("content", facilitatorPrompt)
-            ))
-            put("temperature", 0.6) // Lower temp for structure/consistency
-        }.toString()
-
-        // 4. Send to OpenAI/Mixtral
-        val aiResponseJson = ModelClient.callModel(
-            promptJson = promptJson,
-            forFacilitator = true, // always true for this step
-            openAiKey = openAiKey,
-            mixtralKey = mixtralKey // not needed but passed for interface compatibility
-        )
-
-        // 5. Parse the multi-message response blocks
-        val aiRawResponse = aiResponseJson.optJSONArray("choices")
-            ?.optJSONObject(0)
-            ?.optJSONObject("message")
-            ?.optString("content")
-            ?: error("No response content from model")
-
-        // Your StaticAIResponseParser needs to parse the *new* multi-block format into a List<ChatMessage>.
-        val messages: List<ChatMessage> = StaticAIResponseParser.parseMultiBlockMessages(aiRawResponse)
-
-        // 6. Return ready-to-display messages for the ChatAdapter
-        messages
+        return responses
     }
 
+    // Use your existing OpenAiService to send the activation prompt to OpenAI API
+    private suspend fun callActivationAI(prompt: String, apiKey: String): String = withContext(Dispatchers.IO) {
+        try {
+            val request = com.example.RealmsAI.network.OpenAiChatRequest(
+                model = "gpt-4o-mini",
+                messages = listOf(com.example.RealmsAI.network.Message(role = "system", content = prompt))
+            )
+            val response = ApiClients.openai.getFacilitatorNotes(request)
+            val content = response.choices.firstOrNull()?.message?.content ?: ""
+            content
+        } catch (ex: Exception) {
+            Log.e("Facilitator", "Error calling Activation AI", ex)
+            ""
+        }
+    }
+
+    // Parse the raw activation AI response to find bots and NSFW flags
+    fun parseActivatedSlotsFromResponse(
+        rawResponse: String,
+        slotIdToCharacterProfile: Map<String, CharacterProfile>
+    ): List<Pair<String, Boolean>> {
+        val activated = mutableListOf<Pair<String, Boolean>>()
+        val regex = Regex("""- name:\s*(\S+)\s+nsfw:\s*(true|false)""", RegexOption.IGNORE_CASE)
+        for (match in regex.findAll(rawResponse)) {
+            val botName = match.groupValues[1]
+            val nsfw = match.groupValues[2].toBoolean()
+            val slotId = slotIdToCharacterProfile.entries.find { it.value.name == botName }?.key
+            if (slotId != null) {
+                activated.add(slotId to nsfw)
+            } else {
+                Log.w("Facilitator", "Bot name '$botName' not found in slotIdToCharacterProfile keys")
+            }
+        }
+        return activated
+    }
+
+    // Build the prompt for each character (you can customize this)
+    private fun buildCharPromptForSlot(activationPrompt: String, slotId: String): String {
+        // For now, just return the full activationPrompt. You can slice or customize per slot.
+        return activationPrompt
+    }
+
+    // Call OpenAI for the actual character reply
+    private suspend fun callOpenAiApi(prompt: String, key: String): String {
+        // Reuse the same helper you already have in ApiClients / ModelClient or write a similar call here
+        // For simplicity, call the same endpoint as ActivationAI, but ideally this can be different
+        return callActivationAI(prompt, key)
+    }
+
+    // Call Mixtral API for NSFW character reply
+    private suspend fun callMixtralApi(prompt: String, key: String): String {
+        // Implement your Mixtral call (similar to OpenAI call)
+        // Placeholder implementation:
+        return "[Mixtral Stub] $prompt"
+    }
+
+    private fun getCharacterNameForSlot(slotId: String, slotIdToCharacterProfile: Map<String, CharacterProfile>): String {
+        return slotIdToCharacterProfile[slotId]?.name ?: slotId
+    }
+
+    private fun generateMsgId(): String = UUID.randomUUID().toString()
 }

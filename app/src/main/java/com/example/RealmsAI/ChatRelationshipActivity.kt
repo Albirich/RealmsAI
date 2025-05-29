@@ -26,6 +26,7 @@ class ChatRelationshipActivity : AppCompatActivity() {
     private val participants = mutableListOf<ParticipantPreview>()
     private val relationships = mutableListOf<Relationship>()
 
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_relationships)
@@ -36,6 +37,12 @@ class ChatRelationshipActivity : AppCompatActivity() {
         // Get participant character IDs from intent (could be personas/characters/bots)
         val ids = intent.getStringArrayListExtra("PARTICIPANT_IDS") ?: emptyList()
         Log.d("Relationships", "IDs from intent: $ids")
+
+        val relationshipsJson = intent.getStringExtra("RELATIONSHIPS_JSON") ?: "[]"
+        relationships.clear()
+        relationships.addAll(
+            Gson().fromJson(relationshipsJson, Array<Relationship>::class.java).toList()
+        )
 
         fetchParticipantPreviewsGlobal(ids) { loadedPreviews ->
             participants.clear()
@@ -77,7 +84,8 @@ class ChatRelationshipActivity : AppCompatActivity() {
         val typeSpinner = dialogView.findViewById<Spinner>(R.id.relationshipTypeSpinner)
         val summaryEdit = dialogView.findViewById<EditText>(R.id.relationshipSummaryEdit)
 
-        typeSpinner.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, RELATIONSHIP_TYPES)
+        typeSpinner.adapter =
+            ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, RELATIONSHIP_TYPES)
 
         AlertDialog.Builder(this)
             .setTitle("Add Relationship")
@@ -100,7 +108,10 @@ class ChatRelationshipActivity : AppCompatActivity() {
     /**
      * Fetches character previews from the global /characters collection.
      */
-    private fun fetchParticipantPreviewsGlobal(ids: List<String>, onDone: (List<ParticipantPreview>) -> Unit) {
+    private fun fetchParticipantPreviewsGlobal(
+        ids: List<String>,
+        onDone: (List<ParticipantPreview>) -> Unit
+    ) {
         val db = FirebaseFirestore.getInstance()
         val previews = mutableListOf<ParticipantPreview>()
         var count = 0
@@ -116,29 +127,21 @@ class ChatRelationshipActivity : AppCompatActivity() {
             onDone(emptyList())
             return
         }
-        Log.d("Relationship", "Checking ID: $id in characters and personas")
+
+        // Move the log inside the forEach loop
         ids.forEach { id ->
+            Log.d("Relationship", "Checking ID: $id in characters")
             db.collection("characters").document(id).get()
                 .addOnSuccessListener { charDoc ->
                     if (charDoc.exists()) {
                         val name = charDoc.getString("name") ?: id
                         val avatarUri = charDoc.getString("avatarUri") ?: ""
                         previews.add(ParticipantPreview(id, name, avatarUri))
-                        checkDone()
-                    } else {
-                        db.collection("personas").document(id).get()
-                            .addOnSuccessListener { personaDoc ->
-                                if (personaDoc.exists()) {
-                                    val name = personaDoc.getString("name") ?: id
-                                    val avatarUri = personaDoc.getString("avatarUri") ?: ""
-                                    previews.add(ParticipantPreview(id, name, avatarUri))
-                                }
-                                checkDone()
-                            }
-                            .addOnFailureListener { checkDone() }
                     }
+                    checkDone()
                 }
                 .addOnFailureListener { checkDone() }
         }
     }
 }
+
