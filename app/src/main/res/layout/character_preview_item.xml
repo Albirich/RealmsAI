@@ -1,40 +1,40 @@
-<?xml version="1.0" encoding="utf-8"?>
-<RelativeLayout
-    xmlns:android="http://schemas.android.com/apk/res/android"
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:padding="4dp">
 
     <!-- (a) Card background, same as chat -->
     <ImageView
-        android:id="@+id/cardBackground"
+        android:id="@+id/charCardBackground"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:adjustViewBounds="true"
-        android:scaleType="fitCenter"
+        android:scaleType="fitXY"
         android:src="@drawable/chat_card" />
 
     <!-- (b) One‐slot avatar container with weighted spacers -->
     <LinearLayout
-        android:id="@+id/avatarContainer"
+        android:id="@+id/CharAvatarContainer"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_alignTop="@id/cardBackground"
-        android:layout_marginHorizontal="2dp"
-        android:layout_marginTop="3dp"
         android:orientation="horizontal"
-        android:weightSum="2"
-        >
+        android:layout_alignTop="@id/charCardBackground"
+        android:layout_marginHorizontal="2dp"
+        android:paddingTop="3dp"
+        android:gravity="center_horizontal">
+
 
         <!-- left spacer (0.5 of width) -->
-        <View
+        <ImageView
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_weight="0.5" />
+            android:layout_weight=".5"
+            android:adjustViewBounds="true"
+            android:scaleType="centerCrop"/>
 
         <!-- avatar slot (1 of width) -->
         <ImageView
-            android:id="@+id/chatAvatar1"
+            android:id="@+id/charAvatar1"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
@@ -44,18 +44,20 @@
             android:contentDescription="@null" />
 
         <!-- right spacer -->
-        <View
+        <ImageView
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_weight="0.5" />
+            android:layout_weight=".5"
+            android:adjustViewBounds="true"
+            android:scaleType="centerCrop" />
     </LinearLayout>
 
     <!-- (c) Name (reusing chatTitle id) -->
     <TextView
-        android:id="@+id/chatTitle"
+        android:id="@+id/charTitle"
         android:layout_width="match_parent"
         android:layout_height="36dp"
-        android:layout_below="@id/avatarContainer"
+        android:layout_below="@id/CharAvatarContainer"
         android:layout_marginTop="8dp"
         android:layout_marginHorizontal="4dp"
         android:text="Character Name"
@@ -65,17 +67,39 @@
 
     <!-- (d) Summary (reusing chatPreview id) -->
     <TextView
-        android:id="@+id/chatPreview"
+        android:id="@+id/charPreview"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_below="@id/chatTitle"
+        android:layout_below="@id/charTitle"
+        android:maxHeight="200dp"
         android:layout_marginTop="4dp"
         android:layout_marginHorizontal="4dp"
         android:layout_marginBottom="40dp"
-        android:text="Short summary"
+        android:text="Last message preview goes here."
         android:textSize="14sp"
-        android:textColor="#666"
-        android:ellipsize="end"
-        android:maxLines="2" />
+        android:textColor="#666" />
+    <!-- 5) Rating -->
+    <TextView
+        android:id="@+id/chatRating"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="10dp"
+        android:layout_marginBottom="5dp"
+        android:layout_alignBottom="@id/charCardBackground"
+        android:text="★ 0.0"
+        android:textSize="15sp"
+        android:textColor="#FF8800" />
 
+    <TextView
+        android:id="@+id/previewTypeBadge"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:padding="4dp"
+        android:text="TYPE"
+        android:textSize="13sp"
+        android:textStyle="bold"
+        android:layout_alignBottom="@id/charCardBackground"
+        android:layout_alignParentEnd="true"
+        android:layout_marginEnd="8dp"
+        android:layout_marginBottom="5dp" />
 </RelativeLayout>

@@ -28,7 +28,44 @@
                     android:contentDescription="Profile Icon"
                     android:padding="8dp"/>
 
+            <!-- Read-only handle -->
+            <TextView
+                android:id="@+id/profileHandle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="&#64;handle"
+                android:textSize="18sp"
+                android:textColor="@android:color/darker_gray"
+                android:layout_gravity="center_horizontal"
+                android:paddingTop="12dp"
+                android:paddingBottom="8dp"
+                android:textStyle="bold"
+                android:visibility="gone"/>
+
+            <!-- Editable handle (only visible if not set) -->
+            <LinearLayout
+                android:id="@+id/handleEditContainer"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_horizontal"
+                android:orientation="horizontal"
+                android:visibility="gone">
                 <EditText
+                    android:id="@+id/handleEdit"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:hint="Choose your handle"
+                    android:maxLength="16"
+                    android:textSize="16sp"/>
+                <Button
+                    android:id="@+id/saveHandleButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Set Handle"/>
+            </LinearLayout>
+
+            <EditText
                     android:id="@+id/profileName"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"

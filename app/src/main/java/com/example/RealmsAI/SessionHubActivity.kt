@@ -69,23 +69,56 @@ class SessionHubActivity : BaseActivity() {
                     onLongClick = { preview ->
                         AlertDialog.Builder(this)
                             .setTitle(preview.title)
-                            .setMessage("Delete this session?\n\nThis action cannot be undone.")
-                            .setPositiveButton("Delete") { _, _ ->
-                                FirebaseFirestore.getInstance()
-                                    .collection("chats").document(preview.chatId)
-                                    .collection("sessions").document(preview.id)
-                                    .delete()
-                                    .addOnSuccessListener {
-                                        Toast.makeText(this, "Session deleted.", Toast.LENGTH_SHORT).show()
-                                        // Optionally: reload/refresh the session list
+                            .setMessage("Leave or delete this session?\n\nIf you are the last player, the session will be deleted for everyone. Bots/characters are ignored.")
+                            .setPositiveButton("Leave Session") { _, _ ->
+                                val userId = currentUserId ?: return@setPositiveButton
+
+                                // Get a ref to the full session document (not just the subcollection)
+                                db.collection("sessions").document(preview.id)
+                                    .get()
+                                    .addOnSuccessListener { docSnap ->
+                                        if (!docSnap.exists()) {
+                                            Toast.makeText(this, "Session not found.", Toast.LENGTH_SHORT).show()
+                                            return@addOnSuccessListener
+                                        }
+                                        val data = docSnap.data ?: return@addOnSuccessListener
+
+                                        // Extract and filter participants
+                                        val allParticipants = (data["participants"] as? List<*>)?.mapNotNull { it as? String } ?: emptyList()
+                                        val updatedParticipants = allParticipants.filter { it != userId }
+                                        val isRealUser: (String) -> Boolean = { uid -> uid.length > 16 && uid.any { it.isLetter() } && uid.any { it.isDigit() } }
+                                        val realUserParticipants = updatedParticipants.filter(isRealUser)
+
+                                        val sessionRef = db.collection("sessions").document(preview.id)
+
+                                        if (realUserParticipants.isEmpty()) {
+                                            // No more real users, delete session entirely
+                                            sessionRef.delete()
+                                                .addOnSuccessListener {
+                                                    Toast.makeText(this, "Session deleted (last player left).", Toast.LENGTH_SHORT).show()
+                                                }
+                                                .addOnFailureListener { e ->
+                                                    Toast.makeText(this, "Failed to delete session: ${e.message}", Toast.LENGTH_SHORT).show()
+                                                }
+                                        } else {
+                                            // Just update participants (remove yourself)
+                                            sessionRef.update("participants", updatedParticipants)
+                                                .addOnSuccessListener {
+                                                    Toast.makeText(this, "You have left the session.", Toast.LENGTH_SHORT).show()
+                                                }
+                                                .addOnFailureListener { e ->
+                                                    Toast.makeText(this, "Failed to leave session: ${e.message}", Toast.LENGTH_SHORT).show()
+                                                }
+                                        }
                                     }
                                     .addOnFailureListener { e ->
-                                        Toast.makeText(this, "Failed: ${e.message}", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(this, "Failed to fetch session: ${e.message}", Toast.LENGTH_SHORT).show()
                                     }
                             }
                             .setNegativeButton("Cancel", null)
                             .show()
                     }
+
                 )
 
             }
@@ -135,7 +168,8 @@ class SessionHubActivity : BaseActivity() {
                     id = map["id"] as? String ?: "",
                     outfits = map["outfits"] as? List<String> ?: emptyList(),
                     poses = map["poses"] as? Map<String, List<String>> ?: emptyMap(),
-                    relationships = emptyList() // You can parse this too if you have the structure
+                    relationships = emptyList(),
+                    sfwOnly = map["sfwOnly"] as? Boolean ?: true
                 )
             }
         } ?: emptyList()
@@ -155,12 +189,30 @@ class SessionHubActivity : BaseActivity() {
                     hair = map["hair"] as? String ?: "",
                     height = map["height"] as? String ?: "",
                     id = map["id"] as? String ?: "",
-                    images = map["images"] as? List<String> ?: emptyList(),
                     name = map["name"] as? String ?: "",
                     profileType = map["profileType"] as? String ?: "",
                     relationships = emptyList(), // Parse if needed
-                    weight = map["weight"] as? String ?: ""
+                    weight = map["weight"] as? String ?: "",
+                    bubbleColor = map["bubbleColor"] as? String ?: "#FFFFFF",
+                    textColor = map["textColor"] as? String ?: "#000000",
+                    outfits = (map["outfits"] as? List<Map<String, Any>>)?.mapNotNull { outfitMap ->
+                        try {
+                            com.example.RealmsAI.models.Outfit(
+                                name = outfitMap["name"] as? String ?: "",
+                                poseSlots = (outfitMap["poseSlots"] as? List<Map<String, Any>>)?.mapNotNull { poseMap ->
+                                    try {
+                                        com.example.RealmsAI.models.PoseSlot(
+                                            name = poseMap["name"] as? String ?: "",
+                                            uri  = poseMap["uri"] as? String
+                                        )
+                                    } catch (e: Exception) { null }
+                                }?.toMutableList() ?: mutableListOf()
+                            )
+                        } catch (e: Exception) { null }
+                    } ?: emptyList(),
+                    currentOutfit = map["currentOutfit"] as? String ?: ""
                 )
+
             }
         } ?: emptyList()
     }

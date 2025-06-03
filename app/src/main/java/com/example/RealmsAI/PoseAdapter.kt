@@ -1,50 +1,48 @@
 package com.example.RealmsAI
 
+import android.net.Uri
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.EditText
 import android.widget.ImageButton
+import android.widget.ImageView
 import android.widget.TextView
+import androidx.core.widget.doAfterTextChanged
 import androidx.recyclerview.widget.RecyclerView
+import com.bumptech.glide.Glide
+import com.example.RealmsAI.models.PoseSlot
 
 class PoseAdapter(
-    private val slots: List<PoseSlot>,
-    private val onPick: (position: Int) -> Unit
-) : RecyclerView.Adapter<PoseAdapter.VH>() {
+    private val poses: MutableList<PoseSlot>,
+    private val onImageClick: (poseIdx: Int) -> Unit
+) : RecyclerView.Adapter<PoseAdapter.Holder>() {
 
-    inner class VH(itemView: View) : RecyclerView.ViewHolder(itemView) {
-        val img   = itemView.findViewById<ImageButton>(R.id.poseImg)
-        val label = itemView.findViewById<TextView>(R.id.poseLabel)
+    inner class Holder(v: View) : RecyclerView.ViewHolder(v) {
+        val img = v.findViewById<ImageView>(R.id.poseImg)
+        val label = v.findViewById<EditText>(R.id.poseLabel)
     }
 
-    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
-        val view = LayoutInflater.from(parent.context)
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): Holder {
+        val v = LayoutInflater.from(parent.context)
             .inflate(R.layout.item_pose, parent, false)
-        return VH(view)
+        return Holder(v)
     }
 
-    override fun getItemCount(): Int = slots.size
+    override fun getItemCount() = poses.size
 
-    override fun onBindViewHolder(holder: VH, position: Int) {
-        val slot = slots[position]
+    override fun onBindViewHolder(holder: Holder, pos: Int) {
+        val pose = poses[pos]
 
-        // 1) Show picked image or placeholder
-        if (slot.uri != null) {
-            holder.img.setImageURI(slot.uri)
+        holder.label.setText(pose.name)
+        holder.label.doAfterTextChanged { editable ->
+            pose.name = editable?.toString().orEmpty()
+        }
+        if (pose.uri != null) {
+            holder.img.setImageURI(Uri.parse(pose.uri))
         } else {
             holder.img.setImageResource(R.drawable.placeholder_avatar)
         }
-
-        // 2) Compute a nice capitalized label (and make sure it shows)
-        val rawKey = slot.key.replace('_',' ').replace('-', ' ')
-        val labelText = rawKey.replaceFirstChar {
-            it.titlecase(java.util.Locale.getDefault())
-        }
-        holder.label.text = labelText
-        holder.label.visibility = View.VISIBLE
-
-        // 3) Wire up the click
-        holder.img.setOnClickListener { onPick(position) }
+        holder.img.setOnClickListener { onImageClick(pos) }
     }
-
 }

@@ -11,8 +11,11 @@ data class PersonaProfile(
     val eyes: String = "",
     val physicaldescription: String = "",
     val relationships: List<Relationship> = emptyList(),
-    val images: List<String> = emptyList(),
+    val outfits: List<Outfit> = emptyList(),
+    val currentOutfit: String = "",
     val author: String = "",
     val avatarUri: String = "",
+    val bubbleColor: String = "#FFFFFF",
+    val textColor: String = "#000000",
     val profileType: String = "player"
 )

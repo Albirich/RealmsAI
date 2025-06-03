@@ -14,10 +14,16 @@ class ChatMessageParser(
     private val chatId: String,
     private val sessionId: String,
     private val chatMode: ChatMode
-){
+) {
 
     // === 1. Bracketed (legacy) Format ===
-    private val oneOnOneRe = Regex("""\[\s*([\w\s]+)\s*,\s*(\w+)\s*,\s*(\d+)\s*]\s*["“]?(.+?)["”]?$""")
+    private val oneOnOneRe =
+        Regex("""\[\s*([\w\s]+)\s*,\s*(\w+)\s*,\s*(\d+)\s*]\s*["“]?(.+?)["”]?$""")
+
+    fun parseJsonMessages(raw: String): List<ChatMessage> {
+        // Return an empty list for now
+        return emptyList()
+    }
 
     fun parseBracketed(raw: String): List<ChatMessage> {
         val messages = mutableListOf<ChatMessage>()
@@ -40,6 +46,7 @@ class ChatMessageParser(
             }
         return messages
     }
+}
 
     // === 2. Facilitator Block Format ===
     // Example:
@@ -48,7 +55,8 @@ class ChatMessageParser(
     // image_updates: { 0: "...", 1: "...", ... }
     // bubble_colors: { background: "#FFFFFF", text: "#000000" }
     // background: ... (optional)
-    fun parseFacilitatorBlocks(raw: String): List<ChatMessage> {
+/*    fun parseFacilitatorBlocks(raw: String): List<ChatMessage> {
+
         val messages = mutableListOf<ChatMessage>()
         val blocks = raw.split(Regex("(?=delay:)")).map { it.trim() }.filter { it.isNotEmpty() }
 
@@ -57,7 +65,13 @@ class ChatMessageParser(
             var message = ""
             var bubbleBackgroundColor = 0xFFFFFFFF.toInt()
             var bubbleTextColor = 0xFF000000.toInt()
-            var imageUpdates: Map<Int, String?> = emptyMap()
+            val poseUris = mutableMapOf<String, String?>()
+            val keys = jsonObj.keys()
+            for (key in keys) {
+                poseUris[key] = jsonObj.optString(key, null)
+            }
+
+
             var backgroundImage: String? = null
 
             block.lines().forEach { line ->
@@ -158,5 +172,4 @@ class ChatMessageParser(
             map[key.toIntOrNull() ?: continue] = obj.optString(key)
         }
         return map
-    }
-}
+    }*/

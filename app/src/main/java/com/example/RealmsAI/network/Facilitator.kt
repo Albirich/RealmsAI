@@ -10,59 +10,50 @@ import kotlinx.coroutines.withContext
 import com.example.RealmsAI.network.ApiClients
 
 object Facilitator {
-
-    // Main entry point: handle activation prompt and return ChatMessages from activated bots
-    suspend fun handleActivationPrompt(
+    val responses = mutableListOf<ChatMessage>()
+    suspend fun getActivatedSlots(
         activationPrompt: String,
         openAiKey: String,
-        mixtralKey: String,
         slotIdToCharacterProfile: Map<String, CharacterProfile>
-    ): List<ChatMessage> {
-        Log.d("Facilitator", "ActivationPrompt:\n$activationPrompt")
+    ): List<Pair<String, Boolean>> {
+        // 1. Call OpenAI to get the raw response
+        val rawResponse = callActivationAI(activationPrompt, openAiKey)
 
-        // Step 1: Send prompt to Activation AI using your existing OpenAiService
-        val activationAiResponse = callActivationAI(activationPrompt, openAiKey)
-
-        Log.d("Facilitator", "Raw Activation AI Response:\n$activationAiResponse")
-
-        // Step 2: Parse the raw response for bots to activate and NSFW flags
-        val activatedSlots = parseActivatedSlotsFromResponse(activationAiResponse, slotIdToCharacterProfile)
-
-        Log.d("Facilitator", "Activated bots this round: ${activatedSlots.joinToString()}")
-
-        // Step 3: For each activated bot, call their AI and build ChatMessages
-        val responses = mutableListOf<ChatMessage>()
-        for ((slotId, isNSFW) in activatedSlots) {
-            val charPrompt = buildCharPromptForSlot(activationPrompt, slotId)
-            Log.d("Facilitator", "Slot $slotId (${if (isNSFW) "Mixtral" else "OpenAI"}): Prompt = $charPrompt")
-
-            val aiResponseText = if (isNSFW) {
-                callMixtralApi(charPrompt, mixtralKey)
-            } else {
-                callOpenAiApi(charPrompt, openAiKey)
-            }
-
-            Log.d("Facilitator", "Slot $slotId Response: $aiResponseText")
-
-            val charProfile = slotIdToCharacterProfile[slotId]
-            val chatMsg = ChatMessage(
-                id = generateMsgId(),
-                sender = getCharacterNameForSlot(slotId, slotIdToCharacterProfile),
-                messageText = aiResponseText,
-                timestamp = Timestamp.now(),
-                bubbleBackgroundColor = Color.parseColor(charProfile?.bubbleColor ?: "#FFFFFF"),
-                bubbleTextColor = Color.parseColor(charProfile?.textColor ?: "#000000")
+        // 2. Parse the response into slot IDs and NSFW flags
+        return parseActivatedSlotsFromResponse(rawResponse, slotIdToCharacterProfile)
+    }
+    fun activationRefusedOrMalformed(response: String): Boolean {
+        if (response.isBlank()) return true
+        val lower = response.lowercase()
+        return lower.contains("sorry") ||
+                lower.contains("cannot assist") ||
+                lower.contains("not allowed") ||
+                !lower.contains("characters_to_activate")
+    }
+    fun activationIsEmptyList(response: String): Boolean {
+        val stripped = response.replace("\\s".toRegex(), "")
+        return stripped.contains("characters_to_activate:[]") ||
+                stripped.contains("\"characters_to_activate\":[]")
+    }
+    suspend fun callOpenAiFacilitator(prompt: String, apiKey: String): String = withContext(Dispatchers.IO) {
+        try {
+            val request = com.example.RealmsAI.network.OpenAiChatRequest(
+                model = "gpt-4o-mini", // or whichever model you use
+                messages = listOf(com.example.RealmsAI.network.Message(role = "system", content = prompt))
             )
-            Log.d("Facilitator", "ChatMessage: ${chatMsg.sender}: ${chatMsg.messageText}")
-
-            responses.add(chatMsg)
+            val response = ApiClients.openai.getFacilitatorNotes(request)
+            response.choices.firstOrNull()?.message?.content ?: ""
+        } catch (ex: Exception) {
+            Log.e("Facilitator", "Error calling facilitator AI", ex)
+            ""
         }
-
-        return responses
     }
 
+
+
+
     // Use your existing OpenAiService to send the activation prompt to OpenAI API
-    private suspend fun callActivationAI(prompt: String, apiKey: String): String = withContext(Dispatchers.IO) {
+    suspend fun callActivationAI(prompt: String, apiKey: String): String = withContext(Dispatchers.IO) {
         try {
             val request = com.example.RealmsAI.network.OpenAiChatRequest(
                 model = "gpt-4o-mini",
@@ -91,30 +82,78 @@ object Facilitator {
             if (slotId != null) {
                 activated.add(slotId to nsfw)
             } else {
-                Log.w("Facilitator", "Bot name '$botName' not found in slotIdToCharacterProfile keys")
+               Log.w("Facilitator", "Bot name '$botName' not found in slotIdToCharacterProfile keys")
             }
         }
         return activated
     }
 
     // Build the prompt for each character (you can customize this)
-    private fun buildCharPromptForSlot(activationPrompt: String, slotId: String): String {
-        // For now, just return the full activationPrompt. You can slice or customize per slot.
-        return activationPrompt
+    private fun buildCharPromptForSlot(
+        slotId: String,
+        chatHistory: List<ChatMessage>,
+        characterProfile: CharacterProfile,
+        sessionSummary: String? = null,
+        isNSFW: Boolean = false // true = Mixtral, false = OpenAI
+    ): String {
+        val sb = StringBuilder()
+
+        sb.appendLine("# Character Profile")
+        sb.appendLine("Name: ${characterProfile.name}")
+        sb.appendLine("Personality: ${characterProfile.personality}")
+        // Only include backstory for OpenAI, not Mixtral
+        if (!isNSFW) {
+            sb.appendLine("Backstory: ${characterProfile.backstory}")
+        }
+        if (!characterProfile.tags.isNullOrEmpty()) sb.appendLine("Tags: ${characterProfile.tags.joinToString()}")
+        if (!characterProfile.relationships.isNullOrEmpty()) sb.appendLine("Relationships: ${characterProfile.relationships.joinToString { "${it.toName} (${it.type}): ${it.description}" }}")
+
+        sb.appendLine()
+
+        if (!sessionSummary.isNullOrBlank() && !isNSFW) {
+            sb.appendLine("# Session Summary")
+            sb.appendLine(sessionSummary)
+            sb.appendLine()
+        }
+
+        sb.appendLine("# Recent Chat History")
+        chatHistory.takeLast(10).forEach { msg ->
+            sb.appendLine("${msg.sender}: ${msg.messageText}")
+        }
+        sb.appendLine()
+        sb.appendLine("Reply as ${characterProfile.name}, in character, to the most recent user message.")
+
+        return sb.toString()
     }
+
 
     // Call OpenAI for the actual character reply
-    private suspend fun callOpenAiApi(prompt: String, key: String): String {
-        // Reuse the same helper you already have in ApiClients / ModelClient or write a similar call here
-        // For simplicity, call the same endpoint as ActivationAI, but ideally this can be different
-        return callActivationAI(prompt, key)
+    suspend fun callOpenAiApi(prompt: String, key: String): String = withContext(Dispatchers.IO) {
+        try {
+            Log.d("Facilitator", "[OpenAI] Character Prompt:\n$prompt")
+            val request = com.example.RealmsAI.network.OpenAiChatRequest(
+                model = "gpt-4o-mini",
+                messages = listOf(com.example.RealmsAI.network.Message(role = "system", content = prompt))
+            )
+            val response = ApiClients.openai.getFacilitatorNotes(request)
+            response.choices.firstOrNull()?.message?.content ?: ""
+        } catch (ex: Exception) {
+            Log.e("Facilitator", "Error calling OpenAI API", ex)
+            ""
+        }
+
     }
 
-    // Call Mixtral API for NSFW character reply
-    private suspend fun callMixtralApi(prompt: String, key: String): String {
-        // Implement your Mixtral call (similar to OpenAI call)
-        // Placeholder implementation:
-        return "[Mixtral Stub] $prompt"
+
+    suspend fun callMixtralApi(prompt: String, key: String): String = withContext(Dispatchers.IO) {
+        try {
+            Log.d("Facilitator", "[Mixtral] Character Prompt:\n$prompt")
+            val engine = com.example.RealmsAI.network.MixtralEngine(ApiClients.mixtral)
+            engine.getBotOutput(prompt)
+        } catch (ex: Exception) {
+            Log.e("Facilitator", "Error calling Mixtral API", ex)
+            ""
+        }
     }
 
     private fun getCharacterNameForSlot(slotId: String, slotIdToCharacterProfile: Map<String, CharacterProfile>): String {

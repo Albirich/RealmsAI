@@ -18,9 +18,9 @@ class CharacterPreviewAdapter(
 ) : RecyclerView.Adapter<CharacterPreviewAdapter.VH>() {
 
     inner class VH(view: View) : RecyclerView.ViewHolder(view) {
-        private val avatar  : ImageView = view.findViewById(R.id.chatAvatar1)
-        private val title   : TextView  = view.findViewById(R.id.chatTitle)
-        private val summary : TextView  = view.findViewById(R.id.chatPreview)
+        private val avatar  : ImageView = view.findViewById(R.id.charAvatar1)
+        private val title   : TextView  = view.findViewById(R.id.charTitle)
+        private val summary : TextView  = view.findViewById(R.id.charPreview)
 
         fun bind(preview: CharacterPreview) {
             // 1) Name

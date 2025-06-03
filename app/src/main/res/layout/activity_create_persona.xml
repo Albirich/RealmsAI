@@ -123,14 +123,6 @@
             android:contentDescription="Persona Avatar"
             android:padding="8dp"
             android:background="@android:color/darker_gray"/>
-
-        <Button
-            android:id="@+id/pickPersonaAvatarButton"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Pick Avatar"
-            android:layout_gravity="center_horizontal"
-            android:layout_marginTop="6dp"/>
         <Button
             android:id="@+id/wardrobeButton"
             android:layout_width="wrap_content"
@@ -138,7 +130,27 @@
             android:text="Wardrobe"
             android:layout_gravity="center_horizontal"
             android:layout_marginTop="10dp"/>
+        <!-- Bubble Color Picker -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Bubble Color"
+            android:paddingTop="8dp"/>
+        <Spinner
+            android:id="@+id/bubbleColorSpinner"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"/>
 
+        <!-- Text Color Picker -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Text Color"
+            android:paddingTop="8dp"/>
+        <Spinner
+            android:id="@+id/textColorSpinner"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"/>
         <!-- Save Button -->
         <Button
             android:id="@+id/savePersonaButton"

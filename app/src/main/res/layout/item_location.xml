@@ -8,20 +8,20 @@
     android:padding="8dp">
 
     <ImageButton
-        android:id="@+id/poseImg"
+        android:id="@+id/locationImg"
         android:layout_width="100dp"
         android:layout_height="100dp"
         android:background="?attr/selectableItemBackgroundBorderless"
         android:scaleType="centerInside"
-        android:src="@drawable/placeholder_avatar"
-        android:contentDescription="@string/pose_placeholder"
+        android:src="@drawable/placeholder_background"
+        android:contentDescription="Location Image"
         android:layout_marginBottom="4dp"/>
 
-    <TextView
-        android:id="@+id/poseLabel"
+    <EditText
+        android:id="@+id/locationLabel"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Label"
+        android:hint="Location Name"
         android:textSize="12sp"
         android:textColor="@android:color/black"
         android:maxLines="1"

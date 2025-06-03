@@ -18,13 +18,7 @@
               android:scaleType="fitXY"
               android:src="@drawable/bg_cropper" />
 
-    <!-- 2. User image on top, movable/croppable -->
-    <ImageView
-        android:id="@+id/userImage"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:scaleType="matrix"
-        android:background="#33000000"/>
+
 
     <!-- 3. Height guidelines overlay (custom view, if you want lines/labels) -->
     <com.example.RealmsAI.views.GuidelinesView
@@ -34,8 +28,26 @@
              android:clickable="false"
              android:focusable="false" />
       </FrameLayout>
+    <ImageView
+        android:id="@+id/botAvatar1ImageView"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginBottom="17dp"
+        app:layout_constraintWidth_percent=".57"
+        app:layout_constraintHeight_percent=".57"
+        android:scaleType="fitCenter"
+        android:src="@drawable/default_01" />
 
-
+    <!-- 2. User image on top, movable/croppable -->
+    <ImageView
+        android:id="@+id/userImage"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="matrix"
+        android:background="#33000000"/>
     <!-- 4. Done button -->
     <Button
         android:id="@+id/saveCropButton"
@@ -112,8 +124,16 @@
         android:id="@+id/verticalGuide33"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+        app:layout_constraintEnd_toEndOf="parent"
         android:orientation="vertical"
-        app:layout_constraintGuide_percent="0.33" />
+        app:layout_constraintGuide_percent="0.845" />
+    <androidx.constraintlayout.widget.Guideline
+        android:id="@+id/verticalGuide32"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:orientation="vertical"
+        app:layout_constraintGuide_percent="0.155" />
 
     <androidx.constraintlayout.widget.Guideline
         android:id="@+id/horizontalGuide8ft"
@@ -124,12 +144,21 @@
 
     <!-- Shaded: left 33% (cropped out) -->
     <View
+        android:id="@+id/rightCutoff"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:background="#AAFF0000"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toEndOf="@id/verticalGuide33"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"/>
+    <View
         android:id="@+id/leftCutoff"
         android:layout_width="0dp"
         android:layout_height="match_parent"
         android:background="#AAFF0000"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toStartOf="@id/verticalGuide33"
+        app:layout_constraintEnd_toEndOf="@id/verticalGuide32"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintBottom_toBottomOf="parent"/>
 
@@ -140,8 +169,8 @@
         android:layout_height="0dp"
         android:background="#AAFF0000"
         app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toEndOf="@id/verticalGuide33"
+        app:layout_constraintEnd_toStartOf="@id/rightCutoff"
+        app:layout_constraintStart_toEndOf="@id/leftCutoff"
         app:layout_constraintBottom_toTopOf="@id/horizontalGuide8ft"/>
 
 

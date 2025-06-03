@@ -80,15 +80,14 @@
             android:id="@+id/botAvatar2ImageView"
             android:layout_width="0dp"
             android:layout_height="0dp"
-            app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toStartOf="@id/botAvatar0ImageView"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent"
             android:translationX="30dp"
-            app:layout_constraintWidth_percent="0.38"
-            app:layout_constraintHeight_percent="0.55"
+            app:layout_constraintWidth_percent="0.5"
+            app:layout_constraintHeight_percent="0.70"
             android:scaleType="fitCenter"
-            android:src="@drawable/default_01"
+            android:src="@drawable/silhouette"
             android:alpha="0.80"
             android:scaleX="-1" />
 
@@ -97,30 +96,29 @@
             android:id="@+id/botAvatar3ImageView"
             android:layout_width="0dp"
             android:layout_height="0dp"
-            app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintStart_toEndOf="@id/botAvatar1ImageView"
             android:translationX="-30dp"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintTop_toTopOf="parent"
-            app:layout_constraintWidth_percent="0.38"
-            app:layout_constraintHeight_percent="0.55"
+            app:layout_constraintWidth_percent="0.5"
+            app:layout_constraintHeight_percent="0.70"
             android:scaleType="fitCenter"
-            android:src="@drawable/default_01"
+            android:src="@drawable/silhouette"
             android:alpha="0.80" />
+
 
         <!-- Front left (Bot 1) -->
         <ImageView
             android:id="@+id/botAvatar0ImageView"
             android:layout_width="0dp"
             android:layout_height="0dp"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintEnd_toStartOf="@id/botAvatar1ImageView"
+            android:translationX="-75dp"
+            app:layout_constraintWidth_percent="1"
             app:layout_constraintStart_toStartOf="parent"
-            android:translationX="15dp"
-            app:layout_constraintWidth_percent="0.48"
-            app:layout_constraintHeight_percent="0.75"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintHeight_percent="1.13"
             android:scaleType="fitCenter"
-            android:src="@drawable/default_01"
+            android:src="@drawable/silhouette"
             android:scaleX="-1" />
 
         <!-- Front right (Bot 2) -->
@@ -128,14 +126,14 @@
             android:id="@+id/botAvatar1ImageView"
             android:layout_width="0dp"
             android:layout_height="0dp"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintStart_toEndOf="@id/botAvatar0ImageView"
-            app:layout_constraintEnd_toEndOf="parent"
-            android:translationX="-15dp"
-            app:layout_constraintWidth_percent="0.48"
-            app:layout_constraintHeight_percent="0.75"
+
+            android:translationX="75dp"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintHeight_percent="1.13"
+            app:layout_constraintWidth_percent="1"
             android:scaleType="fitCenter"
-            android:src="@drawable/default_01" />
+            android:src="@drawable/silhouette" />
         <ImageButton
             android:id="@+id/toggleChatInputButton"
             android:layout_width="30dp"

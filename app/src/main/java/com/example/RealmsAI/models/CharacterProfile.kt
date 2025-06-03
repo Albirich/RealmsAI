@@ -26,10 +26,11 @@ data class CharacterProfile(
     var age                : Int                 =0,
     val eyeColor           : String              = "",
     val hairColor          : String              = "",
-    val physicaldescription: String              = "",
+    val physicalDescription: String              = "",
     val gender             : String              = "",
     val relationships: List<Relationship> = emptyList(),
     val bubbleColor: String = "#FFFFFF",
     val textColor: String = "#000000",
+    val sfwOnly: Boolean = true,
     val profileType        : String = "bot"
 )

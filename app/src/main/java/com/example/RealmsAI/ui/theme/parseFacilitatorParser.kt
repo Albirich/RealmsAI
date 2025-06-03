@@ -1,4 +1,3 @@
-// File: ai/FacilitatorParser.kt
 package com.example.RealmsAI.ai
 
 import org.json.JSONObject

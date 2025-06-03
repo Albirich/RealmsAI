@@ -4,17 +4,22 @@ import android.app.Activity
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.util.Log
 import android.webkit.MimeTypeMap
 import android.widget.*
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import com.bumptech.glide.Glide
+import com.example.RealmsAI.models.Outfit
 import com.example.RealmsAI.models.PersonaProfile
-import com.google.gson.Gson
-import com.google.firebase.firestore.FirebaseFirestore
+import com.example.RealmsAI.models.PoseSlot
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.storage.FirebaseStorage
+import com.google.gson.Gson
 
 class PersonaCreationActivity : AppCompatActivity() {
+    // UI
     private lateinit var nameEt: EditText
     private lateinit var ageEt: EditText
     private lateinit var genderEt: EditText
@@ -25,21 +30,37 @@ class PersonaCreationActivity : AppCompatActivity() {
     private lateinit var descEt: EditText
     private lateinit var avatarView: ImageView
     private lateinit var wardrobeBtn: Button
+    private lateinit var bubbleColorSpinner: Spinner
+    private lateinit var textColorSpinner: Spinner
     private lateinit var saveBtn: Button
 
+    // State
     private var avatarUri: Uri? = null
-    private var wardrobeImages: List<String> = emptyList()
     private var avatarStringUri: String = ""
+    private var outfitsList: List<Outfit> = emptyList()
+    private var currentOutfit: String = ""
+    private var editPersonaId: String? = null
+
+    private val colorOptions = listOf(
+        "White" to "#FFFFFF",
+        "Yellow" to "#FFEB3B",
+        "Orange" to "#FF9800",
+        "Blue" to "#2196F3",
+        "Pink" to "#E91E63",
+        "Green" to "#4CAF50",
+        "Black" to "#000000"
+    )
 
     companion object {
         const val WARDROBE_REQUEST = 101
+        const val EXTRA_OUTFITS_JSON = "EXTRA_OUTFITS_JSON"
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_create_persona)
 
-        // Fields
+        // Bind views
         nameEt    = findViewById(R.id.personaNameInput)
         ageEt     = findViewById(R.id.personaAgeInput)
         genderEt  = findViewById(R.id.personaGenderInput)
@@ -50,14 +71,25 @@ class PersonaCreationActivity : AppCompatActivity() {
         descEt    = findViewById(R.id.personaDescriptionInput)
         avatarView= findViewById(R.id.personaAvatarView)
         wardrobeBtn= findViewById(R.id.wardrobeButton)
+        bubbleColorSpinner = findViewById(R.id.bubbleColorSpinner)
+        textColorSpinner = findViewById(R.id.textColorSpinner)
         saveBtn   = findViewById(R.id.savePersonaButton)
+
+        // Color spinners
+        val adapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, colorOptions.map { it.first })
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        bubbleColorSpinner.adapter = adapter
+        textColorSpinner.adapter = adapter
 
         // Avatar picker
         val avatarPicker = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
             uri?.let {
                 avatarUri = it
                 avatarStringUri = it.toString()
-                avatarView.setImageURI(it)
+                Glide.with(this)
+                    .load(it)
+                    .placeholder(R.drawable.placeholder_avatar)
+                    .into(avatarView)
             }
         }
         avatarView.setOnClickListener { avatarPicker.launch("image/*") }
@@ -65,11 +97,21 @@ class PersonaCreationActivity : AppCompatActivity() {
         // Wardrobe picker
         wardrobeBtn.setOnClickListener {
             val intent = Intent(this, WardrobeActivity::class.java)
+            val outfitsJson = Gson().toJson(outfitsList)
+            intent.putExtra(EXTRA_OUTFITS_JSON, outfitsJson)
             startActivityForResult(intent, WARDROBE_REQUEST)
         }
-        val ageStr = ageEt.text.toString().trim()
-        val age = ageStr.toIntOrNull() ?: 0 // or any sensible default/validation
-        // Save
+
+        // If editing
+        editPersonaId = intent.getStringExtra("PERSONA_EDIT_ID")
+        val personaJson = intent.getStringExtra("PERSONA_PROFILE_JSON")
+        if (editPersonaId != null && !personaJson.isNullOrBlank()) {
+            val profile = Gson().fromJson(personaJson, PersonaProfile::class.java)
+            fillFormFromProfile(profile)
+        } else {
+            avatarView.setImageResource(R.drawable.placeholder_avatar)
+        }
+
         saveBtn.setOnClickListener {
             val userId = FirebaseAuth.getInstance().currentUser?.uid
             if (userId == null) {
@@ -77,26 +119,180 @@ class PersonaCreationActivity : AppCompatActivity() {
                 return@setOnClickListener
             }
 
+            val personaId = editPersonaId ?: System.currentTimeMillis().toString()
+            val colorHexList = colorOptions.map { it.second }
+            val bubbleColorHex = colorHexList[bubbleColorSpinner.selectedItemPosition]
+            val textColorHex = colorHexList[textColorSpinner.selectedItemPosition]
+
+            val ageStr = ageEt.text.toString().trim()
+            val age = ageStr.toIntOrNull() ?: 0
+
             val persona = PersonaProfile(
-                id          = System.currentTimeMillis().toString(),
+                id          = personaId,
                 name        = nameEt.text.toString().trim(),
                 age         = age,
                 gender      = genderEt.text.toString().trim(),
                 height      = heightEt.text.toString().trim(),
+                weight      = weightEt.text.toString().trim(),
                 hair        = hairEt.text.toString().trim(),
                 eyes        = eyesEt.text.toString().trim(),
                 physicaldescription = descEt.text.toString().trim(),
-                images      = wardrobeImages,
+                outfits     = outfitsList,
+                currentOutfit = currentOutfit,
                 author      = userId,
-                avatarUri   = avatarStringUri
+                bubbleColor = bubbleColorHex,
+                textColor = textColorHex,
+                avatarUri   = avatarStringUri,
             )
-            uploadAvatarAndSavePersona(persona)
-            savePersona(persona)
+            uploadAllPosesAndAvatarAndSavePersona(persona)
         }
     }
 
+    private fun fillFormFromProfile(profile: PersonaProfile) {
+        nameEt.setText(profile.name)
+        ageEt.setText(profile.age.toString())
+        genderEt.setText(profile.gender)
+        heightEt.setText(profile.height)
+        weightEt.setText(profile.weight)
+        hairEt.setText(profile.hair)
+        eyesEt.setText(profile.eyes)
+        descEt.setText(profile.physicaldescription)
+        outfitsList = profile.outfits
+        currentOutfit = profile.currentOutfit
+
+        // Pick a "neutral" pose image if possible, else fallback to avatarUri
+        val avatarUrl = profile.outfits
+            .firstOrNull { it.name == profile.currentOutfit }
+            ?.poseSlots?.firstOrNull { it.name.equals("neutral", true) }?.uri
+            ?: profile.outfits.firstOrNull()?.poseSlots?.firstOrNull()?.uri
+            ?: profile.avatarUri
+
+        avatarStringUri = avatarUrl ?: ""
+        avatarUri = if (!avatarStringUri.isBlank() && avatarStringUri.startsWith("content://")) Uri.parse(avatarStringUri) else null
+
+        if (!avatarStringUri.isNullOrBlank()) {
+            Glide.with(this)
+                .load(avatarStringUri)
+                .placeholder(R.drawable.placeholder_avatar)
+                .into(avatarView)
+        } else {
+            avatarView.setImageResource(R.drawable.placeholder_avatar)
+        }
+
+        val colorHexList = colorOptions.map { it.second }
+        bubbleColorSpinner.setSelection(colorHexList.indexOf(profile.bubbleColor).takeIf { it >= 0 } ?: 0)
+        textColorSpinner.setSelection(colorHexList.indexOf(profile.textColor).takeIf { it >= 0 } ?: 0)
+    }
+
+    // Handles wardrobe result
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == WARDROBE_REQUEST && resultCode == Activity.RESULT_OK) {
+            val outfitsJson = data?.getStringExtra(EXTRA_OUTFITS_JSON)
+            if (!outfitsJson.isNullOrEmpty()) {
+                val outfits = Gson().fromJson(outfitsJson, Array<Outfit>::class.java)
+                outfitsList = outfits.toList()
+                currentOutfit = outfitsList.firstOrNull()?.name ?: ""
+                // Optionally update avatarView to "neutral" pose
+                val neutralPose = outfitsList.firstOrNull()?.poseSlots?.firstOrNull { it.name.equals("neutral", true) }?.uri
+                if (!neutralPose.isNullOrBlank()) {
+                    Glide.with(this)
+                        .load(neutralPose)
+                        .placeholder(R.drawable.placeholder_avatar)
+                        .into(avatarView)
+                    avatarStringUri = neutralPose
+                }
+            }
+        }
+    }
+
+    // Uploads all local outfit pose images and avatar, then saves persona
+    private fun uploadAllPosesAndAvatarAndSavePersona(persona: PersonaProfile) {
+        val userId = persona.author
+        val personaId = persona.id
+        val storage = FirebaseStorage.getInstance().reference
+
+        // Gather pose image upload tasks
+        val poseTasks = persona.outfits.flatMap { outfit ->
+            outfit.poseSlots.mapNotNull { poseSlot ->
+                val poseName = poseSlot.name.trim()
+                val uriStr = poseSlot.uri?.trim() ?: ""
+                if (poseName.isBlank() || uriStr.isBlank() || uriStr.startsWith("http")) return@mapNotNull null
+                val fileUri = Uri.parse(uriStr)
+                val ext = contentResolver.getType(fileUri)
+                    ?.let { MimeTypeMap.getSingleton().getExtensionFromMimeType(it) }
+                    ?: "jpg"
+                val ref = storage.child("users/$userId/personas/$personaId/outfits/${outfit.name}/$poseName.$ext")
+                Log.d("PersonaCreation", "Uploading $fileUri to $ref")
+                val uploadTask = ref.putFile(fileUri)
+                    .continueWithTask { t ->
+                        if (!t.isSuccessful) throw t.exception!!
+                        ref.downloadUrl
+                    }
+                    .continueWith { t ->
+                        Triple(outfit.name, poseName, t.result.toString())
+                    }
+                uploadTask
+            }
+        }
+
+        // Avatar upload (if local)
+        val avatarUploadTask =
+            if (avatarUri != null && avatarUri.toString().startsWith("content://")) {
+                val ext = contentResolver.getType(avatarUri!!)
+                    ?.let { MimeTypeMap.getSingleton().getExtensionFromMimeType(it) }
+                    ?: "jpg"
+                val avatarRef = storage.child("users/$userId/personas/$personaId/avatar.$ext")
+                avatarRef.putFile(avatarUri!!)
+                    .continueWithTask { t ->
+                        if (!t.isSuccessful) throw t.exception!!
+                        avatarRef.downloadUrl
+                    }
+                    .continueWith { t ->
+                        Triple("__avatar", "__avatar", t.result.toString())
+                    }
+            } else null
+
+        val allTasks = poseTasks.toMutableList()
+        avatarUploadTask?.let { allTasks += it }
+
+        com.google.android.gms.tasks.Tasks.whenAllSuccess<Any>(allTasks)
+            .addOnSuccessListener { results ->
+                val poseTriples = results.filterIsInstance<Triple<String, String, String>>()
+                // Map of outfitName -> MutableMap<poseName, url>
+                val outfitMap = mutableMapOf<String, MutableMap<String, String>>()
+                var avatarUrl: String? = null
+
+                for ((outfitName, poseName, url) in poseTriples) {
+                    if (outfitName == "__avatar" && poseName == "__avatar") {
+                        avatarUrl = url
+                    } else {
+                        val poseMap = outfitMap.getOrPut(outfitName) { mutableMapOf() }
+                        poseMap[poseName] = url
+                    }
+                }
+
+                // Build updated outfit list with remote pose URLs
+                val updatedOutfits = persona.outfits.map { outfit ->
+                    val updatedPoseSlots = outfit.poseSlots.map { poseSlot ->
+                        val newUrl = outfitMap[outfit.name]?.get(poseSlot.name) ?: poseSlot.uri
+                        poseSlot.copy(uri = newUrl)
+                    }.toMutableList()
+                    outfit.copy(poseSlots = updatedPoseSlots)
+                }
+
+                val finalPersona = persona.copy(
+                    outfits = updatedOutfits,
+                    avatarUri = avatarUrl ?: persona.avatarUri
+                )
+                savePersona(finalPersona)
+            }
+            .addOnFailureListener { e ->
+                Toast.makeText(this, "Upload failed: ${e.message}", Toast.LENGTH_LONG).show()
+            }
+    }
+
     private fun savePersona(persona: PersonaProfile) {
-        // Write to Firestore (under user collection for isolation)
         FirebaseFirestore.getInstance()
             .collection("personas")
             .document(persona.id)
@@ -110,50 +306,4 @@ class PersonaCreationActivity : AppCompatActivity() {
                 Toast.makeText(this, "Error saving persona: ${e.message}", Toast.LENGTH_LONG).show()
             }
     }
-
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == WARDROBE_REQUEST && resultCode == Activity.RESULT_OK) {
-            val outfitsJson = data?.getStringExtra(WardrobeActivity.EXTRA_OUTFITS_JSON)
-            if (!outfitsJson.isNullOrEmpty()) {
-                // Parse outfits JSON and extract images for this persona
-                val outfits = Gson().fromJson(outfitsJson, Array<com.example.RealmsAI.models.Outfit>::class.java)
-                wardrobeImages = outfits.flatMap { it.poseUris.values }
-                // Optionally show preview of the first image as avatar
-                wardrobeImages.firstOrNull()?.let {
-                    avatarView.setImageURI(Uri.parse(it))
-                    avatarStringUri = it // set as persona's avatar if you want
-                }
-            }
-        }
-    }
-    private fun uploadAvatarAndSavePersona(persona: PersonaProfile) {
-        val userId = persona.author
-        val personaId = persona.id
-        val storageRef = FirebaseStorage.getInstance().reference
-        val avatarUri = avatarUri // the Uri picked by user
-
-        if (avatarUri != null) {
-            val ext = contentResolver.getType(avatarUri)
-                ?.let { MimeTypeMap.getSingleton().getExtensionFromMimeType(it) }
-                ?: "jpg"
-            val avatarRef = storageRef.child("users/$userId/personas/$personaId/avatar.$ext")
-
-            avatarRef.putFile(avatarUri)
-                .continueWithTask { task ->
-                    if (!task.isSuccessful) throw task.exception!!
-                    avatarRef.downloadUrl
-                }
-                .addOnSuccessListener { downloadUri ->
-                    val updatedPersona = persona.copy(avatarUri = downloadUri.toString())
-                    savePersona(updatedPersona) // Save persona with Storage URL
-                }
-                .addOnFailureListener { e ->
-                    Toast.makeText(this, "Avatar upload failed: ${e.message}", Toast.LENGTH_LONG).show()
-                }
-        } else {
-            savePersona(persona) // No avatar, just save persona data
-        }
-    }
-
 }

@@ -330,77 +330,53 @@ class SessionLandingActivity : AppCompatActivity() {
         // 2. Pick which bot is the speaker (e.g., "B1" for slot 0)
         val poseImageUrls = slotRoster.associate { slotInfo ->
             val charProfile = characterProfiles.find { it.id == slotInfo.id }
-            slotInfo.slot to (
-                    charProfile?.outfits?.find { it.name == charProfile.currentOutfit }?.poseUris
-                        ?: emptyMap()
-                    )
+            // Get current outfit, then convert its poseSlots list to a Map<String, String?>
+            val poseMap = charProfile?.outfits
+                ?.find { it.name == charProfile.currentOutfit }
+                ?.poseSlots
+                ?.associate { poseSlot -> poseSlot.name to (poseSlot.uri ?: "") }
+                ?: emptyMap()
+            slotInfo.slot to poseMap
         }
         val outfitsBySlot = slotRoster.associate { slotInfo ->
             val charProfile = characterProfiles.find { it.id == slotInfo.id }
             slotInfo.slot to (charProfile?.currentOutfit ?: charProfile?.outfits?.firstOrNull()?.name ?: "default")
         }
-        // Colors: optional, use defaults for now
-        val colorMap = characterProfiles.associate { it.id to "#FFFFFF" }
-
-        val facilitatorPrompt = PromptBuilder.buildFacilitatorPrompt(
-            slotRoster = slotRoster,
-            outfits = outfitsBySlot,
-            poseImageUrls = poseImageUrls,
-            sessionDescription = sessionDescription,
-            history = "", // No chat history yet
-            facilitatorNotes = null,
-            userInput = greeting,
-            backgroundImage = chatProfile?.backgroundUri,
-            availableColors = colorMap
+        val sessionProfile = SessionProfile(
+            sessionId = "", // fill as needed
+            chatId = chatProfile?.id ?: "",
+            title = chatProfile?.title ?: characterProfiles.getOrNull(0)?.name ?: "",
+            sessionDescription = chatProfile?.description ?: characterProfiles.getOrNull(0)?.summary ?: "",
+            areas = chatProfile?.areas ?: emptyList(),
+            chatMode = chatProfile?.mode?.name ?: "ONE_ON_ONE",
+            startedAt = null,
+            sfwOnly = sessionLandingProfile.sfwOnly,
+            participants = sessionLandingProfile.participants,
+            relationships = sessionLandingProfile.relationships,
+            slotRoster = buildSlotRoster(sessionLandingProfile, chatProfile, characterProfiles),
+            personaProfiles = listOf() // fill as needed
         )
 
-        // --- 3. Run facilitator with greeting prompt ---
-        runFacilitator(
-            prompt = facilitatorPrompt,
-            onResult = { facilitatorResponse ->
-                // --- 3. On facilitator result, proceed to build the session as before ---
-                val sessionProfile = SessionProfile(
-                    sessionId = "", // fill as needed
-                    chatId = chatProfile?.id ?: "",
-                    title = chatProfile?.title ?: characterProfiles.getOrNull(0)?.name ?: "",
-                    sessionDescription = chatProfile?.description ?: characterProfiles.getOrNull(0)?.summary ?: "",
-                    backgroundUri = chatProfile?.backgroundUri,
-                    chatMode = chatProfile?.mode?.name ?: "ONE_ON_ONE",
-                    startedAt = null,
-                    sfwOnly = sessionLandingProfile.sfwOnly,
-                    participants = sessionLandingProfile.participants,
-                    relationships = sessionLandingProfile.relationships,
-                    slotRoster = buildSlotRoster(sessionLandingProfile, chatProfile, characterProfiles),
-                    personaProfiles = listOf() // fill as needed
-                )
-
-                // Pass the facilitatorResponse as the initial message for MainActivity
-                SessionManager.createSession(
-                    sessionProfile = sessionProfile,
-                    chatProfileJson = chatProfileJson,
-                    userId = currentUserId,
-                    characterProfilesJson = characterProfilesJson,
-                    characterId = selectedCharIds.firstOrNull { it != currentUserId } ?: "",
-                    extraParticipants = listOf(currentUserId),
-                    onResult = { sessionId ->
-                        startActivity(Intent(this, MainActivity::class.java).apply {
-                            putExtra("CHAT_ID", sessionProfile.chatId)
-                            putExtra("SESSION_ID", sessionId)
-                            putExtra("SESSION_PROFILE_JSON", Gson().toJson(sessionProfile))
-                            putExtra("INITIAL_MESSAGE", facilitatorResponse) // <-- pass here!
-                        })
-                        finish()
-                    },
-                    onError = {
-                        Toast.makeText(this, "Failed to start session.", Toast.LENGTH_SHORT).show()
-                    }
-                )
+        // Pass the facilitatorResponse as the initial message for MainActivity
+        SessionManager.createSession(
+            sessionProfile = sessionProfile,
+            chatProfileJson = chatProfileJson,
+            userId = currentUserId,
+            characterProfilesJson = characterProfilesJson,
+            characterId = selectedCharIds.firstOrNull { it != currentUserId } ?: "",
+            extraParticipants = listOf(currentUserId),
+            onResult = { sessionId ->
+                startActivity(Intent(this, MainActivity::class.java).apply {
+                    putExtra("CHAT_ID", sessionProfile.chatId)
+                    putExtra("SESSION_ID", sessionId)
+                    putExtra("SESSION_PROFILE_JSON", Gson().toJson(sessionProfile))
+                    putExtra("GREETING", greeting)
+                })
+                finish()
             },
-            onError = { err: Throwable ->
-                Log.e("SessionLanding", "Facilitator error: ${err.message}", err)
-                Toast.makeText(this, "Failed to generate greeting: ${err.message}", Toast.LENGTH_LONG).show()
+            onError = {
+                Toast.makeText(this, "Failed to start session.", Toast.LENGTH_SHORT).show()
             }
-
         )
     }
 
@@ -418,11 +394,15 @@ class SessionLandingActivity : AppCompatActivity() {
                 summary = profile?.summary ?: "",
                 id = participantId,
                 outfits = profile?.outfits?.map { it.name } ?: emptyList(),
-                poses = profile?.outfits?.firstOrNull()?.poseUris
-                    ?.mapValues { listOf(it.value) } // Convert String to List<String>
+                poses = profile?.outfits?.firstOrNull()
+                    ?.poseSlots
+                    ?.filter { !it.name.isNullOrBlank() && !it.uri.isNullOrBlank() }
+                    ?.associate { poseSlot -> poseSlot.name to listOfNotNull(poseSlot.uri) }
                     ?: emptyMap(),
-                relationships = sessionLandingProfile.relationships.filter { it.fromId == participantId }
+                relationships = sessionLandingProfile.relationships.filter { it.fromId == participantId },
+                sfwOnly = profile?.sfwOnly ?: true
             )
+
         }
     }
     private fun runFacilitator(

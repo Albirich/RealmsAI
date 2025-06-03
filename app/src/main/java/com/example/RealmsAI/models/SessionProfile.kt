@@ -13,8 +13,8 @@ data class SessionProfile(
     val sfwOnly: Boolean = true,
     val participants: List<String> = emptyList(),
     val relationships: List<Relationship> = emptyList(),
-
     val slotRoster: List<SlotInfo> = emptyList(),
+    val areas: List<Area> = emptyList(),
     val personaProfiles: List<PersonaProfile> = emptyList()
 )
 
@@ -25,6 +25,7 @@ data class SlotInfo(
     val id: String = "",
     val outfits: List<String> = emptyList(), // Add if JSON has it
     val poses: Map<String, List<String>> = emptyMap(),
+    val sfwOnly: Boolean,
     val relationships: List<Relationship> = emptyList()
 )
 

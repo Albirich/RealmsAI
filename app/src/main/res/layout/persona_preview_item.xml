@@ -7,7 +7,7 @@
 
     <!-- (a) Card background, same as chat -->
     <ImageView
-        android:id="@+id/cardBackground"
+        android:id="@+id/PersonaCardBackground"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:adjustViewBounds="true"
@@ -16,10 +16,10 @@
 
     <!-- (b) One‐slot avatar container with weighted spacers -->
     <LinearLayout
-        android:id="@+id/avatarContainer"
+        android:id="@+id/personaAvatarContainer"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_alignTop="@id/cardBackground"
+        android:layout_alignTop="@id/PersonaCardBackground"
         android:layout_marginHorizontal="2dp"
         android:layout_marginTop="3dp"
         android:orientation="horizontal"
@@ -27,10 +27,12 @@
         >
 
         <!-- left spacer (0.5 of width) -->
-        <View
+         <ImageView
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_weight="0.5" />
+            android:layout_weight=".5"
+            android:adjustViewBounds="true"
+            android:scaleType="centerCrop"/>
 
         <!-- avatar slot (1 of width) -->
         <ImageView
@@ -44,10 +46,12 @@
             android:contentDescription="@null" />
 
         <!-- right spacer -->
-        <View
+        <ImageView
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_weight="0.5" />
+            android:layout_weight=".5"
+            android:adjustViewBounds="true"
+            android:scaleType="centerCrop"/>
     </LinearLayout>
 
     <!-- (c) Name (reusing chatTitle id) -->
@@ -55,7 +59,7 @@
         android:id="@+id/personaTitle"
         android:layout_width="match_parent"
         android:layout_height="36dp"
-        android:layout_below="@id/avatarContainer"
+        android:layout_below="@id/personaAvatarContainer"
         android:layout_marginTop="8dp"
         android:layout_marginHorizontal="4dp"
         android:text="Character Name"
@@ -68,7 +72,7 @@
         android:id="@+id/personaPreview"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_below="@id/chatTitle"
+        android:layout_below="@id/personaTitle"
         android:layout_marginTop="4dp"
         android:layout_marginHorizontal="4dp"
         android:layout_marginBottom="40dp"

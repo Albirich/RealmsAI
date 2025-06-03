@@ -12,7 +12,7 @@ object StaticAIResponseParser {
         val lines = raw.split("\n").map { it.trim() }
         var currentDelay = 0L
         var message = ""
-        var imageUpdates = mapOf<Int, String?>()
+        var imageUpdates = mapOf<String, String?>()
         var bubbleBackgroundColor = 0xFFFFFFFF.toInt()
         var bubbleTextColor = 0xFF000000.toInt()
         var backgroundImage: String? = null
@@ -23,8 +23,9 @@ object StaticAIResponseParser {
                 line.startsWith("message:") -> message = line.removePrefix("message:").trim()
                 line.startsWith("image_updates:") -> {
                     val json = JSONObject(line.removePrefix("image_updates:").trim())
-                    imageUpdates = json.keys().asSequence().associate {
-                        it.toInt() to json.optString(it).takeIf { s -> s != "null" }
+                    imageUpdates = json.keys().asSequence().associate { key ->
+                        val value = json.optString(key).takeIf { s -> s != "null" }
+                        key to value
                     }
                 }
                 line.startsWith("bubble_colors:") -> {

@@ -9,37 +9,36 @@
     android:layout_marginBottom="16dp">
 
     <EditText
-        android:id="@+id/outfitNameEditText"
+        android:id="@+id/areaNameEditText"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:hint="Outfit Name"/>
+        android:hint="Area Name"/>
 
     <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/poseRecycler"
+        android:id="@+id/locationRecycler"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="8dp"/>
+
     <ImageButton
-        android:id="@+id/addPoseButton"
+        android:id="@+id/addLocationButton"
         android:layout_width="48dp"
         android:layout_height="48dp"
         android:src="@drawable/ic_add"
         android:background="?attr/selectableItemBackgroundBorderless"
-        android:contentDescription="Add Pose"
+        android:contentDescription="Add Location"
         android:scaleType="fitXY"
         android:layout_gravity="end"
-        android:layout_marginTop="8dp" />
-
+        android:layout_marginTop="8dp"/>
     <ImageButton
-        android:id="@+id/deletePoseButton"
+        android:id="@+id/deleteLocationButton"
         android:layout_width="48dp"
         android:layout_height="48dp"
         android:src="@drawable/ic_delete"
         android:background="?attr/selectableItemBackgroundBorderless"
-        android:contentDescription="Delete Pose"
+        android:contentDescription="Delete Location"
         android:scaleType="fitXY"
         android:layout_gravity="end"
-        android:layout_marginStart="8dp"
-        android:layout_marginTop="8dp"/>
+        android:layout_marginStart="8dp"/>
 
 </LinearLayout>

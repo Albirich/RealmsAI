@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:padding="16dp">
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+        <LinearLayout
+            android:id="@+id/areaContainer"
+            android:orientation="vertical"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"/>
+    </ScrollView>
+    <!-- Recycler for all areas -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/areaRecycler"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:overScrollMode="never" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/addAreaButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Add Area"/>
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/loadAreaButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Load Area"
+        android:layout_marginTop="8dp"/>
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/submitGalleryButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Save All Backgrounds"
+        android:layout_marginTop="8dp"/>
+</LinearLayout>

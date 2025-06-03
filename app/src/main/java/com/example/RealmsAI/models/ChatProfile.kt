@@ -12,8 +12,6 @@ data class ChatProfile(
     val description: String = "",
     val firstmessage: String = "",
     val characterIds: List<String> = emptyList(),
-    val backgroundUri: String? = null,
-    val backgroundResId: Int? = null,
     val mode: ChatMode = ChatMode.SANDBOX,
     val relationships: List<Relationship> = emptyList(),
     val rating: Float = 0f,
@@ -21,6 +19,7 @@ data class ChatProfile(
     val timestamp: Timestamp? = null,
     val author: String = "",
     val tags: List<String> = emptyList(),
+    val areas: List<Area> = emptyList(),
     val sfwOnly: Boolean = true
 ) {
     // This secondary constructor gives Firestore the no-arg it needs:
@@ -29,8 +28,6 @@ data class ChatProfile(
         title      = "",
         description= "",
         characterIds = emptyList(),
-        backgroundUri = null,
-        backgroundResId = null,
         mode       = ChatMode.SANDBOX,
         rating     = 0f,
         timestamp  = null,
