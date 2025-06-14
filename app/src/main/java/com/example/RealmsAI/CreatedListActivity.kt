@@ -15,12 +15,15 @@ import androidx.recyclerview.widget.RecyclerView
 import com.example.RealmsAI.models.ChatProfile
 import com.example.RealmsAI.models.CharacterProfile
 import com.example.RealmsAI.models.PersonaProfile
+import com.google.android.gms.tasks.Tasks
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.ktx.toObject         // ← This brings in the correct .toObject extension
 import com.google.firebase.ktx.Firebase
 import com.google.firebase.firestore.ktx.firestore
+import com.google.firebase.storage.FirebaseStorage
+import com.google.firebase.storage.StorageReference
 import com.google.gson.Gson
 import org.json.JSONObject
 
@@ -29,6 +32,7 @@ class CreatedListActivity : BaseActivity() {
 
     private val db = Firebase.firestore
     private val currentUserId = FirebaseAuth.getInstance().currentUser?.uid
+    private var characterMap: Map<String, CharacterProfile> = emptyMap()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -81,11 +85,25 @@ class CreatedListActivity : BaseActivity() {
                 // no-op
             }
         }
-
-        // …then kick off your Firestore loads into each RecyclerView…
-        showChats(chatsRv)
-        showCharacters(charactersRv)
-        showPersonas(personasRv)
+        db.collection("characters")
+            .get()
+            .addOnSuccessListener { snap ->
+                characterMap = snap.documents
+                    .mapNotNull { it.toObject(CharacterProfile::class.java) }
+                    .associateBy { it.id }
+                // Now that characterMap is loaded, show chats
+                showChats(chatsRv)
+                // The rest don't need characterMap
+                showCharacters(charactersRv)
+                showPersonas(personasRv)
+            }
+            .addOnFailureListener { e ->
+                Toast.makeText(this, "Could not load characters: ${e.message}", Toast.LENGTH_SHORT).show()
+                // Still show the other lists (avatars may be missing for chats)
+                showChats(chatsRv)
+                showCharacters(charactersRv)
+                showPersonas(personasRv)
+            }
     }
     private fun lookupAvatar(charId: String): String? {
         // load from the same shared‐prefs or wherever you persisted your CharacterProfile
@@ -99,26 +117,22 @@ class CreatedListActivity : BaseActivity() {
         val adapter = ChatPreviewAdapter(
             context = this,
             chatList = emptyList(),
-            onClick = { /* ... */ },
+            onClick = { /* ...normal chat open... */ },
             onLongClick = { preview ->
                 AlertDialog.Builder(this)
                     .setTitle(preview.title)
                     .setItems(arrayOf("Edit", "Delete")) { _, which ->
                         when (which) {
-                            0 -> {
-                                // Load full profile from Firestore before editing!
-                                FirebaseFirestore.getInstance()
-                                    .collection("chats")
-                                    .document(preview.id)
-                                    .get()
+                            0 -> { // --- Edit Chat ---
+                                db.collection("chats").document(preview.id).get()
                                     .addOnSuccessListener { snapshot ->
                                         val fullProfile = snapshot.toObject(ChatProfile::class.java)
                                         if (fullProfile != null) {
-                                            startActivity(
-                                                Intent(this, ChatCreationActivity::class.java)
-                                                    .putExtra("CHAT_EDIT_ID", preview.id)
-                                                    .putExtra("CHAT_PROFILE_JSON", Gson().toJson(fullProfile))
-                                            )
+                                            // Pass chat profile as JSON for preloading
+                                            val intent = Intent(this, ChatCreationActivity::class.java)
+                                            intent.putExtra("CHAT_EDIT_ID", preview.id)
+                                            intent.putExtra("CHAT_PROFILE_JSON", Gson().toJson(fullProfile))
+                                            startActivityForResult(intent, 1010) // use a req code if you want to refresh after edit
                                         } else {
                                             Toast.makeText(this, "Chat profile not found.", Toast.LENGTH_SHORT).show()
                                         }
@@ -127,7 +141,25 @@ class CreatedListActivity : BaseActivity() {
                                         Toast.makeText(this, "Failed: ${it.message}", Toast.LENGTH_SHORT).show()
                                     }
                             }
-                            1 -> { /* ...delete logic... */ }
+                            1 -> { // --- Delete Chat ---
+                                AlertDialog.Builder(this)
+                                    .setTitle("Delete?")
+                                    .setMessage("Are you sure you want to delete '${preview.title}'?")
+                                    .setPositiveButton("Yes") { _, _ ->
+                                        db.collection("chats").document(preview.id)
+                                            .delete()
+                                            .addOnSuccessListener {
+                                                Toast.makeText(this, "Deleted.", Toast.LENGTH_SHORT).show()
+                                                // Refresh list after deletion
+                                                startActivity(intent)
+                                            }
+                                            .addOnFailureListener { e ->
+                                                Toast.makeText(this, "Failed: ${e.message}", Toast.LENGTH_SHORT).show()
+                                            }
+                                    }
+                                    .setNegativeButton("No", null)
+                                    .show()
+                            }
                         }
                     }
                     .show()
@@ -135,27 +167,33 @@ class CreatedListActivity : BaseActivity() {
         )
         rv.adapter = adapter
 
-        // Load chat previews as before...
-        FirebaseFirestore.getInstance()
-            .collection("chats")
-            .whereEqualTo("author", FirebaseAuth.getInstance().uid)
+        db.collection("chats")
+            .whereEqualTo("author", currentUserId)
             .orderBy("timestamp", Query.Direction.DESCENDING)
             .get()
             .addOnSuccessListener { snap ->
                 val previews = snap.documents.mapNotNull { doc ->
                     doc.toObject(ChatProfile::class.java)?.let { p ->
+                        val char1Id = p.characterIds.getOrNull(0)
+                        val char2Id = p.characterIds.getOrNull(1)
+                        val char1 = characterMap[char1Id]
+                        val char2 = characterMap[char2Id]
                         ChatPreview(
                             id = p.id,
                             rawJson = Gson().toJson(p),
                             title = p.title,
                             description = p.description,
-                            // ...etc
-                            avatar1Uri = p.characterIds.getOrNull(0)?.let(::lookupAvatar),
-                            avatar2Uri = p.characterIds.getOrNull(1)?.let(::lookupAvatar),
+                            avatar1Uri = char1?.avatarUri ?: "",
+                            avatar2Uri = char2?.avatarUri ?: "",
                             avatar1ResId = R.drawable.icon_01,
                             avatar2ResId = R.drawable.icon_01,
                             rating = p.rating,
-                            mode = p.mode
+                            mode = p.mode,
+                            timestamp = p.timestamp,
+                            author = p.author,
+                            tags = p.tags,
+                            sfwOnly = p.sfwOnly,
+                            chatProfile = p
                         )
                     }
                 }
@@ -165,6 +203,8 @@ class CreatedListActivity : BaseActivity() {
                 Toast.makeText(this, "Fetch error: ${e.message}", Toast.LENGTH_LONG).show()
             }
     }
+
+
 
     private fun showCharacters(rv: RecyclerView) {
         rv.layoutManager = GridLayoutManager(this, 2)
@@ -191,13 +231,7 @@ class CreatedListActivity : BaseActivity() {
                 rv.adapter = CharacterPreviewAdapter(
                     this,
                     previews,
-                    onClick = { preview ->
-                        startActivity(
-                            Intent(this, CharacterCreationActivity::class.java)
-                                .putExtra("CHAR_EDIT_ID", preview.id)
-                                .putExtra("CHAR_PROFILE_JSON", Gson().toJson(preview))
-                        )
-                    },
+                    onClick = { /* ... */ },
                     onLongClick = { preview ->
                         // THIS is where the dialog should go!
                         AlertDialog.Builder(this)
@@ -238,27 +272,37 @@ class CreatedListActivity : BaseActivity() {
                                             .setTitle("Delete?")
                                             .setMessage("Are you sure you want to delete '${preview.name}'?")
                                             .setPositiveButton("Yes") { _, _ ->
-                                                // Remove from Firestore
-                                                FirebaseFirestore.getInstance()
-                                                    .collection("characters")
-                                                    .document(preview.id)
-                                                    .delete()
-                                                    .addOnSuccessListener {
-                                                        Toast.makeText(
-                                                            this,
-                                                            "Deleted.",
-                                                            Toast.LENGTH_SHORT
-                                                        ).show()
-                                                        // Optionally refresh the list
+                                                val firestore = FirebaseFirestore.getInstance()
+                                                val storage = FirebaseStorage.getInstance()
+                                                val characterId = preview.id
+                                                val charFolderRef = storage.reference.child("characters/$characterId/")
+
+                                                // Recursively delete all files/folders in character's storage folder
+                                                deleteAllInFolder(charFolderRef) { success, error ->
+                                                    if (success) {
+                                                        firestore.collection("characters")
+                                                            .document(characterId)
+                                                            .delete()
+                                                            .addOnSuccessListener {
+                                                                startActivity(intent)
+                                                                runOnUiThread {
+                                                                    Toast.makeText(this, "Deleted.", Toast.LENGTH_SHORT).show()
+                                                                }
+                                                            }
+                                                            .addOnFailureListener { e ->
+                                                                runOnUiThread {
+                                                                    Toast.makeText(this, "Failed: ${e.message}", Toast.LENGTH_SHORT).show()
+                                                                }
+                                                            }
+                                                        startActivity(intent)
+                                                    } else {
+                                                        runOnUiThread {
+                                                            Toast.makeText(this, "Failed to delete images: ${error?.message}", Toast.LENGTH_SHORT).show()
+                                                        }
                                                     }
-                                                    .addOnFailureListener { e ->
-                                                        Toast.makeText(
-                                                            this,
-                                                            "Failed: ${e.message}",
-                                                            Toast.LENGTH_SHORT
-                                                        ).show()
-                                                    }
+                                                }
                                             }
+
                                             .setNegativeButton("No", null)
                                             .show()
                                     }
@@ -297,28 +341,7 @@ class CreatedListActivity : BaseActivity() {
                 rv.adapter = PersonaPreviewAdapter(
                     this,
                     previews,
-                    onClick = { preview ->
-                        // Load the *full* persona profile from Firestore before editing
-                        FirebaseFirestore.getInstance()
-                            .collection("personas")
-                            .document(preview.id)
-                            .get()
-                            .addOnSuccessListener { snapshot ->
-                                val fullProfile = snapshot.toObject(PersonaProfile::class.java)
-                                if (fullProfile != null) {
-                                    startActivity(
-                                        Intent(this, PersonaCreationActivity::class.java)
-                                            .putExtra("PERSONA_EDIT_ID", preview.id)
-                                            .putExtra("PERSONA_PROFILE_JSON", Gson().toJson(fullProfile))
-                                    )
-                                } else {
-                                    Toast.makeText(this, "Persona profile not found.", Toast.LENGTH_SHORT).show()
-                                }
-                            }
-                            .addOnFailureListener {
-                                Toast.makeText(this, "Failed: ${it.message}", Toast.LENGTH_SHORT).show()
-                            }
-                    },
+                    onClick = {/* ... */},
                     onLongClick = { preview ->
                         AlertDialog.Builder(this)
                             .setTitle(preview.name)
@@ -362,6 +385,7 @@ class CreatedListActivity : BaseActivity() {
                                                     .document(preview.id)
                                                     .delete()
                                                     .addOnSuccessListener {
+                                                        startActivity(intent)
                                                         Toast.makeText(this, "Deleted.", Toast.LENGTH_SHORT).show()
                                                     }
                                                     .addOnFailureListener { e ->
@@ -381,4 +405,46 @@ class CreatedListActivity : BaseActivity() {
                 Toast.makeText(this, "Could not load personas: ${e.message}", Toast.LENGTH_SHORT).show()
             }
     }
+
+    // Recursive function to delete all files in a folder and its subfolders
+    fun deleteAllInFolder(folderRef: StorageReference, onComplete: (Boolean, Exception?) -> Unit) {
+        folderRef.listAll()
+            .addOnSuccessListener { listResult ->
+                val deleteTasks = mutableListOf<com.google.android.gms.tasks.Task<Void>>()
+
+                // Delete all files in this folder
+                for (item in listResult.items) {
+                    deleteTasks.add(item.delete())
+                }
+
+                // Recursively delete all files in all subfolders
+                var subfolderTasks = 0
+                var error: Exception? = null
+
+                if (listResult.prefixes.isEmpty()) {
+                    // No subfolders, just wait for file deletes
+                    com.google.android.gms.tasks.Tasks.whenAllComplete(deleteTasks)
+                        .addOnSuccessListener { onComplete(true, null) }
+                        .addOnFailureListener { e -> onComplete(false, e) }
+                } else {
+                    // There are subfolders
+                    for (prefix in listResult.prefixes) {
+                        subfolderTasks++
+                        deleteAllInFolder(prefix) { success, e ->
+                            subfolderTasks--
+                            if (!success && error == null) error = e
+                            if (subfolderTasks == 0) {
+                                // All subfolders done, now wait for files in this folder
+                                com.google.android.gms.tasks.Tasks.whenAllComplete(deleteTasks)
+                                    .addOnSuccessListener { onComplete(error == null, error) }
+                                    .addOnFailureListener { e2 -> onComplete(false, e2) }
+                            }
+                        }
+                    }
+                }
+            }
+            .addOnFailureListener { e -> onComplete(false, e) }
+    }
+
+
 }

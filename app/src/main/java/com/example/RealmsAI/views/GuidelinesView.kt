@@ -12,14 +12,14 @@ class GuidelinesView @JvmOverloads constructor(
 ) : View(context, attrs, defStyle) {
 
     private val guidelinePaint = Paint().apply {
-        color = Color.WHITE
+        color = Color.BLACK
         alpha = 120 // semi-transparent
         strokeWidth = 2f * resources.displayMetrics.density
         style = Paint.Style.STROKE
         isAntiAlias = true
     }
     private val labelPaint = Paint().apply {
-        color = Color.WHITE
+        color = Color.BLACK
         alpha = 220
         textSize = 16f * resources.displayMetrics.scaledDensity
         isFakeBoldText = true
@@ -55,5 +55,15 @@ class GuidelinesView @JvmOverloads constructor(
             val label = "$feet ft"
             canvas.drawText(label, 12f * resources.displayMetrics.density, y - 8f, labelPaint)
         }
+    }
+
+    // In GuidelinesView.kt
+    fun getYForFeetMarker(feet: Int): Float {
+        val totalHeight = height.toFloat()
+        val marginTop = totalHeight * .1f
+        val marginBottom = totalHeight * 0.02f
+        val usableHeight = totalHeight - marginTop - marginBottom
+        val pixelsPerFoot = usableHeight / 9f
+        return totalHeight - marginBottom - (feet * pixelsPerFoot)
     }
 }

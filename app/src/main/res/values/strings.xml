@@ -4,14 +4,6 @@
     <string name="title_default">Title will appear here</string>
     <string name="text_prompt">Type your message here</string>
     <string name="description">Description</string>
-    <string name="pose_Happy">Happy</string>
-    <string name="pose_Sad">Sad</string>
-    <string name="pose_Angry">Angry</string>
-    <string name="pose_surprised">Surprised</string>
-    <string name="pose_Flirty">Flirty</string>
-    <string name="pose_Fighting">Fighting</string>
-    <string name="pose_Thinking">Thinking</string>
-    <string name="pose_Embarrassed">Embarrassed</string>
     <string name="pose_placeholder">pose_placeholder</string>
     <string name="avatar">Avatar</string>
     <string name="filter_prompt">Show:</string>

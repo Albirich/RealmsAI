@@ -1,7 +1,6 @@
 package com.example.RealmsAI
 
 import android.content.Intent
-import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
 import android.util.Log
@@ -14,36 +13,23 @@ import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
+import com.example.RealmsAI.FacilitatorResponseParser.extractAvatarSlots
 import com.example.RealmsAI.ai.*
+import com.example.RealmsAI.ai.Facilitator.parseActivationAIResponse
+import com.example.RealmsAI.ai.PromptBuilder.buildRoleplayPrompt
 import com.example.RealmsAI.models.*
 import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.FirebaseFirestore
 import com.google.gson.Gson
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.ensureActive
-import kotlinx.coroutines.isActive
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.suspendCancellableCoroutine
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.*
 import java.util.UUID
-import kotlin.coroutines.resumeWithException
-import okhttp3.Call
-import okhttp3.Callback
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.Response
-import java.io.IOException
-import kotlin.coroutines.cancellation.CancellationException
 
 class MainActivity : AppCompatActivity() {
     companion object {
         private const val TAG = "MainActivity"
     }
 
-    // UI Components
+    // UI
     private lateinit var chatTitleView: TextView
     private lateinit var chatDescriptionView: TextView
     private lateinit var chatRecycler: RecyclerView
@@ -53,26 +39,24 @@ class MainActivity : AppCompatActivity() {
     private lateinit var chatOverlayContainer: FrameLayout
     private lateinit var toggleChatInputButton: ImageButton
     private lateinit var avatarViews: List<ImageView>
+    private var currentAvatarMap: Map<Int, Pair<String?, String?>> = emptyMap()
+    private var currentBackground: String? = null
 
-    // Chat Variables
+
+
+    // State
     private lateinit var sessionProfile: SessionProfile
     private lateinit var chatMode: ChatMode
     private lateinit var chatAdapter: ChatAdapter
 
     private var chatId: String? = null
-    private var characterId: String? = null
     private lateinit var sessionId: String
-    private var summariesJson: String = "[]"
-    private var facilitatorNotes: String = ""
 
-    // Avatar Management
-    private val botSlotToAvatarIndex = mutableMapOf<String, Int>()
-    private val frontSlotTimestamps = mutableListOf(0L, 0L)
-    private val backSlots = listOf(2, 3)
-    private val avatarEmotions = mutableMapOf<String, String>()
-    private val recentSpeakers = mutableListOf<String>()
-    private val slotIdToCharacterProfile = mutableMapOf<String, CharacterProfile>()
-    private var currentAvatarMap: Map<Int, Pair<String?, String?>> = emptyMap()
+    // Slot/profile management
+    private val slotIdToProfile = mutableMapOf<String, Any>()
+    private lateinit var slotNameToSlotInfo: Map<String, SlotInfo>
+    private var userPersonaProfile: PersonaProfile? = null
+    private var initialGreeting: String? = null
 
     private var activationRound = 0
     private val maxActivationRounds = 3
@@ -90,11 +74,31 @@ class MainActivity : AppCompatActivity() {
             finish()
             return
         }
+
         setContentView(R.layout.activity_main)
 
-        val greeting = intent.getStringExtra("GREETING")
+        // Load session profile
+        sessionProfile = Gson().fromJson(intent.getStringExtra("SESSION_PROFILE_JSON") ?: "{}", SessionProfile::class.java)
 
-        // Bind UI Elements
+        val playerPersonaId = sessionProfile.playerAssignments["player1"]
+        userPersonaProfile = sessionProfile.personaProfiles.find { it.id == playerPersonaId }
+
+        Log.d("initialization", "playerAssignments: ${sessionProfile.playerAssignments}")
+        Log.d("initialization", "personaProfiles: ${sessionProfile.personaProfiles.map { it.id to it.name }}")
+        Log.d("initialization", "userPersonaProfile: ${userPersonaProfile?.name}")
+
+        initialGreeting = intent.getStringExtra("GREETING")
+        Log.d("initialization", "greeting being loaded is:\n$initialGreeting")
+
+        slotNameToSlotInfo = sessionProfile.slotRoster.associateBy { it.name }
+        slotIdToProfile.clear()
+        sessionProfile.slotRoster.forEach { slotIdToProfile[it.slot] = it }
+        sessionProfile.personaProfiles.forEach { slotIdToProfile[it.id] = it }
+        Log.d("initialization", "slotNameToSlotInfo: $slotNameToSlotInfo")
+        Log.d("initialization", "slotIdToProfile: $slotIdToProfile")
+
+
+        // Bind UI
         chatTitleView = findViewById(R.id.chatTitle)
         chatDescriptionView = findViewById(R.id.chatDescription)
         chatRecycler = findViewById(R.id.chatRecyclerView)
@@ -110,85 +114,54 @@ class MainActivity : AppCompatActivity() {
             findViewById(R.id.botAvatar3ImageView)
         )
 
-        // Load Intent Data
-        chatId = intent.getStringExtra("CHAT_ID")
-        characterId = intent.getStringExtra("CHARACTER_ID")
         sessionId = intent.getStringExtra("SESSION_ID") ?: error("SESSION_ID missing")
-        val sessionProfileJson = intent.getStringExtra("SESSION_PROFILE_JSON") ?: "{}"
-        sessionProfile = Gson().fromJson(sessionProfileJson, SessionProfile::class.java)
         chatMode = ChatMode.values().find { it.name == sessionProfile.chatMode } ?: ChatMode.SANDBOX
-        val chatRoot = findViewById<LinearLayout>(R.id.chatRoot)
-        if (chatId.isNullOrBlank()) {
-            chatId = when (chatMode) {
-                ChatMode.ONE_ON_ONE -> {
-                    val botSlot = sessionProfile.slotRoster.find { it.slot == "B1" }
-                    if (botSlot == null || botSlot.id.isNullOrBlank()) {
-                        Toast.makeText(this, "Missing character ID for one-on-one chat.", Toast.LENGTH_SHORT).show()
-                        return
-                    }
-                    "${botSlot.id}_${FirebaseAuth.getInstance().currentUser?.uid}"
-                }
-                else -> {
-                    Toast.makeText(this, "CHAT_ID missing for non-one-on-one session.", Toast.LENGTH_SHORT).show()
-                    return
-                }
-            }
-        }
 
-        // Load Characters
-        val currentUserId = FirebaseAuth.getInstance().currentUser?.uid ?: ""
-        lifecycleScope.launch {
-            for (slot in sessionProfile.slotRoster) {
-                try {
-                    val charProfile = fetchCharacterProfile(currentUserId, slot.id)
-                    slotIdToCharacterProfile[slot.slot] = charProfile
-                } catch (e: Exception) {
-                    Log.e("AvatarLoader", "Failed to load charProfile for slot: ${slot.slot}, id: ${slot.id}")
-                }
-            }
-            updateAvatarViews()
-        }
-
-        // UI Initialization
-        chatTitleView.text = sessionProfile.title ?: "Untitled"
+        // UI display
+        chatTitleView.text = sessionProfile.title
         val summary = sessionProfile.sessionDescription ?: ""
+        Log.d("initialization", "heres the whole summary: $summary")
         chatDescriptionView.text = if (summary.isNotBlank()) summary else ""
         chatDescriptionView.visibility = if (summary.isNotBlank()) View.VISIBLE else View.GONE
 
-        // Adapter and RecyclerView Setup
-        chatAdapter = ChatAdapter(mutableListOf()) {
-            val lastPos = chatAdapter.itemCount - 1
-            if (lastPos >= 0) chatRecycler.smoothScrollToPosition(lastPos)
-        }
+        // Adapter setup
+        chatAdapter = ChatAdapter(
+            mutableListOf(),
+            { lastPos -> if (lastPos >= 0) chatRecycler.smoothScrollToPosition(lastPos) },
+            sessionProfile.slotRoster,
+            sessionProfile.personaProfiles,
+            userPersonaProfile?.name ?: "You"
+        )
         chatRecycler.layoutManager = LinearLayoutManager(this)
         chatRecycler.adapter = chatAdapter
 
-        // Avatar Initialization
+        // Load avatars
+        // First, hide all avatar views to start clean
+        avatarViews.forEach { it.visibility = View.INVISIBLE }
+
+        // Then, only show avatars for each slot in use
         sessionProfile.slotRoster.forEachIndexed { idx, slotInfo ->
-            loadAvatarUriForCharacter(slotInfo.id) { uri ->
-                if (!uri.isNullOrBlank() && idx < avatarViews.size) {
-                    avatarViews[idx].setImageURI(Uri.parse(uri))
-                    avatarViews[idx].visibility = View.VISIBLE
-                } else if (idx < avatarViews.size) {
-                    avatarViews[idx].setImageDrawable(null)
-                    avatarViews[idx].visibility = View.INVISIBLE
-                }
+            val profile = getProfileById(slotInfo.id)
+            val avatarUri = getProfileAvatarUri(profile)
+            if (!avatarUri.isNullOrBlank() && idx < avatarViews.size) {
+                avatarViews[idx].setImageURI(Uri.parse(avatarUri))
+                avatarViews[idx].visibility = View.VISIBLE
             }
         }
 
-        // Entry Mode Handling
+
+        // Entry mode: new or load
         when (intent.getStringExtra("ENTRY_MODE") ?: "CREATE") {
-            "CREATE" -> chatAdapter.clearMessages()
+            "CREATE" -> {
+                chatAdapter.clearMessages()
+                activationRound = 0
+                updateButtonState(ButtonState.INTERRUPT)
+                sendToAI("") // Triggers the greeting to AI, but doesn't add a message to visible chat
+            }
             "LOAD" -> loadSessionHistory()
         }
 
-        if ((intent.getStringExtra("ENTRY_MODE") ?: "CREATE") == "CREATE") {
-            chatAdapter.clearMessages()
-            if (!greeting.isNullOrBlank()) {
-                sendMessageAndCallAI(greeting)
-            }
-        }
-
+        // Toggle input visibility
         toggleChatInputButton.setOnClickListener {
             val isVisible = messageEditText.visibility == View.VISIBLE
             listOf(messageEditText, sendButton, chatRecycler, topOverlay, chatOverlayContainer).forEach {
@@ -196,12 +169,13 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        // Send button logic
         sendButton.setOnClickListener {
             if (currentState == ButtonState.SEND) {
                 val text = messageEditText.text.toString().trim()
                 if (text.isNotEmpty()) {
                     updateButtonState(ButtonState.INTERRUPT)
-                    sendMessageAndCallAI(text)
+                    sendMessageAndCallAI(text, displayInChat = true)
                     messageEditText.text.clear()
                 }
             } else if (currentState == ButtonState.INTERRUPT) {
@@ -210,10 +184,154 @@ class MainActivity : AppCompatActivity() {
             }
         }
     }
+
+    // ========== AI Activation & Roleplay Loop ==========
+
+    private fun processActivationRound(
+        input: String,
+        chatHistory: List<ChatMessage>
+    ) {
+        if (activationRound >= maxActivationRounds) return
+        activationRound++
+
+        val userPersonaName = userPersonaProfile?.name ?: "You"
+
+        val historyWithGreeting: List<ChatMessage> =
+            if (chatHistory.isEmpty() && !initialGreeting.isNullOrBlank()) {
+                listOf(ChatMessage(
+                    id = "greeting",
+                    sender = userPersonaName,
+                    messageText = initialGreeting!!,
+                    timestamp = null
+                ))
+            } else chatHistory
+
+        aiJob = lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                // 1. Build activation prompt with correct parameter names!
+                val activationPrompt = PromptBuilder.buildActivationPrompt(
+                    sessionProfile = sessionProfile,
+                    chatHistory = buildTrimmedHistory(
+                        historyWithGreeting, // chat history with greeting only if needed
+                        maxChars = 800,
+                        greeting = null,
+                        userPersonaName = userPersonaName
+                    )
+                )
+                Log.d("AI_CYCLE", "Activation Prompt:\n$activationPrompt")
+
+                // 2. Call OpenAI (or fallback)
+                val activationResponse = Facilitator.callActivationAI(
+                    prompt = activationPrompt,
+                    apiKey = BuildConfig.OPENAI_API_KEY
+                )
+                ensureActive()
+                Log.d("AI_CYCLE", "Raw AI Response:\n$activationResponse")
+
+                // 3. Parse activation AND updated area map
+                val (activatedSlots, updatedAreas) = parseActivationAIResponse(activationResponse, sessionProfile.areas)
+
+                // 4. Update and persist
+                sessionProfile = sessionProfile.copy(areas = updatedAreas)
+
+                Log.d("AI_CYCLE", "Updated areas: ${
+                    updatedAreas.joinToString("\n") { area ->
+                        val chars = area.locations.flatMap { it.characters }
+                        "- ${area.name}: ${chars.joinToString(", ")}"
+                    }
+                }")
+
+                saveSessionProfile(sessionProfile, sessionId)
+
+
+                // 5. Proceed to roleplay AI
+                if (activatedSlots.isNotEmpty()) {
+                    val (charName, isNSFW) = activatedSlots.first()
+                    val slotProfile = sessionProfile.slotRoster.find { it.name == charName }
+                    if (slotProfile == null) {
+                        Log.w("AI_CYCLE", "Bot name '$charName' not found in slotRoster")
+                        activationRound = 0
+                        withContext(Dispatchers.Main) { updateButtonState(ButtonState.SEND) }
+                        return@launch
+                    }
+                    Log.d("AI_CYCLE","Activated slots: $slotProfile")
+
+
+                    // Build roleplay prompt
+                    val otherProfiles = sessionProfile.slotRoster.filter { it.name != charName }
+                    val roleplayPrompt = buildRoleplayPrompt(
+                        characterProfile = slotProfile,
+                        otherProfiles = sessionProfile.slotRoster.filter { it.name != slotProfile.name },
+                        sessionProfile = sessionProfile,
+                        recentHistory = buildTrimmedHistory(historyWithGreeting, greeting = null, userPersonaName = userPersonaName),
+                        currentAvatarMap = currentAvatarMap,
+                        currentBackground = currentBackground
+                    )
+                    Log.d("AI_CYCLE", "Roleplay Prompt for ${slotProfile.name}:\n$roleplayPrompt")
+
+                    // Call the appropriate AI (Mixtral for NSFW, OpenAI otherwise)
+                    val roleplayResponse = if (isNSFW) {
+
+                        Facilitator.callMixtralApi(roleplayPrompt, BuildConfig.MIXTRAL_API_KEY)
+                    } else {
+
+                        Facilitator.callOpenAiApi(roleplayPrompt, BuildConfig.OPENAI_API_KEY)
+                    }
+                    ensureActive()
+                    Log.d("AI_CYCLE", roleplayResponse)
+
+                    // Parse output blocks (ChatMessages)
+                    val finalMessages = FacilitatorResponseParser.parseFacilitatorBlocks(roleplayResponse)
+                    val (avatarMap, background, areaLocIds) = extractAvatarSlots(roleplayResponse)
+                    Log.d("AI_CYCLE", "Final Messages: $finalMessages")
+                    Log.d("AI_CYCLE", "this stuff too: $avatarMap, $background, $areaLocIds")
+                    currentAvatarMap = avatarMap
+                    currentBackground = background
+                    withContext(Dispatchers.Main) {
+                        displayMessagesSequentially(finalMessages)
+                        FirestoreHelper.saveMessages(sessionId, finalMessages)
+                        val updatedHistory = chatAdapter.getMessages()
+                        if (activationRound < maxActivationRounds && isActive) {
+                            processActivationRound(input = "", chatHistory = updatedHistory)
+                        }
+                    }
+                } else {
+                    activationRound = 0
+                    withContext(Dispatchers.Main) { updateButtonState(ButtonState.SEND) }
+                }
+            } catch (e: CancellationException) {
+                Log.i(TAG, "AI job cancelled cleanly.")
+                withContext(Dispatchers.Main) { updateButtonState(ButtonState.INTERRUPT) }
+            } catch (e: Exception) {
+                Log.e(TAG, "AI call failed", e)
+                withContext(Dispatchers.Main) { updateButtonState(ButtonState.INTERRUPT) }
+            }
+        }
+    }
+
+    // ========== Helpers and Boilerplate (Unchanged) ==========
+
+    private fun saveSessionProfile(sessionProfile: SessionProfile, sessionId: String) {
+        // Firestore or wherever you want to persist (implement as in your project)
+        // Example:
+        // FirebaseFirestore.getInstance().collection("sessions").document(sessionId).set(sessionProfile)
+    }
+
+    private fun getProfileById(id: String): Any? {
+        sessionProfile.personaProfiles.find { it.id == id }?.let { return it }
+        sessionProfile.slotRoster.find { it.id == id }?.let { return it }
+        return null
+    }
+
+    private fun getProfileAvatarUri(profile: Any?): String? = when (profile) {
+        is PersonaProfile -> profile.avatarUri
+        else -> null
+    }
+
     private fun interruptAILoop() {
         aiJob?.cancel()
-        // Optionally, display a "Stopped" message or reset UI
     }
+
     private fun loadSessionHistory() {
         SessionManager.loadHistory(sessionId, {
             chatAdapter.clearMessages()
@@ -228,218 +346,41 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun sendMessageAndCallAI(text: String) {
-        val userMsg = ChatMessage(UUID.randomUUID().toString(), "You", text, Timestamp.now())
-        chatAdapter.addMessage(userMsg)
-        chatRecycler.smoothScrollToPosition(chatAdapter.itemCount - 1)
-        SessionManager.sendMessage(chatId!!, sessionId, userMsg)
+    private fun sendMessageAndCallAI(
+        text: String,
+        displayInChat: Boolean = true
+    ) {
+        val senderName = userPersonaProfile?.name ?: "You"
+        val userMsg = ChatMessage(UUID.randomUUID().toString(), senderName, text, Timestamp.now())
+        if (displayInChat) {
+            chatAdapter.addMessage(userMsg)
+            chatRecycler.smoothScrollToPosition(chatAdapter.itemCount - 1)
+        }
+        SessionManager.sendMessage(chatId ?: "", sessionId, userMsg)
         sendToAI(text)
     }
 
     private fun sendToAI(userInput: String) {
         activationRound = 0
-            processActivationRound(userInput, chatAdapter.getMessages())
+        processActivationRound(userInput, chatAdapter.getMessages())
     }
 
-    private fun processActivationRound(
-        input: String,
-        chatHistory: List<ChatMessage>,
-        prevFacilitatorNotes: String = ""
-    ) {
-        if (activationRound >= maxActivationRounds) return
-        activationRound++
-
-        Log.d("FacilitatorResponseParser", "History for activation: $chatHistory")
-        val activationPrompt = PromptBuilder.buildActivationPrompt(
-            slotRoster = sessionProfile.slotRoster,
-            sessionDescription = sessionProfile.sessionDescription,
-            history = buildTrimmedHistory(chatHistory, maxChars = 800),
-            slotIdToCharacterProfile = slotIdToCharacterProfile
-        )
-
-        aiJob = lifecycleScope.launch(Dispatchers.IO) {
-            try {
-                // STEP 1: Call OpenAI for character activation (cancellable)
-                val openAIResponse = Facilitator.callActivationAI(activationPrompt, BuildConfig.OPENAI_API_KEY)
-                ensureActive()
-
-                withContext(Dispatchers.Main) { updateButtonState(ButtonState.INTERRUPT) }
-                ensureActive()
-
-                // STEP 2: Parse which slots should activate (fallback to Mixtral for NSFW/blocked)
-                val activatedSlots: List<Pair<String, Boolean>> = when {
-                    Facilitator.activationRefusedOrMalformed(openAIResponse) -> {
-                        val fallbackPrompt = PromptBuilder.buildNSFWActivationPrompt(
-                            slotRoster = sessionProfile.slotRoster,
-                            history = buildTrimmedHistory(chatHistory, maxChars = 800)
-                        )
-                        val mixtralResponse = Facilitator.callMixtralApi(fallbackPrompt, BuildConfig.MIXTRAL_API_KEY)
-                        ensureActive()
-                        Facilitator.parseActivatedSlotsFromResponse(mixtralResponse, slotIdToCharacterProfile)
-                    }
-                    Facilitator.activationIsEmptyList(openAIResponse) -> {
-                        activationRound = 0
-                        return@launch
-                    }
-                    else -> Facilitator.parseActivatedSlotsFromResponse(openAIResponse, slotIdToCharacterProfile)
-                }
-                ensureActive()
-
-                // STEP 3: For each activated character, build prompt and get reply
-                val characterResponses = mutableListOf<ChatMessage>()
-                val imageUrlList = sessionProfile.slotRoster.joinToString("\n") { slot ->
-                    val profile = slotIdToCharacterProfile[slot.slot]
-                    // Find the right outfit by name
-                    val outfit = profile?.outfits?.find { it.name == profile.currentOutfit }
-                    val poseImages = outfit?.poseSlots?.filter { !it.name.isNullOrBlank() && !it.uri.isNullOrBlank() }
-                    val imageLines = poseImages?.joinToString(", ") { "${it.name} → ${it.uri}" } ?: ""
-                    "- ${slot.name}: $imageLines"
-                }
-
-                for ((slotId, isNSFW) in activatedSlots) {
-                    ensureActive()
-                    val charProfile = slotIdToCharacterProfile[slotId] ?: continue
-                    val charPrompt = if (isNSFW) {
-                        PromptBuilder.buildNSFWRoleplayPrompt(
-                            slotRoster = sessionProfile.slotRoster,
-                            chatHistory = chatHistory,
-                            sessionDescription = sessionProfile.sessionDescription,
-                            slotIdToCharacterProfile = slotIdToCharacterProfile,
-                            imageUrlList = imageUrlList
-                        )
-                    } else {
-                        PromptBuilder.buildSFWRoleplayPrompt(
-                            characterProfile = charProfile,
-                            chatHistory = chatHistory,
-                            sessionSummary = sessionProfile.sessionDescription
-                        )
-                    }
-
-                    val aiResponseText = if (isNSFW) {
-                        Facilitator.callMixtralApi(charPrompt, BuildConfig.MIXTRAL_API_KEY)
-                    } else {
-                        Facilitator.callOpenAiApi(charPrompt, BuildConfig.OPENAI_API_KEY)
-                    }
-                    ensureActive()
-
-                    // Parse response(s) from AI and add to result list
-                    if (isNSFW) {
-                        val messages = FacilitatorResponseParser.parseFacilitatorBlocks(aiResponseText)
-                        characterResponses.addAll(messages)
-                    } else {
-                        characterResponses.add(
-                            ChatMessage(
-                                id = UUID.randomUUID().toString(),
-                                sender = charProfile.name,
-                                messageText = aiResponseText,
-                                timestamp = Timestamp.now(),
-                                bubbleBackgroundColor = Color.parseColor(charProfile.bubbleColor ?: "#FFFFFF"),
-                                bubbleTextColor = Color.parseColor(charProfile.textColor ?: "#000000")
-                            )
-                        )
-                    }
-                    withContext(Dispatchers.Main) { updateButtonState(ButtonState.WAITING) }
-                    ensureActive()
-                }
-
-                // STEP 4: Build and send facilitator prompt (narration, slot images, avatars, etc.)
-                val outfits = sessionProfile.slotRoster.associate { slotInfo ->
-                    slotInfo.slot to (slotIdToCharacterProfile[slotInfo.slot]?.outfits?.firstOrNull()?.name ?: "default")
-                }
-                val poseImageUrls = sessionProfile.slotRoster.associate { slotInfo ->
-                    val charProfile = slotIdToCharacterProfile[slotInfo.slot]
-                    val currentOutfitName = charProfile?.currentOutfit ?: charProfile?.outfits?.firstOrNull()?.name ?: "default"
-                    val outfit = charProfile?.outfits?.find { it.name == currentOutfitName }
-                    // Build a Map<String, String> of poseName -> url (omit blank names or uris)
-                    slotInfo.slot to (outfit?.poseSlots
-                        ?.filter { !it.name.isNullOrBlank() && !it.uri.isNullOrBlank() }
-                        ?.associate { it.name to (it.uri ?: "") }
-                        ?: emptyMap()
-                            )
-                }
 
 
-                val facilitatorPrompt = PromptBuilder.buildFacilitatorPrompt(
-                    slotRoster = sessionProfile.slotRoster,
-                    outfits = outfits,
-                    poseImageUrls = poseImageUrls,
-                    sessionDescription = sessionProfile.sessionDescription,
-                    history = buildTrimmedHistory(chatHistory, maxChars = 800),
-                    userInput = input,
-                    backgroundImage = null,
-                    availableColors = slotIdToCharacterProfile.mapValues { (_, p) -> p.bubbleColor ?: "#FFFFFF" },
-                    botReplies = characterResponses
-                )
-                ensureActive()
-
-                val facilitatorOutput = Facilitator.callOpenAiFacilitator(facilitatorPrompt, BuildConfig.OPENAI_API_KEY)
-                ensureActive()
-
-                val newAvatarMap = FacilitatorResponseParser.extractAvatarSlots(facilitatorOutput)
-                Log.d("AvatarDebug", "Facilitator output avatar map: $newAvatarMap")
-                currentAvatarMap = newAvatarMap
-
-                val finalMessages = FacilitatorResponseParser.parseFacilitatorBlocks(facilitatorOutput)
-
-                // STEP 5: Show messages in UI and save to Firestore (main thread)
-                withContext(Dispatchers.Main) {
-                    displayMessagesSequentially(finalMessages)
-                    FirestoreHelper.saveMessages(sessionId, finalMessages)
-
-                    // Recursively call next round if not maxed, and still active
-                    val updatedHistory = chatAdapter.getMessages()
-                    if (activationRound < maxActivationRounds && isActive) {
-                        processActivationRound(input = "", chatHistory = updatedHistory)
-                    }
-                }
-            } catch (e: CancellationException) {
-                Log.i(TAG, "AI job cancelled cleanly.")
-                withContext(Dispatchers.Main) { updateButtonState(ButtonState.INTERRUPT) }
-            } catch (e: Exception) {
-                Log.e(TAG, "AI call failed", e)
-                withContext(Dispatchers.Main) { updateButtonState(ButtonState.INTERRUPT) }
-            }
-        }
-    }
-
-    fun updateAvatarsFromMessage(msg: ChatMessage) {
-        msg.imageUpdates.forEach { (slotStr, url) ->
-            val slot = slotStr.toIntOrNull() ?: return@forEach
-            if (slot in avatarViews.indices) {
-                if (!url.isNullOrBlank()) {
-                    Glide.with(this).load(url).placeholder(R.drawable.default_01).into(avatarViews[slot])
-                    avatarViews[slot].visibility = View.VISIBLE
-                }
-            }
-        }
-    }
-    suspend fun executeCancellableRequest(request: Request, client: OkHttpClient): String =
-        suspendCancellableCoroutine { cont ->
-            val call = client.newCall(request)
-            cont.invokeOnCancellation { call.cancel() } // If coroutine is cancelled, cancel HTTP
-            call.enqueue(object : Callback {
-                override fun onFailure(call: Call, e: IOException) {
-                    if (cont.isActive) cont.resumeWithException(e)
-                }
-                override fun onResponse(call: Call, response: Response) {
-                    response.use {
-                        if (!cont.isActive) return
-                        if (response.isSuccessful) {
-                            cont.resume(response.body?.string() ?: "") {}
-                        } else {
-                            cont.resumeWithException(IOException("HTTP error"))
-                        }
-                    }
-                }
-            })
-        }
     suspend fun displayMessagesSequentially(messages: List<ChatMessage>) {
         for (msg in messages) {
-            delay(msg.delay)  // Wait for specified delay
-            Log.d("AvatarDebug", "Updating avatars with imageUpdates: ${msg.imageUpdates}")
+            Log.d("AI_CYCLE", "messages in waiting: $messages")
+            delay(msg.delay)
             withContext(Dispatchers.Main) {
+                Log.d("AI_CYCLE","Background url ${msg.backgroundImage}")
+                if (!msg.backgroundImage.isNullOrBlank()) {
+                    Glide.with(this@MainActivity)
+                        .load(msg.backgroundImage)
+                        .into(findViewById<ImageView>(R.id.backgroundImageView))
+                }
                 chatAdapter.addMessage(msg)
-                updateAvatarsFromMessage(msg)
+                Log.d("AI_CYCLE","Message posted: $msg")
+                updateAvatarsFromMessage(msg) // <-- this is all you need for avatars!
                 chatRecycler.smoothScrollToPosition(chatAdapter.itemCount - 1)
             }
         }
@@ -448,76 +389,37 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun loadAvatarUriForCharacter(charId: String, onUriLoaded: (String?) -> Unit) {
-        val userId = FirebaseAuth.getInstance().currentUser?.uid ?: return onUriLoaded(null)
-        FirebaseFirestore.getInstance()
-            .collection("characters")
-            .document(charId)
-            .get()
-            .addOnSuccessListener { onUriLoaded(it.getString("avatarUri")) }
-            .addOnFailureListener { onUriLoaded(null) }
-    }
-
-    private fun updateAvatarViews() {
-        for (i in avatarViews.indices) {
-            if (i < recentSpeakers.size) {
-                val speakerId = recentSpeakers[i]
-                val emotion = avatarEmotions[speakerId] ?: "neutral"
-                setAvatarImage(avatarViews[i], speakerId, emotion)
-                avatarViews[i].visibility = View.VISIBLE
-            } else {
-                avatarViews[i].setImageDrawable(null)
-                avatarViews[i].visibility = View.INVISIBLE
-            }
-        }
-    }
-
-    private fun setAvatarImage(imageView: ImageView, speakerId: String, emotion: String) {
-        val character = slotIdToCharacterProfile[speakerId] ?: return
-        val outfit = character.outfits.firstOrNull()
-        // Try to find a poseSlot with a name matching `emotion`
-        val poseSlot = outfit?.poseSlots?.firstOrNull {
-            it.name.equals(emotion, ignoreCase = true)
-        }
-        val poseUri = poseSlot?.uri
-        if (!poseUri.isNullOrBlank()) {
-            Glide.with(imageView).load(poseUri).placeholder(R.drawable.default_01).into(imageView)
-        } else {
-            imageView.setImageResource(R.drawable.default_01)
-        }
-    }
-
-
-    fun onNewMessage(speakerSlot: String, emotions: Map<String, String>) {
-        val now = System.currentTimeMillis()
-        if (chatMode == ChatMode.ONE_ON_ONE) {
-            botSlotToAvatarIndex["B1"] = 0
-            botSlotToAvatarIndex["P1"] = 1
-            if (speakerSlot == "B1") frontSlotTimestamps[0] = now
-            if (speakerSlot == "P1") frontSlotTimestamps[1] = now
-        } else {
-            if (!botSlotToAvatarIndex.containsKey(speakerSlot)) {
-                val older = if (frontSlotTimestamps[0] <= frontSlotTimestamps[1]) 0 else 1
-                botSlotToAvatarIndex.entries.find { it.value == older }?.key?.let {
-                    val back = backSlots.find { b -> b !in botSlotToAvatarIndex.values } ?: backSlots[0]
-                    botSlotToAvatarIndex[it] = back
+    fun updateAvatarsFromMessage(msg: ChatMessage) {
+        Log.d("AI_CYCLE", "Image list: ${msg.imageUpdates}")
+        msg.imageUpdates.forEach { (slotStr, url) ->
+            val slot = slotStr.toIntOrNull() ?: return@forEach
+            if (slot in avatarViews.indices) {
+                if (!url.isNullOrBlank()) {
+                    Glide.with(this)
+                        .load(url)
+                        .placeholder(R.drawable.default_01)
+                        .into(avatarViews[slot])
+                    avatarViews[slot].visibility = View.VISIBLE
+                } else {
+                    avatarViews[slot].setImageDrawable(null)
+                    avatarViews[slot].visibility = View.INVISIBLE
                 }
-                botSlotToAvatarIndex[speakerSlot] = older
-                frontSlotTimestamps[older] = now
-            } else {
-                val idx = botSlotToAvatarIndex[speakerSlot]!!
-                if (idx == 0 || idx == 1) frontSlotTimestamps[idx] = now
             }
         }
-        avatarEmotions.putAll(emotions)
-        recentSpeakers.clear()
-        recentSpeakers.addAll(botSlotToAvatarIndex.entries.sortedBy { it.value }.map { it.key })
-        updateAvatarViews()
     }
 
-    fun buildTrimmedHistory(messages: List<ChatMessage>, maxChars: Int = 500): String {
-        var totalChars = 0
+    fun buildTrimmedHistory(messages: List<ChatMessage>, maxChars: Int = 500, greeting: String? = null, userPersonaName: String): String {
         val trimmed = mutableListOf<String>()
+        var totalChars = 0
+
+        if (!greeting.isNullOrBlank()) {
+            val line = "$userPersonaName: $greeting"
+            if (totalChars + line.length <= maxChars) {
+                trimmed.add(line)
+                totalChars += line.length
+            }
+        }
+
         for (msg in messages.asReversed()) {
             val line = "${msg.sender}: ${msg.messageText}"
             if (totalChars + line.length > maxChars) break
@@ -527,33 +429,16 @@ class MainActivity : AppCompatActivity() {
         return trimmed.asReversed().joinToString("\n")
     }
 
-    suspend fun fetchCharacterProfile(userId: String, charId: String): CharacterProfile = suspendCancellableCoroutine { cont ->
-        if (charId.isBlank() || userId.isBlank()) {
-            cont.resumeWithException(IllegalArgumentException("Invalid userId/charId"))
-            return@suspendCancellableCoroutine
-        }
-        FirebaseFirestore.getInstance().collection("characters").document(charId).get()
-            .addOnSuccessListener {
-                it.toObject(CharacterProfile::class.java)?.let { profile ->
-                    cont.resume(profile, onCancellation = null)
-                } ?: cont.resumeWithException(RuntimeException("Character $charId not found for user $userId"))
-            }
-            .addOnFailureListener { cont.resumeWithException(it) }
-    }
-
     private fun updateButtonState(state: ButtonState) {
         currentState = state
-        val sendButton = findViewById<Button>(R.id.sendButton)
         when (state) {
             ButtonState.SEND -> {
                 sendButton.text = "Send"
                 sendButton.isEnabled = true
-                // Optionally change color/style
             }
             ButtonState.INTERRUPT -> {
                 sendButton.text = "Interrupt"
                 sendButton.isEnabled = true
-                // Optionally: set a red background
             }
             ButtonState.WAITING -> {
                 sendButton.text = "Waiting…"
@@ -571,4 +456,5 @@ class MainActivity : AppCompatActivity() {
         }
         else -> super.onOptionsItemSelected(item)
     }
+
 }

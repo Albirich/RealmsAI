@@ -153,30 +153,11 @@
             android:text="Relationships"/>
 
         <!-- Background Selector -->
-        <TextView
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/addAreaButton"
             android:layout_width="wrap_content"
-            android:layout_height="1dp"
-            android:layout_marginTop="12dp"
-            android:text="Background"
-            android:textStyle="bold" />
-
-        <ImageButton
-            android:id="@+id/backgroundButton"
-            android:layout_width="64dp"
-            android:layout_height="64dp"
-            android:src="@drawable/placeholder_background"
-            android:scaleType="fitXY"
-            android:contentDescription="Upload background"/>
-
-        <!-- NEW: Preset backgrounds gallery -->
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/backgroundRecycler"
-            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:paddingTop="8dp"
-            android:overScrollMode="never"
-            android:scrollbars="horizontal"
-            app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"/>
+            android:text="Background Gallery" />
 
 
         <!-- 2) Profile Info (collapsible) -->

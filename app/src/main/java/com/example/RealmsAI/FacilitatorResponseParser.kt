@@ -1,78 +1,224 @@
 package com.example.RealmsAI
 
 import android.util.Log
+import android.util.Log.e
 import com.example.RealmsAI.models.ChatMessage
 import com.google.firebase.Timestamp
 import org.json.JSONObject
-import org.json.JSONException
 
 object FacilitatorResponseParser {
+
     fun parseFacilitatorBlocks(raw: String): List<ChatMessage> {
-
         val messages = mutableListOf<ChatMessage>()
-        // Split by blank lines (assuming each output block is separated)
-        val blocks = raw.split(Regex("""\n\s*\n""")).map { it.trim() }.filter { it.isNotEmpty() }
+
+        // 1. Find all triple-backtick code blocks (prefer these if present)
+        val tripleBlocks = Regex("""```(?:json)?\s*([\s\S]*?)\s*```""")
+            .findAll(raw)
+            .map { it.groupValues[1].trim() }
+            .toList()
+
+        // 2. If any code blocks, parse those; otherwise split by blank lines
+        val blocks = if (tripleBlocks.isNotEmpty()) tripleBlocks
+        else raw.split(Regex("""\n\s*\n""")).map { it.trim() }.filter { it.isNotEmpty() }
+
         for (block in blocks) {
-
             Log.d("FacilitatorResponseParser", "Raw block:\n$block")
-            try {
-                val map = mutableMapOf<String, String>()
-                block.lines().forEach { line ->
-                    val idx = line.indexOf(':')
-                    if (idx > 0) {
-                        val key = line.substring(0, idx).trim()
-                        val value = line.substring(idx + 1).trim().removeSurrounding("\"")
-                        map[key] = value
-                    }
-                }
-                val message = map["message"] ?: ""
-                if (message.isNotBlank()) {
-                    val id = System.currentTimeMillis().toString()
-                    val sender = map["sender"] ?: "Narrator"
-                    val message = map["message"] ?: ""
-                    val delay = map["delay"]?.toLongOrNull() ?: 0L
-                    val imageUpdates =
-                        map["image_updates"]?.let { parseImageUpdates(it) } ?: emptyMap()
-                    val bubbleColors = map["bubble_colors"]?.let { parseBubbleColors(it) } ?: Pair(
-                        0xFFFFFFFF.toInt(),
-                        0xFF000000.toInt()
-                    )
-                    val backgroundImage = map["background"]
-                    Log.d("FacilitatorResponseParser", "Parsed imageUpdates: $imageUpdates")
-                    messages.add(
-                        ChatMessage(
-                            id = id,
-                            sender = sender,              // use sender directly
-                            messageText = message,        // message is just the text
-                            timestamp = Timestamp.now(),
-                            delay = delay,
-                            bubbleBackgroundColor = bubbleColors.first,
-                            bubbleTextColor = bubbleColors.second,
-                            imageUpdates = imageUpdates,
-                            backgroundImage = backgroundImage
-                        )
-                    )
-                }
+            val cleanBlock = block.removePrefix("```json").removePrefix("```").removeSuffix("```").trim()
+            val jsonBlocks = extractTopLevelJsonBlocks(cleanBlock)
 
-            } catch (e: Exception) {
-                // Skip malformed blocks
+            var foundJson = false
+            for (jsonString in jsonBlocks) {
+                try {
+                    val jsonObj = JSONObject(jsonString)
+                    foundJson = true
+                    val map = mutableMapOf<String, String>()
+                    for (key in jsonObj.keys()) {
+                        map[key] = jsonObj.get(key).toString()
+                    }
+                    val message = map["message"] ?: ""
+                    if (message.isNotBlank()) {
+                        val id = System.currentTimeMillis().toString()
+                        val sender = map["sender"] ?: "Narrator"
+                        val delay = map["delay"]?.toLongOrNull() ?: 0L
+
+                        val imageUpdates: Map<String, String?> = map["image_updates"]?.let {
+                            parseImageUpdates(it)
+                        } ?: emptyMap()
+
+                        // Allow both keys for background
+                        val backgroundImage = map["background"] ?: map["background_image"]
+                        Log.d("FacilitatorResponseParser", "Parsed imageUpdates: $imageUpdates")
+                        messages.add(
+                            ChatMessage(
+                                id = id,
+                                sender = sender,
+                                messageText = message,
+                                timestamp = Timestamp.now(),
+                                delay = delay,
+                                imageUpdates = imageUpdates,
+                                backgroundImage = backgroundImage
+                            )
+                        )
+                    }
+                } catch (e: Exception) {
+                    Log.e("FacilitatorResponseParser", "Failed to parse JSON: $jsonString", e)
+                }
+            }
+
+            // If no JSON blocks found, try YAML-style key-value parsing ONCE for the whole block
+            if (!foundJson) {
+                try {
+                    val map = mutableMapOf<String, String>()
+                    val lines = cleanBlock.lines()
+                    var i = 0
+                    while (i < lines.size) {
+                        val line = lines[i]
+                        if (line.startsWith("#")) { i++; continue }
+                        val idx = line.indexOf(':')
+                        if (idx > 0) {
+                            val key = line.substring(0, idx).trim()
+                            var value = line.substring(idx + 1).trim().removeSurrounding("\"")
+                            // Detect and collect multi-line value (for image_updates)
+                            if (key == "image_updates" && (value.isEmpty() || value == "|" || value == "")) {
+                                val multiLineValue = StringBuilder()
+                                i++
+                                // Collect all indented lines (YAML-style)
+                                while (i < lines.size && (lines[i].startsWith(" ") || lines[i].startsWith("\t") || Regex("""^\d+: """).containsMatchIn(lines[i]))) {
+                                    multiLineValue.append(lines[i].trim()).append("\n")
+                                    i++
+                                }
+                                map[key] = multiLineValue.toString().trim()
+                                continue // already incremented i in while loop
+                            } else {
+                                map[key] = value
+                            }
+                        }
+                        i++
+                    }
+                    val message = map["message"] ?: ""
+                    if (message.isNotBlank()) {
+                        val id = System.currentTimeMillis().toString()
+                        val sender = map["sender"] ?: "Narrator"
+                        val delay = map["delay"]?.toLongOrNull() ?: 0L
+
+                        val imageUpdates: Map<String, String?> = map["image_updates"]?.let {
+                            parseImageUpdates(it)
+                        } ?: emptyMap()
+
+                        // Allow both keys for background
+                        val backgroundImage = map["background"] ?: map["background_image"]
+                        Log.d("FacilitatorResponseParser", "Parsed imageUpdates: $imageUpdates")
+                        messages.add(
+                            ChatMessage(
+                                id = id,
+                                sender = sender,
+                                messageText = message,
+                                timestamp = Timestamp.now(),
+                                delay = delay,
+                                imageUpdates = imageUpdates,
+                                backgroundImage = backgroundImage
+                            )
+                        )
+                    }
+                } catch (_: Exception) {}
             }
         }
         return messages
     }
-    fun extractAvatarSlots(raw: String): Map<Int, Pair<String?, String?>> {
+
+    // Helper: Extracts only *top-level* JSON blocks from a text string.
+    fun extractTopLevelJsonBlocks(input: String): List<String> {
+        val blocks = mutableListOf<String>()
+        val sb = StringBuilder()
+        var openBraces = 0
+        var inBlock = false
+        for (c in input) {
+            if (c == '{') {
+                openBraces++
+                inBlock = true
+            }
+            if (inBlock) sb.append(c)
+            if (c == '}') {
+                openBraces--
+                if (openBraces == 0 && inBlock) {
+                    blocks.add(sb.toString().trim())
+                    sb.clear()
+                    inBlock = false
+                }
+            }
+        }
+        return blocks
+    }
+
+
+    // Example: Handles both {"0": "..."} and 0: ...
+    fun parseImageUpdates(input: String): Map<String, String?> {
+        return try {
+            val out = mutableMapOf<String, String?>()
+            val trimmed = input.trim()
+            // Try JSON
+            if (trimmed.startsWith("{")) {
+                val obj = JSONObject(trimmed)
+                obj.keys().forEach { k ->
+                    val v = obj.get(k)
+                    when {
+                        v == JSONObject.NULL -> out[k] = null
+                        v is String -> out[k] = v.takeIf { it != "null" }
+                        v is org.json.JSONArray && v.length() > 0 -> out[k] = v.getString(0)
+                        v is org.json.JSONArray && v.length() == 0 -> out[k] = null
+                        else -> out[k] = v.toString()
+                    }
+                }
+                out
+            } else {
+                // YAML-style: 0: url or 0: null (single-line only)
+                trimmed
+                    .removeSurrounding("{", "}")
+                    .lines()
+                    .mapNotNull { entry ->
+                        val idx = entry.indexOf(':')
+                        if (idx > 0) {
+                            val key = entry.substring(0, idx).trim().removeSurrounding("\"")
+                            val value = entry.substring(idx + 1).trim().removeSurrounding("\"")
+                            key to value.takeIf { it != "null" }
+                        } else null
+                    }
+                    .toMap()
+            }
+        } catch (e: Exception) {
+            emptyMap()
+        }
+    }
+
+    fun extractAvatarSlots(raw: String): Triple<Map<Int, Pair<String?, String?>>, String?, Pair<String?, String?>?> {
         val avatarMap = mutableMapOf<Int, Pair<String?, String?>>()
+        var currentBackground: String? = null
+        var areaLocIds: Pair<String?, String?>? = null
         val marker = "# Avatar Slots"
         val idx = raw.indexOf(marker)
-        if (idx == -1) return avatarMap // No block found
+        if (idx == -1) return Triple(avatarMap.toMap(), null, null)
 
         // Get lines after "# Avatar Slots"
         val lines = raw.substring(idx + marker.length)
             .trim()
             .lines()
-            .take(4) // only want lines for 0..3
+            .filter { it.isNotBlank() }
 
         for (line in lines) {
+            // Check for background line
+            val bgMatch = Regex("""^background:\s*(.*)""").find(line)
+            if (bgMatch != null) {
+                currentBackground = bgMatch.groupValues[1].trim()
+                // Try to extract IDs: e.g. (a1/l2) at end
+                val idMatch = Regex("""\(([^/]+)?/([^)]+)?\)""").find(currentBackground)
+                if (idMatch != null) {
+                    val areaId = idMatch.groupValues.getOrNull(1)
+                    val locationId = idMatch.groupValues.getOrNull(2)
+                    areaLocIds = Pair(areaId, locationId)
+                }
+                continue
+            }
+            // Parse avatar slots as before
             val slotMatch = Regex("""^(\d+):\s*(.*?)(?:,\s*(.*))?$""").find(line)
             if (slotMatch != null) {
                 val slotNum = slotMatch.groupValues[1].toInt()
@@ -81,45 +227,8 @@ object FacilitatorResponseParser {
                 avatarMap[slotNum] = Pair(char, emotion)
             }
         }
-        return avatarMap
+        return Triple(avatarMap.toMap(), currentBackground, areaLocIds)
     }
 
-    // Helper to parse image_updates: { 0: "...", 1: "...", ... }
-    private fun parseImageUpdates(raw: String): Map<String, String?> {
-        val imageUpdates = mutableMapOf<String, String?>()
-        try {
-            // Step 1: quote keys
-            var fixed = raw.replace(Regex("""(\d+):"""), "\"$1\":")
-            // Step 2: quote values, except for null
-            fixed = fixed.replace(Regex(""":\s*([^",}{\s][^,}{\s]*)""")) { m ->
-                val value = m.groupValues[1]
-                if (value == "null") ": null" else ": \"$value\""
-            }
-            val jsonObj = JSONObject(fixed)
-            for (key in jsonObj.keys()) {
-                val value = jsonObj.opt(key)
-                imageUpdates[key] = if (value == null || value == JSONObject.NULL) null else value.toString()
-            }
-        } catch (e: Exception) {
-            Log.e("FacilitatorParser", "ImageUpdate parse error: $e")
-        }
-        return imageUpdates
-    }
 
-    // Helper to parse bubble_colors: { background: "#FFFFFF", text: "#000000" }
-    private fun parseBubbleColors(raw: String): Pair<Int, Int> {
-        val bgMatch = Regex("""background:\s*"(#[A-Fa-f0-9]{6,8})"""").find(raw)
-        val txtMatch = Regex("""text:\s*"(#[A-Fa-f0-9]{6,8})"""").find(raw)
-        val bgColor = bgMatch?.groupValues?.get(1)?.let { parseHexColor(it) } ?: 0xFFFFFFFF.toInt()
-        val txtColor = txtMatch?.groupValues?.get(1)?.let { parseHexColor(it) } ?: 0xFF000000.toInt()
-        return Pair(bgColor, txtColor)
-    }
-
-    private fun parseHexColor(hex: String): Int = hex.removePrefix("#").toLong(16).toInt() or (0xFF shl 24)
-
-    // You might want to extract the speaker from message (e.g., "Naruto: ...")
-    private fun parseSpeaker(message: String): String {
-        val idx = message.indexOf(':')
-        return if (idx > 0) message.substring(0, idx).trim() else "Narrator"
-    }
 }

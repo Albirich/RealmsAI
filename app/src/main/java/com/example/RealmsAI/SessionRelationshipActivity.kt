@@ -1,6 +1,5 @@
 package com.example.RealmsAI
 
-import android.R.attr.id
 import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
@@ -14,6 +13,7 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.example.RealmsAI.models.ChatProfile
 import com.example.RealmsAI.models.ParticipantPreview
 import com.example.RealmsAI.models.RELATIONSHIP_TYPES
 import com.example.RealmsAI.models.Relationship
@@ -38,11 +38,23 @@ class SessionRelationshipActivity : AppCompatActivity() {
         val ids = intent.getStringArrayListExtra("PARTICIPANT_IDS") ?: emptyList()
         Log.d("Relationships", "IDs from intent: $ids")
 
+        // Robustly load relationships: if chat profile present, load only those, else use whatever was passed in
+        val chatProfileJson = intent.getStringExtra("CHAT_PROFILE_JSON") ?: ""
         val relationshipsJson = intent.getStringExtra("RELATIONSHIPS_JSON") ?: "[]"
         relationships.clear()
-        relationships.addAll(
-            Gson().fromJson(relationshipsJson, Array<Relationship>::class.java).toList()
-        )
+
+        if (chatProfileJson.isNotBlank()) {
+            // Use chat profile's relationships only (ignore what was passed in)
+            val chatProfile = Gson().fromJson(chatProfileJson, ChatProfile::class.java)
+            relationships.addAll(chatProfile.relationships)
+            Log.d("Relationships", "Loaded relationships from ChatProfile (${relationships.size})")
+        } else {
+            // Use provided relationships (likely from character, or previously edited)
+            relationships.addAll(
+                Gson().fromJson(relationshipsJson, Array<Relationship>::class.java).toList()
+            )
+            Log.d("Relationships", "Loaded relationships from RELATIONSHIPS_JSON (${relationships.size})")
+        }
 
         fetchParticipantPreviewsGlobal(ids) { loadedPreviews ->
             participants.clear()
@@ -105,9 +117,10 @@ class SessionRelationshipActivity : AppCompatActivity() {
     }
 
     /**
-     * Fetches character previews from the global /characters collection.
+     * Fetches character/persona previews from the global collections.
      */
     private fun fetchParticipantPreviewsGlobal(ids: List<String>, onDone: (List<ParticipantPreview>) -> Unit) {
+        Log.d("REL_DEBUG", "fetchParticipantPreviewsGlobal IDs: $ids")
         val db = FirebaseFirestore.getInstance()
         val previews = mutableListOf<ParticipantPreview>()
         var count = 0
@@ -120,10 +133,11 @@ class SessionRelationshipActivity : AppCompatActivity() {
         }
 
         if (ids.isEmpty()) {
+            Log.d("REL_DEBUG", "No IDs provided to fetchParticipantPreviewsGlobal!")
             onDone(emptyList())
             return
         }
-        Log.d("Relationship", "Checking ID: $id in characters and personas")
+
         ids.forEach { id ->
             if (!id.isNullOrEmpty()) {
                 db.collection("characters").document(id).get()
@@ -133,6 +147,8 @@ class SessionRelationshipActivity : AppCompatActivity() {
                             val avatarUri = charDoc.getString("avatarUri") ?: ""
                             previews.add(ParticipantPreview(id, name, avatarUri))
                             checkDone()
+                            Log.d("REL_DEBUG", "Added preview: ${name} / $id")
+
                         } else {
                             db.collection("personas").document(id).get()
                                 .addOnSuccessListener { personaDoc ->
@@ -147,6 +163,8 @@ class SessionRelationshipActivity : AppCompatActivity() {
                         }
                     }
                     .addOnFailureListener { checkDone() }
+            } else {
+                checkDone()
             }
         }
     }

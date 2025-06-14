@@ -11,13 +11,14 @@ import com.example.RealmsAI.models.Area
 import com.example.RealmsAI.models.LocationSlot
 
 class AreaAdapter(
-    var areas: MutableList<Area>,
-    val onPickImage: (areaIdx: Int, locIdx: Int) -> Unit,
-    val onDeleteLocation: (areaIdx: Int, locIdx: Int) -> Unit
+    val areas: MutableList<Area>,
+    val onPickImage: (Int, Int) -> Unit,
+    val onDeleteLocation: (Int, Int) -> Unit,
+    val readonly: Boolean = false
 ) : RecyclerView.Adapter<AreaAdapter.VH>() {
     inner class VH(itemView: View) : RecyclerView.ViewHolder(itemView) {
         val nameEt = itemView.findViewById<EditText>(R.id.areaNameEditText)
-        val locationRecycler = itemView.findViewById<RecyclerView>(R.id.areaRecycler)
+        val locationRecycler = itemView.findViewById<RecyclerView>(R.id.locationRecycler)
         val addLocationBtn = itemView.findViewById<ImageButton>(R.id.addLocationButton)
         val deleteLocationBtn = itemView.findViewById<ImageButton>(R.id.deleteLocationButton)
     }
@@ -50,6 +51,8 @@ class AreaAdapter(
             onDeleteLocation = { locIdx -> onDeleteLocation(position, locIdx) }
         )
         holder.locationRecycler.adapter = adapter
+        holder.addLocationBtn.visibility = if (readonly) View.GONE else View.VISIBLE
+        holder.deleteLocationBtn.visibility = if (readonly) View.GONE else View.VISIBLE
 
         // Add Location Button
         holder.addLocationBtn.setOnClickListener {

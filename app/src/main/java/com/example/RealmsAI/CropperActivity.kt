@@ -18,6 +18,11 @@ import com.example.RealmsAI.views.GuidelinesView
 import java.io.File
 import java.io.FileOutputStream
 
+private const val OUTPUT_WIDTH = 750
+private const val OUTPUT_HEIGHT = 1805
+private const val FEET_RANGE = 8.5f // 0 ft at bottom, 8'6" at top
+private const val PX_PER_FOOT = OUTPUT_HEIGHT / FEET_RANGE // ≈ 212.35 px/ft
+
 class CropperActivity : AppCompatActivity() {
     private lateinit var userImage: ImageView
 
@@ -41,14 +46,6 @@ class CropperActivity : AppCompatActivity() {
         setContentView(R.layout.activity_cropper)
         userImage = findViewById(R.id.userImage)
 
-        val viewWidth = userImage.width.toFloat()
-        val viewHeight = userImage.height.toFloat()
-
-        val cropLeftView = viewWidth * 0.33f
-        val cropTopView = viewHeight * 0.15f
-        val cropRightView = viewWidth
-        val cropBottomView = viewHeight
-
         // Set up guidelines
         val charHeight = intent.getFloatExtra("CHARACTER_HEIGHT_FEET", 6.0f)
         val guidelinesView = findViewById<GuidelinesView>(R.id.guidelinesOverlay)
@@ -67,14 +64,18 @@ class CropperActivity : AppCompatActivity() {
 
         // Save/crop button
         findViewById<Button>(R.id.saveCropButton).setOnClickListener {
-            val croppedBitmap = getCroppedBitmap()
-            val croppedUri = saveBitmapToCache(croppedBitmap)
-            val resultIntent = Intent().apply {
-                putExtra("CROPPED_IMAGE_URI", croppedUri)
+            val guidelinesView = findViewById<GuidelinesView>(R.id.guidelinesOverlay)
+            guidelinesView.post {
+                val croppedBitmap = cropVisibleGuidelinesRegion()
+                val croppedUri = saveBitmapToCache(croppedBitmap)
+                val resultIntent = Intent().apply {
+                    putExtra("CROPPED_IMAGE_URI", croppedUri)
+                }
+                setResult(Activity.RESULT_OK, resultIntent)
+                finish()
             }
-            setResult(Activity.RESULT_OK, resultIntent)
-            finish()
         }
+
 
         // Gesture handling (pinch to zoom & pan)
         val scaleDetector = ScaleGestureDetector(this, object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
@@ -149,43 +150,57 @@ class CropperActivity : AppCompatActivity() {
         }
     }
 
-    /** Crop visible region of the ImageView */
-    private fun getCroppedBitmap(): Bitmap {
-        val OUTPUT_WIDTH = 900
-        val OUTPUT_HEIGHT = 2560
+    private fun cropVisibleGuidelinesRegion(): Bitmap {
+        // Output: always 750x1805
+        val OUTPUT_WIDTH = 750
+        val OUTPUT_HEIGHT = 1805
 
+        // 1. Blank output canvas
+        val outputBitmap = Bitmap.createBitmap(OUTPUT_WIDTH, OUTPUT_HEIGHT, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(outputBitmap)
+        canvas.drawARGB(0, 0, 0, 0)
+
+        // 2. Guidelines area in preview
+        val guidelinesView = findViewById<GuidelinesView>(R.id.guidelinesOverlay)
+        val previewW = guidelinesView.width.toFloat()
+        val previewH = guidelinesView.height.toFloat()
+        val marginTop = previewH * 0.1f
+        val marginBottom = previewH * 0.02f
+        val usableH = previewH - marginTop - marginBottom
+        val leftPx = previewW * 0.155f
+        val rightPx = previewW * 0.845f
+        val usableW = rightPx - leftPx
+
+        val srcRect = android.graphics.RectF(
+            leftPx,
+            marginTop,
+            rightPx,
+            marginTop + usableH
+        )
+        val dstRect = android.graphics.RectF(
+            0f,
+            0f,
+            OUTPUT_WIDTH.toFloat(),
+            OUTPUT_HEIGHT.toFloat()
+        )
+        val boxToOutputMatrix = Matrix()
+        boxToOutputMatrix.setRectToRect(srcRect, dstRect, Matrix.ScaleToFit.FILL)
+
+        // 3. Combine with user pan/zoom matrix
+        val userMatrix = userImage.imageMatrix
+        val finalMatrix = Matrix()
+        finalMatrix.set(userMatrix)
+        finalMatrix.postConcat(boxToOutputMatrix)
+
+        // 4. Draw user image with correct transform
         val drawable = userImage.drawable as BitmapDrawable
         val originalBitmap = drawable.bitmap
 
-        val matrix = userImage.imageMatrix
-        val values = FloatArray(9)
-        matrix.getValues(values)
-
-        val scaleX = values[Matrix.MSCALE_X]
-        val scaleY = values[Matrix.MSCALE_Y]
-        val transX = values[Matrix.MTRANS_X]
-        val transY = values[Matrix.MTRANS_Y]
-
-        // Step 1: Create full transparent canvas
-        val canvasBitmap = Bitmap.createBitmap(OUTPUT_WIDTH, OUTPUT_HEIGHT, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(canvasBitmap)
-        canvas.drawARGB(0, 0, 0, 0) // Transparent
-
-        // Step 2: Draw transformed bitmap into full canvas
-        val drawMatrix = Matrix()
-        drawMatrix.setValues(values)
-        canvas.setMatrix(drawMatrix)
+        canvas.setMatrix(finalMatrix)
         canvas.drawBitmap(originalBitmap, 0f, 0f, null)
 
-        // Step 3: Crop only the "safe zone" area from canvas
-        val cropLeft = (OUTPUT_WIDTH * 0.33f).toInt()    // Left 33% cropped
-        val cropTop = (OUTPUT_HEIGHT * 0.15f).toInt()    // Top 15% cropped
-        val cropWidth = (OUTPUT_WIDTH * 0.67f).toInt()   // Remaining 67%
-        val cropHeight = (OUTPUT_HEIGHT * 0.75f).toInt() // Bottom 75%
-
-        val croppedBitmap = Bitmap.createBitmap(canvasBitmap, cropLeft, cropTop, cropWidth, cropHeight)
-
-        return croppedBitmap
+        // 5. Done! Output is always 750x1805, chart exactly fills output.
+        return outputBitmap
     }
 
 

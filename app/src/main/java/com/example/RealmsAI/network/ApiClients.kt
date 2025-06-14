@@ -1,4 +1,3 @@
-// ApiClients.kt
 package com.example.RealmsAI.network
 
 import android.util.Log
@@ -24,6 +23,9 @@ object ApiClients {
         .build()
 
     private val openAiClient = OkHttpClient.Builder()
+        .connectTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
+        .readTimeout(60, java.util.concurrent.TimeUnit.SECONDS)
+        .writeTimeout(60, java.util.concurrent.TimeUnit.SECONDS)
         // Add a logging interceptor for facilitator calls
         .addInterceptor(
             HttpLoggingInterceptor { message -> Log.d("HTTP-OpenAI", message) }
@@ -50,6 +52,9 @@ object ApiClients {
             .apply { level = HttpLoggingInterceptor.Level.BODY }
 
         OkHttpClient.Builder()
+            .connectTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
+            .readTimeout(60, java.util.concurrent.TimeUnit.SECONDS)
+            .writeTimeout(60, java.util.concurrent.TimeUnit.SECONDS)
             .addInterceptor(logger)
             .addInterceptor { chain ->
                 val req = chain.request().newBuilder()

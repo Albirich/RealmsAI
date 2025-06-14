@@ -42,37 +42,11 @@ class CharacterHubActivity : BaseActivity() {
                     Toast.makeText(this, "You must be signed in to continue.", Toast.LENGTH_SHORT).show()
                     return@CharacterPreviewAdapter
                 }
-
-                // Check for an existing session for this character & user
-                SessionManager.findSessionForUser(
-                    chatId = preview.id, // or however you map characterId to chatId
-                    userId = userId,
-                    onResult = { sessionId ->
-                        if (sessionId != null) {
-                            Log.d("CharacterHub", "Navigating to MainActivity with sessionId: $sessionId")
-                            startActivity(Intent(this, MainActivity::class.java).apply {
-                                putExtra("SESSION_ID", sessionId)
-                                putExtra("CHARACTER_ID", preview.id)
-                                putExtra("CHARACTER_PROFILE_JSON", preview.rawJson)
-                            })
-                        } else {
-                            // No session: go to SessionLandingActivity to start/setup
-                            startActivity(Intent(this, SessionLandingActivity::class.java).apply {
-                                putExtra("CHARACTER_ID", preview.id)
-                                putExtra("CHARACTER_PROFILE_JSON", preview.rawJson)
-                            })
-                        }
-                    },
-                    onError = { error ->
-                        // Handle error (show a message, retry, etc)
-                        Toast.makeText(this, "Failed to load session.", Toast.LENGTH_SHORT).show()
-                        // Optionally, fallback to session landing
-                        startActivity(Intent(this, SessionLandingActivity::class.java).apply {
-                            putExtra("CHARACTER_ID", preview.id)
-                            putExtra("CHARACTER_PROFILE_JSON", preview.rawJson)
-                        })
-                    }
-                )
+                startActivity(Intent(this, SessionLandingActivity::class.java).apply {
+                    Log.d("Characterhubactivity", "it has an id of: ${preview.id}")
+                    putExtra("CHARACTER_ID", preview.id)
+                    putExtra("CHARACTER_PROFILES_JSON", preview.rawJson)
+                })
             }
         )
 

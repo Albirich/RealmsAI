@@ -8,14 +8,14 @@
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="With:"
+        android:text="This Character:"
         android:paddingTop="2dp" />
     <EditText
         android:id="@+id/relationshipToNameEdit"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_weight="1"
-        android:hint="With (Name)"
+        android:hint="Enter a name"
         android:textSize="16sp"
         android:inputType="textPersonName" />
 
@@ -23,7 +23,7 @@
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Relationship type:"
+        android:text="Is character's:"
         android:paddingTop="12dp" />
     <Spinner
         android:id="@+id/relationshipTypeSpinner"

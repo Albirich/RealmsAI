@@ -21,6 +21,7 @@ class PoseAdapter(
     inner class Holder(v: View) : RecyclerView.ViewHolder(v) {
         val img = v.findViewById<ImageView>(R.id.poseImg)
         val label = v.findViewById<EditText>(R.id.poseLabel)
+        var watcher: android.text.TextWatcher? = null
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): Holder {
@@ -32,12 +33,27 @@ class PoseAdapter(
     override fun getItemCount() = poses.size
 
     override fun onBindViewHolder(holder: Holder, pos: Int) {
-        val pose = poses[pos]
+        // Remove old watcher to avoid duplicates
+        holder.watcher?.let { holder.label.removeTextChangedListener(it) }
 
+        val pose = poses[pos]
         holder.label.setText(pose.name)
-        holder.label.doAfterTextChanged { editable ->
-            pose.name = editable?.toString().orEmpty()
+
+        // New watcher just for this holder
+        val newWatcher = object : android.text.TextWatcher {
+            override fun afterTextChanged(editable: android.text.Editable?) {
+                val adapterPos = holder.adapterPosition
+                if (adapterPos != RecyclerView.NO_POSITION) {
+                    poses[adapterPos].name = editable?.toString().orEmpty()
+                }
+            }
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
         }
+        holder.label.addTextChangedListener(newWatcher)
+        holder.watcher = newWatcher
+
+        // Image logic
         if (pose.uri != null) {
             holder.img.setImageURI(Uri.parse(pose.uri))
         } else {

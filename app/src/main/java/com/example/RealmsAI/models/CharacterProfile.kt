@@ -16,7 +16,7 @@ data class CharacterProfile(
     val avatarResId        : Int?                = null,
     @SerializedName("avatarUri")
     val avatarUri          : String?             = null,
-    val background         : String              = "",
+    var areas: List<Area> = emptyList(),
     val summary            : String?             = null,
     val outfits            : List<Outfit>        = emptyList(),
     val currentOutfit      : String              = "",
@@ -34,3 +34,25 @@ data class CharacterProfile(
     val sfwOnly: Boolean = true,
     val profileType        : String = "bot"
 )
+
+fun characterProfileToPersona(character: CharacterProfile): PersonaProfile {
+    return PersonaProfile(
+        id = character.id,
+        name = character.name,
+        gender = character.gender,
+        height = character.height,
+        weight = character.weight,
+        age = character.age,
+        hair = character.hairColor,
+        eyes = character.eyeColor,
+        physicaldescription = character.physicalDescription,
+        relationships = character.relationships,
+        outfits = character.outfits,
+        currentOutfit = character.currentOutfit,
+        author = character.author,
+        avatarUri = character.avatarUri ?: "",
+        bubbleColor = character.bubbleColor,
+        textColor = character.textColor,
+        profileType = "bot"
+    )
+}

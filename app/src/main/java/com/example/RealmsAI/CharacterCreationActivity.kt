@@ -11,11 +11,13 @@ import android.webkit.MimeTypeMap
 import android.widget.*
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
+import com.example.RealmsAI.models.Area
 import com.example.RealmsAI.models.CharacterProfile
 import com.example.RealmsAI.models.Outfit
 import com.example.RealmsAI.models.Relationship
@@ -33,11 +35,12 @@ class CharacterCreationActivity : AppCompatActivity() {
     private lateinit var avatarView: ImageView
     private lateinit var relationshipBtn: Button
     private lateinit var wardrobeButton: MaterialButton
-    private lateinit var bgButton: ImageButton
-    private lateinit var bgRecycler: RecyclerView
+    private var areaList: MutableList<Area> = mutableListOf()
+    private lateinit var areaGalleryLauncher: ActivityResultLauncher<Intent>
     private lateinit var bubbleColorSpinner: Spinner
     private lateinit var textColorSpinner: Spinner
     private lateinit var submitBtn: MaterialButton
+
 
     // EditTexts
     private lateinit var nameEt: EditText
@@ -59,24 +62,23 @@ class CharacterCreationActivity : AppCompatActivity() {
     private var avatarUri: Uri? = null             // Only local uri if user picks new
     private var avatarChanged = false              // Tracks if avatar was re-picked
     private var originalAvatarUrl: String? = null  // Download url from firestore
-    private var selectedBgUri: Uri? = null
-    private var selectedBgResId: Int? = null
     private var outfitsList: List<Outfit> = emptyList()
     private var relationships: List<Relationship> = emptyList()
     private val colorOptions = listOf(
-        "White" to "#FFFFFF",
-        "Yellow" to "#FFEB3B",
-        "Orange" to "#FF9800",
+        "Black" to "#000000",
         "Blue" to "#2196F3",
-        "Pink" to "#E91E63",
         "Green" to "#4CAF50",
-        "Black" to "#000000"
+        "Orange" to "#FF9800",
+        "Pink" to "#E91E63",
+        "Purple" to "#A200FF",
+        "Red" to "#FF002A",
+        "White" to "#FFFFFF",
+        "Yellow" to "#FFEB3B"
     )
 
     // Launcher
     private lateinit var wardrobeLauncher: ActivityResultLauncher<Intent>
     private lateinit var avatarPicker: ActivityResultLauncher<String>
-    private lateinit var bgPicker: ActivityResultLauncher<String>
     private lateinit var sfwSwitch: Switch
     companion object {
         private const val RELATIONSHIP_REQ_CODE = 5001
@@ -98,8 +100,6 @@ class CharacterCreationActivity : AppCompatActivity() {
         avatarView = findViewById(R.id.avatarImageView)
         relationshipBtn = findViewById(R.id.charrelationshipBtn)
         wardrobeButton = findViewById(R.id.wardrobeButton)
-        bgButton = findViewById(R.id.backgroundButton)
-        bgRecycler = findViewById(R.id.backgroundRecycler)
         bubbleColorSpinner = findViewById(R.id.bubbleColorSpinner)
         textColorSpinner = findViewById(R.id.textColorSpinner)
         submitBtn = findViewById(R.id.charSubmitButton)
@@ -117,6 +117,7 @@ class CharacterCreationActivity : AppCompatActivity() {
         backstoryEt = findViewById(R.id.backstoryEditText)
         greetingEt = findViewById(R.id.characterGreetingInput)
         sfwSwitch = findViewById(R.id.sfwSwitch)
+        val addAreaButton = findViewById<MaterialButton>(R.id.addAreaButton)
 
 
         // Color spinners show names but store hex
@@ -154,36 +155,20 @@ class CharacterCreationActivity : AppCompatActivity() {
         }
 
         // Background Picker
-        bgPicker = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-            uri?.let {
-                selectedBgUri = it
-                selectedBgResId = null
-                bgButton.setImageURI(it)
-            }
-        }
-        bgButton.setOnClickListener { bgPicker.launch("image/*") }
-        bgRecycler.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
-        bgRecycler.adapter = object : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
-            override fun getItemCount() = presetBackgrounds.size
-            override fun onCreateViewHolder(parent: ViewGroup, vt: Int) =
-                object : RecyclerView.ViewHolder(ImageView(parent.context).apply {
-                    val size = (64 * resources.displayMetrics.density).toInt()
-                    layoutParams = ViewGroup.LayoutParams(size, size)
-                    scaleType = ImageView.ScaleType.CENTER_CROP
-                    setPadding(8, 8, 8, 8)
-                }) {}
-            override fun onBindViewHolder(holder: RecyclerView.ViewHolder, i: Int) {
-                val res = presetBackgrounds[i]
-                (holder.itemView as ImageView).apply {
-                    setImageResource(res)
-                    setOnClickListener {
-                        selectedBgResId = res
-                        selectedBgUri = null
-                        bgButton.setImageResource(res)
-                    }
+        areaGalleryLauncher = registerForActivityResult(StartActivityForResult()) { result ->
+            if (result.resultCode == Activity.RESULT_OK && result.data != null) {
+                val areasJson = result.data?.getStringExtra("EXTRA_AREAS_JSON")
+                if (!areasJson.isNullOrBlank()) {
+                    areaList = Gson().fromJson(areasJson, Array<Area>::class.java).toMutableList()
                 }
             }
         }
+        addAreaButton.setOnClickListener {
+            val intent = Intent(this, BackgroundGalleryActivity::class.java)
+            intent.putExtra("EXTRA_AREAS_JSON", Gson().toJson(areaList))
+            areaGalleryLauncher.launch(intent)
+        }
+
 
         // Relationships button
         relationshipBtn.setOnClickListener {
@@ -267,31 +252,17 @@ class CharacterCreationActivity : AppCompatActivity() {
         val storage = FirebaseStorage.getInstance().reference
         val firestore = FirebaseFirestore.getInstance()
 
-        // 1. Upload avatar if changed
-        fun onAvatarUploaded(avatarUrl: String) {
-            // 2. Upload any local pose images (skip those with http/https)
-            val poseTasks = outfitsList.flatMap { outfit ->
-                outfit.poseSlots.mapNotNull { poseSlot ->
-                    val poseName = poseSlot.name.trim()
-                    val uriStr = poseSlot.uri?.trim() ?: ""
-                    if (poseName.isBlank() || uriStr.isBlank() || uriStr.startsWith("http")) return@mapNotNull null
-                    val fileUri = Uri.parse(uriStr)
-                    val ext = File(fileUri.path ?: "").extension.ifBlank { "jpg" }
-                    val ref = storage.child("characters/$charId/poses/${outfit.name}/$poseName.$ext")
-                    Log.d("CharCreation", "Uploading $fileUri to $ref")
-                    val uploadTask = ref.putFile(fileUri)
-                        .continueWithTask { t ->
-                            if (!t.isSuccessful) throw t.exception!!
-                            ref.downloadUrl
-                        }
-                        .continueWith { t ->
-                            Triple(outfit.name, poseName, t.result.toString())
-                        }
-                    uploadTask
-                }
-            }
+        // If editing, load old profile to compare pose images
+        val oldProfileTask = if (editCharId != null)
+            firestore.collection("characters").document(editCharId).get()
+        else null
 
-            com.google.android.gms.tasks.Tasks.whenAllSuccess<Any>(poseTasks)
+        val onSave = { avatarUrl: String, oldOutfits: List<Outfit>? ->
+            // Delete removed poses if editing
+            val deletedTasks = deleteOldPoseImages(charId, oldOutfits, outfitsList, storage)
+            // Upload local pose images
+            val poseUploadTasks = uploadPoseImages(charId, outfitsList, storage, contentResolver)
+            com.google.android.gms.tasks.Tasks.whenAllSuccess<Any>(deletedTasks + poseUploadTasks)
                 .addOnSuccessListener { results ->
                     val poseTriples = results.filterIsInstance<Triple<String, String, String>>()
                     // Map of outfitName -> Map<poseName, url>
@@ -309,10 +280,7 @@ class CharacterCreationActivity : AppCompatActivity() {
                         }.toMutableList()
                         outfit.copy(poseSlots = updatedPoseSlots)
                     }
-
-                    val age = ageEt.text.toString().toFloatOrNull() ?: 0f
                     val isSfwOnly = if (age < 18) true else sfwSwitch.isChecked
-
                     val charData: Map<String, Any?> = mapOf(
                         "id" to charId,
                         "name" to name,
@@ -333,8 +301,16 @@ class CharacterCreationActivity : AppCompatActivity() {
                         "author" to currentUserId,
                         "tags" to emptyList<String>(),
                         "avatarUri" to avatarUrl,
-                        "background" to (selectedBgUri?.toString() ?: selectedBgResId?.let { "android.resource://$packageName/$it" } ?: ""),
-                        "createdAt" to FieldValue.serverTimestamp(),
+                        "areas" to areaList.map { area ->
+                            mapOf(
+                                "id" to area.id,
+                                "name" to area.name,
+                                "locations" to area.locations.map { loc ->
+                                    mapOf("id" to loc.id, "name" to loc.name, "uri" to loc.uri)
+                                }
+                            )
+                        },
+                        "createdAt" to com.google.firebase.firestore.FieldValue.serverTimestamp(),
                         "relationships" to relationships.map { it.copy(fromId = charId) },
                         "sfwOnly" to isSfwOnly,
                         "outfits" to updatedOutfits // will save as a list of outfits, each with poseSlots (name+uri)
@@ -360,33 +336,111 @@ class CharacterCreationActivity : AppCompatActivity() {
                 }
         }
 
+        showProgressDialog()
 
-        // Only upload new image if user picked one
-        if (avatarChanged && avatarUri != null) {
-            val ext = contentResolver.getType(avatarUri!!)
-                ?.let { MimeTypeMap.getSingleton().getExtensionFromMimeType(it) }
-                ?: "jpg"
-            val avatarCache = File(cacheDir, "avatar_$charId.$ext")
-            contentResolver.openInputStream(avatarUri!!)?.use { input ->
-                FileOutputStream(avatarCache).use { output ->
-                    input.copyTo(output)
+        val doAvatar = { oldOutfits: List<Outfit>? ->
+            uploadAvatarIfNeeded(
+                avatarChanged, avatarUri, charId, contentResolver, storage,
+                onComplete = { avatarUrl -> onSave(avatarUrl, oldOutfits) },
+                onError = { e ->
+                    dismissProgressDialog()
+                    toast("Avatar upload failed: ${e.message}")
                 }
+            )
+        }
+
+        // Run the chain
+        if (oldProfileTask != null) {
+            oldProfileTask.addOnSuccessListener { docSnap ->
+                val oldProfile = docSnap.toObject(CharacterProfile::class.java)
+                doAvatar(oldProfile?.outfits)
+            }.addOnFailureListener {
+                doAvatar(null)
+            }
+        } else {
+            doAvatar(null)
+        }
+    }
+
+
+    private fun uploadAvatarIfNeeded(
+        avatarChanged: Boolean,
+        avatarUri: Uri?,
+        charId: String,
+        contentResolver: android.content.ContentResolver,
+        storage: com.google.firebase.storage.StorageReference,
+        onComplete: (String) -> Unit,
+        onError: (Exception) -> Unit
+    ) {
+        if (avatarChanged && avatarUri != null) {
+            val ext = contentResolver.getType(avatarUri)
+                ?.let { android.webkit.MimeTypeMap.getSingleton().getExtensionFromMimeType(it) }
+                ?: "jpg"
+            val avatarCache = java.io.File(cacheDir, "avatar_$charId.$ext")
+            contentResolver.openInputStream(avatarUri)?.use { input ->
+                java.io.FileOutputStream(avatarCache).use { output -> input.copyTo(output) }
             }
             val fileUri = Uri.fromFile(avatarCache)
             val ref = storage.child("characters/$charId/avatar.$ext")
             ref.putFile(fileUri)
                 .continueWithTask { t -> if (!t.isSuccessful) throw t.exception!!; ref.downloadUrl }
-                .addOnSuccessListener { uri ->
-                    onAvatarUploaded(uri.toString())
-                }
-                .addOnFailureListener { e ->
-                    dismissProgressDialog()
-                    toast("Avatar upload failed: ${e.message}")
-                }
+                .addOnSuccessListener { uri -> onComplete(uri.toString()) }
+                .addOnFailureListener { e -> onError(e) }
         } else {
-            onAvatarUploaded(originalAvatarUrl ?: "")
+            onComplete("") // No change, use previous
         }
     }
+
+    private fun deleteOldPoseImages(
+        charId: String,
+        oldOutfits: List<Outfit>?,
+        newOutfits: List<Outfit>,
+        storage: com.google.firebase.storage.StorageReference
+    ): List<com.google.android.gms.tasks.Task<Void>> {
+        val deletedTasks = mutableListOf<com.google.android.gms.tasks.Task<Void>>()
+        if (oldOutfits != null) {
+            val oldSet = oldOutfits.flatMap { o -> o.poseSlots.map { "${o.name}:${it.name}" } }.toSet()
+            val newSet = newOutfits.flatMap { o -> o.poseSlots.map { "${o.name}:${it.name}" } }.toSet()
+            val toDelete = oldSet - newSet
+            oldOutfits.forEach { outfit ->
+                outfit.poseSlots.forEach { pose ->
+                    if ("${outfit.name}:${pose.name}" in toDelete && pose.uri != null && pose.uri!!.startsWith("http")) {
+                        try {
+                            val ref = storage.storage.getReferenceFromUrl(pose.uri!!)
+                            deletedTasks.add(ref.delete())
+                        } catch (_: Exception) { }
+                    }
+                }
+            }
+        }
+        return deletedTasks
+    }
+
+    private fun uploadPoseImages(
+        charId: String,
+        outfits: List<Outfit>,
+        storage: com.google.firebase.storage.StorageReference,
+        contentResolver: android.content.ContentResolver
+    ): List<com.google.android.gms.tasks.Task<Triple<String, String, String>>> {
+        return outfits.flatMap { outfit ->
+            outfit.poseSlots.mapNotNull { poseSlot ->
+                val poseName = poseSlot.name.trim()
+                val uriStr = poseSlot.uri?.trim() ?: ""
+                if (poseName.isBlank() || uriStr.isBlank() || uriStr.startsWith("http")) return@mapNotNull null
+                val fileUri = Uri.parse(uriStr)
+                val ext = java.io.File(fileUri.path ?: "").extension.ifBlank { "jpg" }
+                val ref = storage.child("characters/$charId/poses/${outfit.name}/$poseName.$ext")
+                val uploadTask = ref.putFile(fileUri)
+                    .continueWithTask { t ->
+                        if (!t.isSuccessful) throw t.exception!!
+                        ref.downloadUrl
+                    }
+                    .continueWith { t -> Triple(outfit.name, poseName, t.result.toString()) }
+                uploadTask
+            }
+        }
+    }
+
 
     private fun showProgressDialog() {
         progressDialog = AlertDialog.Builder(this)

@@ -3,53 +3,13 @@ package com.example.RealmsAI.ai
 import android.graphics.Color
 import android.util.Log
 import com.example.RealmsAI.models.*
-import com.google.firebase.Timestamp
 import java.util.UUID
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import com.example.RealmsAI.network.ApiClients
 
+
 object Facilitator {
-    val responses = mutableListOf<ChatMessage>()
-    suspend fun getActivatedSlots(
-        activationPrompt: String,
-        openAiKey: String,
-        slotIdToCharacterProfile: Map<String, CharacterProfile>
-    ): List<Pair<String, Boolean>> {
-        // 1. Call OpenAI to get the raw response
-        val rawResponse = callActivationAI(activationPrompt, openAiKey)
-
-        // 2. Parse the response into slot IDs and NSFW flags
-        return parseActivatedSlotsFromResponse(rawResponse, slotIdToCharacterProfile)
-    }
-    fun activationRefusedOrMalformed(response: String): Boolean {
-        if (response.isBlank()) return true
-        val lower = response.lowercase()
-        return lower.contains("sorry") ||
-                lower.contains("cannot assist") ||
-                lower.contains("not allowed") ||
-                !lower.contains("characters_to_activate")
-    }
-    fun activationIsEmptyList(response: String): Boolean {
-        val stripped = response.replace("\\s".toRegex(), "")
-        return stripped.contains("characters_to_activate:[]") ||
-                stripped.contains("\"characters_to_activate\":[]")
-    }
-    suspend fun callOpenAiFacilitator(prompt: String, apiKey: String): String = withContext(Dispatchers.IO) {
-        try {
-            val request = com.example.RealmsAI.network.OpenAiChatRequest(
-                model = "gpt-4o-mini", // or whichever model you use
-                messages = listOf(com.example.RealmsAI.network.Message(role = "system", content = prompt))
-            )
-            val response = ApiClients.openai.getFacilitatorNotes(request)
-            response.choices.firstOrNull()?.message?.content ?: ""
-        } catch (ex: Exception) {
-            Log.e("Facilitator", "Error calling facilitator AI", ex)
-            ""
-        }
-    }
-
-
 
 
     // Use your existing OpenAiService to send the activation prompt to OpenAI API
@@ -68,66 +28,111 @@ object Facilitator {
         }
     }
 
-    // Parse the raw activation AI response to find bots and NSFW flags
-    fun parseActivatedSlotsFromResponse(
-        rawResponse: String,
-        slotIdToCharacterProfile: Map<String, CharacterProfile>
-    ): List<Pair<String, Boolean>> {
-        val activated = mutableListOf<Pair<String, Boolean>>()
-        val regex = Regex("""- name:\s*(\S+)\s+nsfw:\s*(true|false)""", RegexOption.IGNORE_CASE)
-        for (match in regex.findAll(rawResponse)) {
-            val botName = match.groupValues[1]
-            val nsfw = match.groupValues[2].toBoolean()
-            val slotId = slotIdToCharacterProfile.entries.find { it.value.name == botName }?.key
-            if (slotId != null) {
-                activated.add(slotId to nsfw)
-            } else {
-               Log.w("Facilitator", "Bot name '$botName' not found in slotIdToCharacterProfile keys")
+    fun parseActivationAIResponse(
+        response: String,
+        previousAreas: List<Area>
+    ): Pair<List<Pair<String, Boolean>>, List<Area>> {
+        val activatedSlots = mutableListOf<Pair<String, Boolean>>()
+        val updatedAreas = mutableListOf<Area>()
+
+        val lines = response.lines().map { it.trim() }
+        var inActivate = false
+        var inAreaMap = false
+        var currentAreaName: String? = null
+        var characterNames: List<String> = emptyList()
+
+        for (i in lines.indices) {
+            val line = lines[i]
+            // Block starts
+            if (line.startsWith("characters_to_activate:")) {
+                inActivate = true
+                inAreaMap = false
+                continue
+            }
+            if (line.startsWith("current_area_map:")) {
+                inActivate = false
+                inAreaMap = true
+                continue
+            }
+            // Parse activations
+            if (inActivate && line.startsWith("- name:")) {
+                val name = line.removePrefix("- name:").trim()
+                val nsfwLine = lines.getOrNull(i + 1)?.trim()
+                val nsfw = nsfwLine?.startsWith("nsfw:") == true && nsfwLine.contains("true")
+                activatedSlots.add(name to nsfw)
+            }
+            // Parse area map
+            if (inAreaMap) {
+                if (line.startsWith("- area:")) {
+                    // Save previous area (if any)
+                    if (currentAreaName != null) {
+                        updatedAreas.add(
+                            Area(
+                                id = UUID.randomUUID().toString(),
+                                creatorId = "",
+                                name = currentAreaName!!,
+                                locations = mutableListOf(
+                                    LocationSlot(
+                                        id = UUID.randomUUID().toString(),
+                                        name = currentAreaName!!,
+                                        uri = null,
+                                        characters = characterNames // Fix: assign the parsed names!
+                                    )
+                                )
+                            )
+                        )
+                    }
+                    // Start new area
+                    currentAreaName = line.removePrefix("- area:").trim()
+                    characterNames = emptyList()
+                } else if (line.startsWith("characters: [")) {
+                    characterNames = line.substringAfter("[").substringBefore("]").split(",").map { it.trim() }.filter { it.isNotEmpty() }
+                    // Insert characterNames in the last location slot for the current area
+                    // Optionally, you could add them as a field to LocationSlot if your model supports it
+                    if (currentAreaName != null) {
+                        updatedAreas.removeAll { it.name == currentAreaName }
+                        updatedAreas.add(
+                            Area(
+                                id = UUID.randomUUID().toString(),
+                                creatorId = "",
+                                name = currentAreaName!!,
+                                locations = mutableListOf(
+                                    LocationSlot(
+                                        id = UUID.randomUUID().toString(),
+                                        name = currentAreaName!!,
+                                        uri = null,
+                                        characters = characterNames // Fix: assign the parsed names!
+                                    )
+
+                                )
+                            )
+                        )
+                    }
+                    currentAreaName = null // Mark area complete after processing
+                }
             }
         }
-        return activated
+        // Add any final area left open (edge case)
+        if (currentAreaName != null) {
+            updatedAreas.add(
+                Area(
+                    id = UUID.randomUUID().toString(),
+                    creatorId = "",
+                    name = currentAreaName!!,
+                    locations = mutableListOf(
+                        LocationSlot(
+                            id = UUID.randomUUID().toString(),
+                            name = currentAreaName!!,
+                            uri = null
+                        )
+                    )
+                )
+            )
+        }
+        // Fallback: use previousAreas if nothing parsed
+        return activatedSlots to (if (updatedAreas.isNotEmpty()) updatedAreas else previousAreas)
     }
 
-    // Build the prompt for each character (you can customize this)
-    private fun buildCharPromptForSlot(
-        slotId: String,
-        chatHistory: List<ChatMessage>,
-        characterProfile: CharacterProfile,
-        sessionSummary: String? = null,
-        isNSFW: Boolean = false // true = Mixtral, false = OpenAI
-    ): String {
-        val sb = StringBuilder()
-
-        sb.appendLine("# Character Profile")
-        sb.appendLine("Name: ${characterProfile.name}")
-        sb.appendLine("Personality: ${characterProfile.personality}")
-        // Only include backstory for OpenAI, not Mixtral
-        if (!isNSFW) {
-            sb.appendLine("Backstory: ${characterProfile.backstory}")
-        }
-        if (!characterProfile.tags.isNullOrEmpty()) sb.appendLine("Tags: ${characterProfile.tags.joinToString()}")
-        if (!characterProfile.relationships.isNullOrEmpty()) sb.appendLine("Relationships: ${characterProfile.relationships.joinToString { "${it.toName} (${it.type}): ${it.description}" }}")
-
-        sb.appendLine()
-
-        if (!sessionSummary.isNullOrBlank() && !isNSFW) {
-            sb.appendLine("# Session Summary")
-            sb.appendLine(sessionSummary)
-            sb.appendLine()
-        }
-
-        sb.appendLine("# Recent Chat History")
-        chatHistory.takeLast(10).forEach { msg ->
-            sb.appendLine("${msg.sender}: ${msg.messageText}")
-        }
-        sb.appendLine()
-        sb.appendLine("Reply as ${characterProfile.name}, in character, to the most recent user message.")
-
-        return sb.toString()
-    }
-
-
-    // Call OpenAI for the actual character reply
     suspend fun callOpenAiApi(prompt: String, key: String): String = withContext(Dispatchers.IO) {
         try {
             Log.d("Facilitator", "[OpenAI] Character Prompt:\n$prompt")
@@ -155,10 +160,4 @@ object Facilitator {
             ""
         }
     }
-
-    private fun getCharacterNameForSlot(slotId: String, slotIdToCharacterProfile: Map<String, CharacterProfile>): String {
-        return slotIdToCharacterProfile[slotId]?.name ?: slotId
-    }
-
-    private fun generateMsgId(): String = UUID.randomUUID().toString()
 }

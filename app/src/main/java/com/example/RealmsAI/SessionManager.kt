@@ -59,7 +59,8 @@ object SessionManager {
             "chatMode" to sessionProfile.chatMode,
             "slotRoster" to sessionProfile.slotRoster,
             "personaProfiles" to sessionProfile.personaProfiles,
-            "characterProfilesJson" to characterProfilesJson
+            "characterProfilesJson" to characterProfilesJson,
+            "playerAssignments" to sessionProfile.playerAssignments
         )
 
         // Sessions are now top-level documents

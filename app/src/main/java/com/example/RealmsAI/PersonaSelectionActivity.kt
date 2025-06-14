@@ -3,6 +3,7 @@ package com.example.RealmsAI
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.util.Log
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -89,12 +90,13 @@ class PersonaSelectionActivity : AppCompatActivity() {
         // 4) Done → return list
         findViewById<MaterialButton>(R.id.doneButton).setOnClickListener {
             val intent = Intent().apply {
-                // Return the first selected persona ID, or send the whole list if multiple allowed
                 putExtra("SELECTED_PERSONA_ID", selectedIds.firstOrNull())
                 putStringArrayListExtra("SELECTED_PERSONAS", ArrayList(selectedIds))
             }
+            Log.d("PersonaSelection", "Returning persona: ${selectedIds.firstOrNull()}")
             setResult(RESULT_OK, intent)
             finish()
         }
+
     }
 }

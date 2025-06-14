@@ -34,13 +34,27 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             app:counterEnabled="true"
-            app:counterMaxLength="4000">
-        <EditText
-            android:id="@+id/descriptionEditText"
+            app:counterMaxLength="1000">
+            <EditText
+                android:id="@+id/descriptionEditText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="Enter description"
+                android:maxHeight="200dp" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <!-- Secret Description -->
+        <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="Enter description"
-            android:maxHeight="200dp" />
+            app:counterEnabled="true"
+            app:counterMaxLength="1000">
+            <EditText
+                android:id="@+id/secretDescriptionEditText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="Enter secret description"
+                android:maxHeight="200dp" />
         </com.google.android.material.textfield.TextInputLayout>
 
         <!-- First Message -->
@@ -48,13 +62,13 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             app:counterEnabled="true"
-            app:counterMaxLength="500">
-        <EditText
-            android:id="@+id/firstMessageEditText"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:hint="Enter the opening message"
-            android:maxHeight="200dp" />
+            app:counterMaxLength="100">
+            <EditText
+                android:id="@+id/firstMessageEditText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="Enter the opening message"
+                android:maxHeight="200dp" />
         </com.google.android.material.textfield.TextInputLayout>
 
         <!-- Safe-for-Work Toggle -->
@@ -76,99 +90,34 @@
                 android:layout_marginStart="8dp" />
         </LinearLayout>
 
-        <!-- Character Selection Buttons -->
+        <!-- Characters (Load from Collection) -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
-            android:text="Characters"
+            android:text="Character Setup"
             android:textStyle="bold" />
 
-        <HorizontalScrollView
+        <Button
+            android:id="@+id/btnLoadCollections"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:paddingTop="8dp">
+            android:text="Load Character Collections" />
 
-            <LinearLayout
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal">
+        <!-- Map Setup -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnOpenMap"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginVertical="8dp"
+            android:text="Open Map Builder" />
 
-                <!-- Repeat up to 6 slots -->
-                <ImageButton
-                    android:id="@+id/charButton1"
-                    android:layout_width="100dp"
-                    android:layout_height="100dp"
-                    android:layout_marginEnd="8dp"
-                    android:src="@drawable/placeholder_avatar"
-                    android:contentDescription="Character slot 1"
-                    android:background="?attr/selectableItemBackgroundBorderless"
-                    android:scaleType="centerCrop" />
-
-                <ImageButton
-                    android:id="@+id/charButton2"
-                    android:layout_width="100dp"
-                    android:layout_height="100dp"
-                    android:layout_marginEnd="8dp"
-                    android:src="@drawable/placeholder_avatar"
-                    android:contentDescription="Character slot 2"
-                    android:background="?attr/selectableItemBackgroundBorderless"
-                    android:scaleType="centerCrop" />
-
-                <ImageButton
-                    android:id="@+id/charButton3"
-                    android:layout_width="100dp"
-                    android:layout_height="100dp"
-                    android:layout_marginEnd="8dp"
-                    android:src="@drawable/placeholder_avatar"
-                    android:contentDescription="Character slot 3"
-                    android:background="?attr/selectableItemBackgroundBorderless"
-                    android:scaleType="centerCrop" />
-
-                <ImageButton
-                    android:id="@+id/charButton4"
-                    android:layout_width="100dp"
-                    android:layout_height="100dp"
-                    android:layout_marginEnd="8dp"
-                    android:src="@drawable/placeholder_avatar"
-                    android:contentDescription="Character slot 4"
-                    android:background="?attr/selectableItemBackgroundBorderless"
-                    android:scaleType="centerCrop" />
-
-                <ImageButton
-                    android:id="@+id/charButton5"
-                    android:layout_width="100dp"
-                    android:layout_height="100dp"
-                    android:layout_marginEnd="8dp"
-                    android:src="@drawable/placeholder_avatar"
-                    android:contentDescription="Character slot 5"
-                    android:background="?attr/selectableItemBackgroundBorderless"
-                    android:scaleType="centerCrop" />
-
-                <ImageButton
-                    android:id="@+id/charButton6"
-                    android:layout_width="100dp"
-                    android:layout_height="100dp"
-                    android:src="@drawable/placeholder_avatar"
-                    android:contentDescription="Character slot 6"
-                    android:background="?attr/selectableItemBackgroundBorderless"
-                    android:scaleType="centerCrop" />
-
-            </LinearLayout>
-        </HorizontalScrollView>
+        <!-- Relationship Setup -->
         <Button
             android:id="@+id/chatrelationshipBtn"
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="Relationships"/>
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/addAreaButton"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:text="Background gallery" />
+            android:text="Relationships" />
 
         <!-- Tags -->
         <TextView
@@ -182,6 +131,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:hint="e.g. fantasy, mystery" />
+
         <!-- Create Button -->
         <Button
             android:id="@+id/createChatButton"
@@ -189,5 +139,6 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="24dp"
             android:text="Create Chat" />
+
     </LinearLayout>
 </ScrollView>

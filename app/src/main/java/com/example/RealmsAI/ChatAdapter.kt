@@ -1,7 +1,7 @@
 package com.example.RealmsAI
 
 import android.app.AlertDialog
-import android.content.ContentValues.TAG
+import android.graphics.Color
 import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
@@ -11,26 +11,34 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import com.example.RealmsAI.models.ChatMessage
-import java.util.UUID
+import com.example.RealmsAI.models.PersonaProfile
+import com.example.RealmsAI.models.SlotInfo
 
 class ChatAdapter(
     private val messages: MutableList<ChatMessage>,
-    /**
-     * Called with the new item’s position whenever addMessage() is used.
-     * In MainActivity you’ll hook this up to RecyclerView.smoothScrollToPosition().
-     */
-    private val onNewMessage: (position: Int) -> Unit
+    private val onNewMessage: (position: Int) -> Unit,
+    private val slotInfoList: List<SlotInfo>,
+    private val personaProfiles: List<PersonaProfile>,
+    private val userPersonaName: String
 ) : RecyclerView.Adapter<ChatAdapter.ChatViewHolder>() {
 
     data class MessageStyle(val backgroundColor: Int, val textColor: Int)
 
-    private fun getSenderStyle(sender: String): MessageStyle {
-        return when (sender) {
-            "You"   -> MessageStyle(0xaa0000FF.toInt(), 0xaaFFFFFF.toInt())
-            "B1" -> MessageStyle(0xaaFFA500.toInt(), 0xaa008000.toInt())
-            "B2" -> MessageStyle(0xaa800080.toInt(), 0xaaFFC0CB.toInt())
-            else    -> MessageStyle(0xaaCCCCCC.toInt(), 0xaa000000.toInt())
+    private fun getSenderColors(sender: String): MessageStyle {
+        slotInfoList.find { it.name == sender }?.let {
+            return MessageStyle(
+                safeParseColor(it.bubbleColor, 0xFFCCCCCC.toInt()),
+                safeParseColor(it.textColor, 0xFF000000.toInt())
+            )
         }
+        personaProfiles.find { it.name == sender }?.let {
+            return MessageStyle(
+                safeParseColor(it.bubbleColor, 0xFFCCCCCC.toInt()),
+                safeParseColor(it.textColor, 0xFF000000.toInt())
+            )
+        }
+        // Default: gray bubble, black text
+        return MessageStyle(0xFFCCCCCC.toInt(), 0xFF000000.toInt())
     }
 
     inner class ChatViewHolder(view: View) : RecyclerView.ViewHolder(view) {
@@ -50,17 +58,23 @@ class ChatAdapter(
         val msg = messages[position]
         holder.messageTextView.text = "${msg.sender}: ${msg.messageText}"
 
-        // alignment & colors
-        val style = getSenderStyle(msg.sender)
-        // holder.messageContainer is your bubble’s parent layout
+        // Prefer explicit color from the message, fallback to profile/defaults
+        val style = if (msg.bubbleBackgroundColor != 0xFFFFFFFF.toInt() || msg.bubbleTextColor != 0xFF000000.toInt()) {
+            // If bubble/text color differ from hardcoded default, use them
+            MessageStyle(msg.bubbleBackgroundColor, msg.bubbleTextColor)
+        } else {
+            getSenderColors(msg.sender)
+        }
+
         holder.messageContainer.setBackgroundColor(style.backgroundColor)
-        // and you already had:
         holder.messageTextView.setTextColor(style.textColor)
+
+        // Align user persona right, bots/NPCs left
         (holder.messageContainer.layoutParams as? androidx.constraintlayout.widget.ConstraintLayout.LayoutParams)
-            ?.apply { horizontalBias = if (msg.sender == "You") 1f else 0f }
+            ?.apply { horizontalBias = if (msg.sender == userPersonaName) 1f else 0f }
             ?.also { holder.messageContainer.layoutParams = it }
 
-        // long-press to edit/delete
+        // Long-press: edit/delete
         holder.itemView.setOnLongClickListener {
             val ctx = holder.itemView.context
             val edit = EditText(ctx).apply { setText(msg.messageText) }
@@ -84,23 +98,22 @@ class ChatAdapter(
         }
     }
 
+    fun safeParseColor(colorString: String?, default: Int): Int {
+        return try {
+            if (colorString.isNullOrBlank()) default else Color.parseColor(colorString)
+        } catch (e: Exception) {
+            default
+        }
+    }
+
     /** Add a message, notify the insertion, then fire your scroll hook. */
     fun addMessage(newMsg: ChatMessage) {
-        // Log for debug
         Log.d("ChatAdapter", "Trying to add message ID: ${newMsg.id}")
-
-        // Add message to the adapter’s list
         messages.add(newMsg)
         Log.d("ChatAdapter", "addMessage: Added message '${newMsg.messageText.take(30)}...' at position ${messages.size - 1}")
-
-        // Notify RecyclerView and trigger callback
         notifyItemInserted(messages.size - 1)
         onNewMessage(messages.size - 1)
     }
-
-
-
-
 
     /** Clear both list and view. */
     fun clearMessages() {
@@ -108,7 +121,6 @@ class ChatAdapter(
         messages.clear()
         notifyItemRangeRemoved(0, count)
     }
-
 
     fun getMessages(): List<ChatMessage> = messages.toList()
 }

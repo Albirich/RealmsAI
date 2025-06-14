@@ -6,12 +6,13 @@ import java.util.UUID
 data class LocationSlot(
     val id: String = UUID.randomUUID().toString(),
     var name: String = "",
-    var uri: String? = null
+    var uri: String? = null,
+    var characters: List<String> = emptyList()
 )
 
 data class Area(
     var id: String = UUID.randomUUID().toString(),
     var creatorId: String = "",  // <- Add this!
     var name: String = "",
-    var locations: MutableList<LocationSlot> = mutableListOf()
+    var locations: MutableList<LocationSlot> = mutableListOf(),
 )

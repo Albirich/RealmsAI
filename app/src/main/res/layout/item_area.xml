@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout
-    xmlns:android="http://schemas.android.com/apk/res/android"
+
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:orientation="vertical"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
@@ -12,12 +13,16 @@
         android:id="@+id/areaNameEditText"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        app:layout_constraintTop_toTopOf="parent"
         android:hint="Area Name"/>
 
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/locationRecycler"
-        android:layout_width="match_parent"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
+        app:layout_constraintTop_toBottomOf="@id/areaNameEditText"
+        app:layout_constraintEnd_toStartOf="@id/addLocationButton"
+        app:layout_constraintStart_toStartOf="parent"
         android:layout_marginTop="8dp"/>
 
     <ImageButton
@@ -26,6 +31,8 @@
         android:layout_height="48dp"
         android:src="@drawable/ic_add"
         android:background="?attr/selectableItemBackgroundBorderless"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/areaNameEditText"
         android:contentDescription="Add Location"
         android:scaleType="fitXY"
         android:layout_gravity="end"
@@ -36,9 +43,11 @@
         android:layout_height="48dp"
         android:src="@drawable/ic_delete"
         android:background="?attr/selectableItemBackgroundBorderless"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/addLocationButton"
         android:contentDescription="Delete Location"
         android:scaleType="fitXY"
         android:layout_gravity="end"
+        android:layout_marginTop="8dp"
         android:layout_marginStart="8dp"/>
-
-</LinearLayout>
+</androidx.constraintlayout.widget.ConstraintLayout>

@@ -20,13 +20,7 @@
 
 
 
-    <!-- 3. Height guidelines overlay (custom view, if you want lines/labels) -->
-    <com.example.RealmsAI.views.GuidelinesView
-             android:id="@+id/guidelinesOverlay"
-             android:layout_width="match_parent"
-             android:layout_height="match_parent"
-             android:clickable="false"
-             android:focusable="false" />
+
       </FrameLayout>
     <ImageView
         android:id="@+id/botAvatar1ImageView"
@@ -40,7 +34,13 @@
         app:layout_constraintHeight_percent=".57"
         android:scaleType="fitCenter"
         android:src="@drawable/default_01" />
-
+    <!-- 3. Height guidelines overlay (custom view, if you want lines/labels) -->
+    <com.example.RealmsAI.views.GuidelinesView
+        android:id="@+id/guidelinesOverlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:clickable="false"
+        android:focusable="false" />
     <!-- 2. User image on top, movable/croppable -->
     <ImageView
         android:id="@+id/userImage"
@@ -48,6 +48,7 @@
         android:layout_height="match_parent"
         android:scaleType="matrix"
         android:background="#33000000"/>
+
     <!-- 4. Done button -->
     <Button
         android:id="@+id/saveCropButton"

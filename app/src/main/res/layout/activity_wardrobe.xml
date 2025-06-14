@@ -6,6 +6,12 @@
     android:layout_height="match_parent"
     android:padding="16dp">
 
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Name outfits and poses in a way to let the AI know what options it has. (Uniform, Casual, Super Saiyan Transformation, etc)"
+        android:textSize="18dp"/>
+
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/outfitsRecycler"
         android:layout_width="match_parent"
