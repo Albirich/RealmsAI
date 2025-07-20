@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/bottomNavBar"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
@@ -7,88 +9,95 @@
     android:clipChildren="false"
     android:paddingBottom="8dp">
 
-    <!-- 1) Halo background -->
+    <!-- Halo background -->
     <ImageView
         android:id="@+id/halo_background"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:adjustViewBounds="true"
+        app:layout_constraintTop_toTopOf="parent"
         android:src="@drawable/halo_shape"
         android:scaleType="centerCrop"
         android:translationY="6dp"/>
 
-    <!-- 3) Create button -->
+    <!-- Chats -->
+    <ImageButton
+        android:id="@+id/navChats"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toStartOf="@id/navCharacters"
+        app:layout_constraintBottom_toBottomOf="@id/halo_background"
+        app:layout_constraintDimensionRatio="1:1"
+        android:src="@drawable/btn_chats2"
+        android:background="@null"
+        android:scaleType="fitXY"/>
+
+    <!-- Characters -->
+    <ImageButton
+        android:id="@+id/navCharacters"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        app:layout_constraintStart_toEndOf="@id/navChats"
+        app:layout_constraintEnd_toStartOf="@id/navCreate"
+        app:layout_constraintBottom_toBottomOf="@id/halo_background"
+        app:layout_constraintDimensionRatio="1:1"
+        android:elevation="4dp"
+        android:src="@drawable/btn_characters2"
+        android:background="@null"
+        android:scaleType="fitXY"/>
+
+    <!-- Create button (large, centered, circle) -->
     <ImageButton
         android:id="@+id/navCreate"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_gravity="bottom|center_horizontal"
-        android:translationY="-20dp"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        app:layout_constraintStart_toEndOf="@id/navCharacters"
+        app:layout_constraintEnd_toStartOf="@id/navHistory"
+        app:layout_constraintBottom_toBottomOf="@id/halo_background"
+        app:layout_constraintDimensionRatio="1:1"
+        android:scaleX="1.25"
+        android:scaleY="1.25"
         android:src="@drawable/btn_create2"
         android:background="@null"
-        android:scaleType="fitXY"
-        android:scaleX="2"
-        android:scaleY="2"/>
+        android:scaleType="fitXY"/>
 
-    <!-- 2) Four side buttons + one empty weight slot -->
-    <LinearLayout
-        android:id="@+id/bottom_buttons_row"
-        android:layout_width="match_parent"
-        android:layout_height="75dp"
-        android:orientation="horizontal"
-        android:weightSum="5"
-        android:layout_gravity="bottom"
-        android:gravity="center_vertical">
+    <!-- History -->
+    <ImageButton
+        android:id="@+id/navHistory"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        app:layout_constraintStart_toEndOf="@id/navCreate"
+        app:layout_constraintEnd_toStartOf="@id/navProfile"
+        app:layout_constraintBottom_toBottomOf="@id/halo_background"
+        app:layout_constraintDimensionRatio="1:1"
+        android:elevation="4dp"
+        android:src="@drawable/btn_history2"
+        android:background="@null"
+        android:scaleType="fitXY"/>
 
+    <!-- Profile -->
+    <ImageButton
+        android:id="@+id/navProfile"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        app:layout_constraintStart_toEndOf="@id/navHistory"
+        app:layout_constraintEnd_toEndOf="@id/halo_background"
+        app:layout_constraintBottom_toBottomOf="@id/halo_background"
+        app:layout_constraintDimensionRatio="1:1"
+        android:src="@drawable/btn_profile2"
+        android:background="@null"
+        android:scaleType="fitXY"/>
 
-        <!-- Chats -->
-        <ImageButton
-            android:id="@+id/navChats"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:src="@drawable/btn_chats2"
-            android:background="@null"
-            android:scaleType="fitXY"/>
+    <!-- Messages Badge (Notification Dot) -->
+    <View
+        android:id="@+id/messagesBadge"
+        android:layout_width="20dp"
+        android:layout_height="20dp"
+        android:background="@drawable/new_message"
+        app:layout_constraintTop_toTopOf="@id/navProfile"
+        app:layout_constraintEnd_toEndOf="@id/navProfile"
+        android:translationZ="10dp"
+        android:visibility="gone"/>
 
-        <!-- Characters -->
-        <ImageButton
-            android:id="@+id/navCharacters"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:elevation="4dp"
-            android:src="@drawable/btn_characters2"
-            android:background="@null"
-            android:scaleType="fitXY"/>
-
-        <!-- Placeholder so center slot stays empty for Create -->
-        <View
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1" />
-
-        <!-- History -->
-        <ImageButton
-            android:id="@+id/navHistory"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:elevation="4dp"
-            android:src="@drawable/btn_history2"
-            android:background="@null"
-            android:scaleType="fitXY"/>
-
-        <!-- Profile -->
-        <ImageButton
-            android:id="@+id/navProfile"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:src="@drawable/btn_profile2"
-            android:background="@null"
-            android:scaleType="fitXY"/>
-    </LinearLayout>
-
-
-</FrameLayout>
+</androidx.constraintlayout.widget.ConstraintLayout>

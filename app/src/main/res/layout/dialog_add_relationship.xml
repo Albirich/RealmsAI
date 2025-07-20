@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:orientation="vertical"
     android:padding="18dp"
     android:layout_width="match_parent"
@@ -23,16 +24,27 @@
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Is character's:"
+        android:text="Is their:"
         android:paddingTop="12dp" />
     <Spinner
         android:id="@+id/relationshipTypeSpinner"
         android:layout_width="match_parent"
         android:layout_height="wrap_content" />
 
-    <EditText
-        android:id="@+id/relationshipSummaryEdit"
+    <com.google.android.material.textfield.TextInputLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:hint="(optional) Description, e.g. 'Childhood rival'" />
+        android:padding="8dp"
+        app:counterEnabled="true"
+        app:counterMaxLength="80"
+        app:helperText="A short description of the character. This is what will show on the preview.">
+
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/relationshipSummaryEdit"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="(optional) Description, e.g. 'Childhood rival'"
+            android:maxLines="2"
+            android:inputType="textCapSentences|textMultiLine"/>
+    </com.google.android.material.textfield.TextInputLayout>
 </LinearLayout>

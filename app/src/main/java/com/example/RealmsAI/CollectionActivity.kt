@@ -73,16 +73,20 @@ class CollectionActivity : AppCompatActivity() {
     }
 
     private fun launchCharacterSelectorCreate(collectionName: String) {
+        Log.d("CollectionActivity", "Launching CharacterSelectionActivity for CREATE")
         val intent = Intent(this, CharacterSelectionActivity::class.java)
         intent.putExtra("mode", "create")
+        intent.putExtra("from", "collections")
         intent.putExtra("collectionName", collectionName)
         intent.putExtra("selectionCap", 20)
         startActivityForResult(intent, CREATE_COLLECTION_REQUEST)
     }
 
     private fun launchCharacterSelectorEdit(collection: CharacterCollection) {
+        Log.d("CollectionActivity", "Launching CharacterSelectionActivity for EDIT")
         val intent = Intent(this, CharacterSelectionActivity::class.java)
         intent.putExtra("mode", "edit")
+        intent.putExtra("from", "collections")
         intent.putExtra("collectionId", collection.id)
         intent.putExtra("collectionName", collection.name)
         intent.putStringArrayListExtra("preSelectedIds", ArrayList(collection.characterIds))
@@ -130,6 +134,7 @@ class CollectionActivity : AppCompatActivity() {
 
     private fun updateCollection(id: String, updatedIds: List<String>) {
         if (userId.isEmpty()) return
+        Log.d("CollectionActivity", "Updating $id with: $updatedIds")
 
         db.collection("users").document(userId)
             .collection("collections").document(id)
@@ -141,10 +146,12 @@ class CollectionActivity : AppCompatActivity() {
             .addOnFailureListener {
                 Toast.makeText(this, "Failed to update collection", Toast.LENGTH_SHORT).show()
             }
+
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+        Log.d("CollectionActivity", "onActivityResult called! req=$requestCode, result=$resultCode, data=$data")
 
         if (resultCode != Activity.RESULT_OK || data == null) return
 
@@ -152,14 +159,18 @@ class CollectionActivity : AppCompatActivity() {
             CREATE_COLLECTION_REQUEST -> {
                 val name = data.getStringExtra("collectionName") ?: return
                 val selected = data.getStringArrayListExtra("selectedCharacterIds") ?: return
+                Log.d("CollectionActivity", "[CREATE] Received character IDs: $selected")
                 createNewCollection(name, selected)
             }
 
             EDIT_COLLECTION_REQUEST -> {
                 val id = data.getStringExtra("collectionId") ?: return
                 val selected = data.getStringArrayListExtra("selectedCharacterIds") ?: return
+                Log.d("CollectionActivity", "[EDIT] Received collectionId: $id, characterIds: $selected")
+
                 updateCollection(id, selected)
             }
         }
     }
+
 }

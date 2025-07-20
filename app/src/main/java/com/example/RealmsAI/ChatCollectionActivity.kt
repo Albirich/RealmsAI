@@ -43,6 +43,7 @@ class ChatCollectionActivity : AppCompatActivity() {
         adapter = CharacterPreviewAdapter(
             context = this,
             items = previews,
+            itemLayoutRes = R.layout.character_preview_item,
             onClick = { /* Optional: define behavior */ },
             onLongClick = { /* Optional: maybe remove from list */ }
         )
@@ -65,6 +66,7 @@ class ChatCollectionActivity : AppCompatActivity() {
         findViewById<Button>(R.id.btnAddIndividual).setOnClickListener {
             val intent = Intent(this, CharacterSelectionActivity::class.java)
             intent.putExtra("TEMP_SELECTION_MODE", true)
+            intent.putExtra("from", "chat")
             intent.putExtra("INITIAL_COUNT", selectedCharacters.size)
             intent.putStringArrayListExtra("preSelectedIds", ArrayList(selectedCharacters.map { it.id }))
             startActivityForResult(intent, 1002)

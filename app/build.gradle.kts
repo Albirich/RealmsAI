@@ -25,7 +25,7 @@ android {
         minSdk        = 23
         targetSdk     = 35
         versionCode   = 1
-        versionName   = "1.0"
+        versionName   = "0.2.2"
 
         // grab your secrets
         val openaiKey  = localProps.getProperty("OPENAI_API_KEY",  "")

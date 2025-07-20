@@ -14,7 +14,6 @@ data class ChatPreview(
     val avatar2ResId: Int,
     val rating: Float = 0f,
     val timestamp: Timestamp? = null,
-    val mode: ChatMode,
     val author: String = "",
     val tags: List<String> = emptyList(),
     val sfwOnly: Boolean = true,

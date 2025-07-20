@@ -7,8 +7,9 @@ import android.os.Bundle
 import android.view.View
 import android.widget.*
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.appcompat.app.AppCompatActivity
 import com.bumptech.glide.Glide
+import com.example.RealmsAI.models.MessageStatus
+import com.example.RealmsAI.models.UserProfile
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.storage.FirebaseStorage
@@ -23,10 +24,14 @@ class ProfileActivity : BaseActivity() {
     private lateinit var handleEditContainer: LinearLayout
     private lateinit var saveHandleButton: Button
     private lateinit var logoutBtn: Button
+    private lateinit var viewProfileButton: Button
+    private lateinit var messageButton: Button
 
     private var iconUri: Uri? = null
     private var currentIconUrl: String? = null
     private var handle: String? = null
+    private var userProfile: UserProfile? = null
+
     private val db = FirebaseFirestore.getInstance()
     private val userId: String get() = FirebaseAuth.getInstance().currentUser?.uid ?: ""
 
@@ -50,6 +55,7 @@ class ProfileActivity : BaseActivity() {
         handleEditContainer = findViewById(R.id.handleEditContainer)
         saveHandleButton = findViewById(R.id.saveHandleButton)
         logoutBtn = findViewById(R.id.logoutButton)
+        viewProfileButton = findViewById(R.id.viewProfileButton)
 
         iconView.setOnClickListener {
             pickIcon.launch("image/*")
@@ -61,8 +67,41 @@ class ProfileActivity : BaseActivity() {
             finish()
         }
 
+        viewProfileButton.setOnClickListener {
+            val intent = Intent(this, DisplayProfileActivity::class.java)
+            intent.putExtra("userId", userId)
+            startActivity(intent)
+        }
+
         findViewById<Button>(R.id.saveProfileButton).setOnClickListener {
             saveProfile()
+        }
+
+        val userId = FirebaseAuth.getInstance().currentUser?.uid ?: return
+        val db = FirebaseFirestore.getInstance()
+
+        db.collection("users").document(userId)
+            .collection("messages")
+            .whereEqualTo("status", MessageStatus.UNOPENED.name) // If stored as string (enum name)
+            .limit(1) // Only need to know if ANY exist
+            .get()
+            .addOnSuccessListener { snap ->
+                if (!snap.isEmpty) {
+                    // Show badge!
+                    showMessagesBadge(true)
+                } else {
+                    // Hide badge
+                    showMessagesBadge(false)
+                }
+            }
+            .addOnFailureListener {
+                // Optionally handle errors (e.g., hide badge)
+                showMessagesBadge(false)
+            }
+
+        val messageButton = findViewById<Button>(R.id.messageButton)
+        messageButton.setOnClickListener {
+            startActivity(Intent(this, MessagesActivity::class.java))
         }
 
         saveHandleButton.setOnClickListener {
@@ -77,33 +116,39 @@ class ProfileActivity : BaseActivity() {
         loadProfile()
     }
 
-    private fun loadProfile() {
-        db.collection("users").document(userId).get().addOnSuccessListener { doc ->
-            handle = doc.getString("handle")
-            val name = doc.getString("name") ?: ""
-            val bio = doc.getString("bio") ?: ""
-            val iconUrl = doc.getString("iconUrl")
-            currentIconUrl = iconUrl
+    private fun showMessagesBadge(show: Boolean) {
+        val badge = findViewById<View>(R.id.messagesBadge)
+        badge.visibility = if (show) View.VISIBLE else View.GONE
+    }
 
-            if (handle.isNullOrBlank()) {
-                // Let user pick a handle (show edit)
+    private fun loadProfile() {
+        db.collection("users").document(userId).get()
+            .addOnSuccessListener { doc ->
+                userProfile = doc.toObject(UserProfile::class.java)
+                userProfile?.let { profile ->
+                    handle = profile.handle
+                    nameEt.setText(profile.name)
+                    bioEt.setText(profile.bio)
+                    currentIconUrl = profile.iconUrl
+
+                    if (profile.handle.isNullOrBlank()) {
+                        handleEditContainer.visibility = View.VISIBLE
+                        handleTv.visibility = View.GONE
+                    } else {
+                        handleTv.text = "\u0040${profile.handle}"
+                        handleTv.visibility = View.VISIBLE
+                        handleEditContainer.visibility = View.GONE
+                    }
+
+                    if (!profile.iconUrl.isNullOrBlank()) {
+                        Glide.with(this).load(profile.iconUrl).into(iconView)
+                    }
+                }
+            }
+            .addOnFailureListener {
                 handleEditContainer.visibility = View.VISIBLE
                 handleTv.visibility = View.GONE
-            } else {
-                // Show locked handle
-                handleTv.text = "\u0040$handle" // \u0040 is "@"
-                handleTv.visibility = View.VISIBLE
-                handleEditContainer.visibility = View.GONE
             }
-
-            nameEt.setText(name)
-            bioEt.setText(bio)
-            if (!iconUrl.isNullOrBlank()) Glide.with(this).load(iconUrl).into(iconView)
-        }.addOnFailureListener {
-            // If profile doesn't exist (new user), show handleEdit
-            handleEditContainer.visibility = View.VISIBLE
-            handleTv.visibility = View.GONE
-        }
     }
 
     private fun checkHandleUniqueAndSet(newHandle: String) {
@@ -144,7 +189,33 @@ class ProfileActivity : BaseActivity() {
     private fun saveProfile() {
         val name = nameEt.text.toString().trim()
         val bio = bioEt.text.toString().trim()
+        val updatedHandle = handle  // handle is already set or locked
         val userDoc = db.collection("users").document(userId)
+
+        fun updateProfileInFirestore(iconUrl: String?) {
+            // Use current data for fields not shown on this page
+            val current = userProfile
+            val profile = UserProfile(
+                handle = updatedHandle,
+                name = name,
+                bio = bio,
+                iconUrl = iconUrl ?: current?.iconUrl,
+                favorites = current?.favorites ?: emptyList(),
+                userPicks = current?.userPicks ?: emptyList(),
+                friends = current?.friends ?: emptyList(),
+                pendingFriends = current?.pendingFriends ?: emptyList(),
+                recentChats = current?.recentChats ?: emptyList()
+            )
+            userDoc.set(profile)
+                .addOnSuccessListener {
+                    Toast.makeText(this, "Profile updated!", Toast.LENGTH_SHORT).show()
+                    currentIconUrl = profile.iconUrl
+                    userProfile = profile
+                }
+                .addOnFailureListener { e ->
+                    Toast.makeText(this, "Profile update failed: ${e.message}", Toast.LENGTH_LONG).show()
+                }
+        }
 
         if (iconUri != null && iconUri.toString() != currentIconUrl) {
             // Upload icon to storage
@@ -156,25 +227,13 @@ class ProfileActivity : BaseActivity() {
                     iconRef.downloadUrl
                 }
                 .addOnSuccessListener { downloadUri ->
-                    userDoc.set(mapOf(
-                        "name" to name,
-                        "bio" to bio,
-                        "iconUrl" to downloadUri.toString()
-                    )).addOnSuccessListener {
-                        Toast.makeText(this, "Profile updated!", Toast.LENGTH_SHORT).show()
-                        currentIconUrl = downloadUri.toString()
-                    }
+                    updateProfileInFirestore(downloadUri.toString())
                 }
                 .addOnFailureListener { e ->
                     Toast.makeText(this, "Icon upload failed: ${e.message}", Toast.LENGTH_LONG).show()
                 }
         } else {
-            userDoc.update(mapOf(
-                "name" to name,
-                "bio" to bio
-            )).addOnSuccessListener {
-                Toast.makeText(this, "Profile updated!", Toast.LENGTH_SHORT).show()
-            }
+            updateProfileInFirestore(null)
         }
     }
 }

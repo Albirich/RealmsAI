@@ -7,12 +7,14 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
+import androidx.annotation.LayoutRes
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 
 class CharacterPreviewAdapter(
     private val context: Context,
     private var items: List<CharacterPreview>,
+    @LayoutRes private val itemLayoutRes: Int,
     private val onClick:    (CharacterPreview) -> Unit,
     private val onLongClick: (CharacterPreview) -> Unit = {}
 ) : RecyclerView.Adapter<CharacterPreviewAdapter.VH>() {
@@ -58,8 +60,7 @@ class CharacterPreviewAdapter(
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
-        val v = LayoutInflater.from(parent.context)
-            .inflate(R.layout.character_preview_item, parent, false)
+        val v = LayoutInflater.from(parent.context).inflate(itemLayoutRes, parent, false)
         return VH(v)
     }
 

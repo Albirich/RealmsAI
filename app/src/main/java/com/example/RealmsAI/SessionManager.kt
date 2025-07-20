@@ -30,11 +30,7 @@ object SessionManager {
         onError: (Exception) -> Unit = {}
     ) {
         // Combine: SessionProfile participants, current user, and any extras from UI
-        val participants = (
-                (sessionProfile.participants ?: emptyList()) +
-                        userId +
-                        extraParticipants
-                ).filterNotNull().toSet()
+        val userIds = sessionProfile.userMap.keys.toList()
 
         // Generate a unique sessionId if not provided
         val sessionId = if (sessionProfile.sessionId.isNullOrBlank()) {
@@ -45,22 +41,16 @@ object SessionManager {
 
         val sessionData = hashMapOf(
             "sessionId" to sessionId,
-            "participants" to participants.toList(),
-            "characterId" to characterId,
-            "chatId" to try {
-                JSONObject(chatProfileJson).optString("id", sessionProfile.chatId)
-            } catch (e: Exception) {
-                sessionProfile.chatId
-            },
-            "startedAt" to com.google.firebase.Timestamp.now(),
-            "sfwOnly" to sessionProfile.sfwOnly,
+            "userMap" to sessionProfile.userMap,
+            "userAssignments" to sessionProfile.userAssignments,
+            "areas" to sessionProfile.areas,
             "title" to sessionProfile.title,
-            "backgroundUri" to sessionProfile.backgroundUri,
+            "chatId" to sessionProfile.chatId,
+            "sfwOnly" to sessionProfile.sfwOnly,
             "chatMode" to sessionProfile.chatMode,
             "slotRoster" to sessionProfile.slotRoster,
-            "personaProfiles" to sessionProfile.personaProfiles,
-            "characterProfilesJson" to characterProfilesJson,
-            "playerAssignments" to sessionProfile.playerAssignments
+            "relationships" to sessionProfile.relationships,
+            "startedAt" to Timestamp.now()
         )
 
         // Sessions are now top-level documents
@@ -157,21 +147,17 @@ object SessionManager {
      * Sends a single ChatMessage to Firestore for the given session.
      */
     fun sendMessage(chatId: String, sessionId: String, chatMessage: ChatMessage) {
-        val msgMap = mapOf(
-            "id" to chatMessage.id,
-            "sender" to chatMessage.sender,
-            "messageText" to chatMessage.messageText,
-            "timestamp" to (chatMessage.timestamp ?: Timestamp.now())
-        )
         db.collection("sessions")
             .document(sessionId)
             .collection("messages")
-            .add(msgMap)
-            .addOnSuccessListener { docRef ->
-                Log.d("SessionManager", "Message sent: ${docRef.id}")
+            .document(chatMessage.id) // Use deterministic IDs so you don't get duplicates!
+            .set(chatMessage)
+            .addOnSuccessListener {
+                Log.d("SessionManager", "Message sent: ${chatMessage.id}")
             }
             .addOnFailureListener { e ->
                 Log.e("SessionManager", "Failed to send message", e)
             }
     }
+
 }

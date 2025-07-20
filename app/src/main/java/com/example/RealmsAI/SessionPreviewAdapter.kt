@@ -18,7 +18,7 @@ class SessionPreviewAdapter(
 
     inner class SessionViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         val title: TextView      = itemView.findViewById(R.id.sessionTitle)
-        val chatId: TextView     = itemView.findViewById(R.id.sessionChatId)
+        val sessionId: TextView     = itemView.findViewById(R.id.sessionChatId)
         val timestamp: TextView  = itemView.findViewById(R.id.sessionTimestamp)
     }
 
@@ -31,7 +31,7 @@ class SessionPreviewAdapter(
     override fun onBindViewHolder(holder: SessionViewHolder, position: Int) {
         val session = sessionList[position]
         holder.title.text = session.title
-        holder.chatId.text = "Chat: ${session.chatId}"
+        holder.sessionId.text = "Session id: ${session.id}"
 
         // Format timestamp to readable date
         val date = Date(session.timestamp * 1000) // Firestore seconds to millis

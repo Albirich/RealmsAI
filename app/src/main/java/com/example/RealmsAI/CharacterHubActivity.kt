@@ -8,6 +8,7 @@ import android.widget.AdapterView
 import android.widget.ArrayAdapter
 import android.widget.Spinner
 import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.example.RealmsAI.models.CharacterProfile
@@ -35,6 +36,7 @@ class CharacterHubActivity : BaseActivity() {
         adapter = CharacterPreviewAdapter(
             context = this,
             items = emptyList(),
+            itemLayoutRes = R.layout.character_preview_item,
             onClick = { preview ->
                 // Get user ID
                 val userId = currentUserId
@@ -47,7 +49,29 @@ class CharacterHubActivity : BaseActivity() {
                     putExtra("CHARACTER_ID", preview.id)
                     putExtra("CHARACTER_PROFILES_JSON", preview.rawJson)
                 })
+            },
+            onLongClick = { preview ->
+                AlertDialog.Builder(this)
+                    .setTitle(preview.name)
+                    .setItems(arrayOf("Profile", "Creator")) { _, which ->
+                        when (which) {
+                            0 -> { // Profile
+                                startActivity(
+                                    Intent(this, CharacterProfileActivity::class.java)
+                                        .putExtra("characterId", preview.id)
+                                )
+                            }
+                            1 -> { // Creator
+                                startActivity(
+                                    Intent(this, DisplayProfileActivity::class.java)
+                                        .putExtra("userId", preview.author)
+                                )
+                            }
+                        }
+                    }
+                .show()
             }
+
         )
 
         charsRv.adapter = adapter
@@ -86,6 +110,7 @@ class CharacterHubActivity : BaseActivity() {
 
         FirebaseFirestore.getInstance()
             .collection("characters")
+            .whereNotEqualTo("private", true)
             .orderBy(orderBy, Query.Direction.DESCENDING)
             .get()
             .addOnSuccessListener { snap ->

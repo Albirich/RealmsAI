@@ -26,6 +26,7 @@ import com.google.firebase.storage.FirebaseStorage
 import com.google.firebase.storage.StorageReference
 import com.google.gson.Gson
 import org.json.JSONObject
+import com.example.RealmsAI.SessionManager.findSessionForUser
 
 
 class CreatedListActivity : BaseActivity() {
@@ -117,22 +118,50 @@ class CreatedListActivity : BaseActivity() {
         val adapter = ChatPreviewAdapter(
             context = this,
             chatList = emptyList(),
-            onClick = { /* ...normal chat open... */ },
+            onClick = { preview ->
+                val userId = currentUserId
+                if (userId == null) {
+                    Toast.makeText(this, "You must be signed in to continue.", Toast.LENGTH_SHORT).show()
+                    return@ChatPreviewAdapter
+                }
+                findSessionForUser(
+                    chatId = preview.id,
+                    userId = userId,
+                    onResult = { sessionId ->
+                        startActivity(Intent(this, SessionLandingActivity::class.java).apply {
+                            putExtra("CHAT_ID", preview.id)
+                            putExtra("CHAT_PROFILE_JSON", preview.rawJson)
+                        })
+                    },
+                    onError = {
+                        startActivity(Intent(this, SessionLandingActivity::class.java).apply {
+                            putExtra("CHAT_ID", preview.id)
+                            putExtra("CHAT_PROFILE_JSON", preview.rawJson)
+                        })
+                    }
+                )
+            },
+            itemLayoutRes = R.layout.chat_preview_item,
             onLongClick = { preview ->
                 AlertDialog.Builder(this)
                     .setTitle(preview.title)
-                    .setItems(arrayOf("Edit", "Delete")) { _, which ->
+                    .setItems(arrayOf("Profile", "Edit", "Delete", "Top Pick")) { _, which ->
                         when (which) {
-                            0 -> { // --- Edit Chat ---
+                            0 -> { // --- Profile ---
+                                startActivity(
+                                    Intent(this, ChatProfileActivity::class.java)
+                                        .putExtra("chatId", preview.id)
+                                )
+                            }
+                            1 -> { // --- Edit Chat ---
                                 db.collection("chats").document(preview.id).get()
                                     .addOnSuccessListener { snapshot ->
                                         val fullProfile = snapshot.toObject(ChatProfile::class.java)
                                         if (fullProfile != null) {
-                                            // Pass chat profile as JSON for preloading
                                             val intent = Intent(this, ChatCreationActivity::class.java)
                                             intent.putExtra("CHAT_EDIT_ID", preview.id)
                                             intent.putExtra("CHAT_PROFILE_JSON", Gson().toJson(fullProfile))
-                                            startActivityForResult(intent, 1010) // use a req code if you want to refresh after edit
+                                            startActivityForResult(intent, 1010)
                                         } else {
                                             Toast.makeText(this, "Chat profile not found.", Toast.LENGTH_SHORT).show()
                                         }
@@ -141,7 +170,7 @@ class CreatedListActivity : BaseActivity() {
                                         Toast.makeText(this, "Failed: ${it.message}", Toast.LENGTH_SHORT).show()
                                     }
                             }
-                            1 -> { // --- Delete Chat ---
+                            2 -> { // --- Delete Chat ---
                                 AlertDialog.Builder(this)
                                     .setTitle("Delete?")
                                     .setMessage("Are you sure you want to delete '${preview.title}'?")
@@ -150,7 +179,6 @@ class CreatedListActivity : BaseActivity() {
                                             .delete()
                                             .addOnSuccessListener {
                                                 Toast.makeText(this, "Deleted.", Toast.LENGTH_SHORT).show()
-                                                // Refresh list after deletion
                                                 startActivity(intent)
                                             }
                                             .addOnFailureListener { e ->
@@ -160,10 +188,43 @@ class CreatedListActivity : BaseActivity() {
                                     .setNegativeButton("No", null)
                                     .show()
                             }
+                            3 -> { // --- Top Pick ---
+                                val currentUser = FirebaseAuth.getInstance().currentUser
+                                if (currentUser == null) {
+                                    Toast.makeText(this, "You must be signed in.", Toast.LENGTH_SHORT).show()
+                                    return@setItems
+                                }
+                                val userId = currentUser.uid
+                                val userDoc = db.collection("users").document(userId)
+                                userDoc.get().addOnSuccessListener { snapshot ->
+                                    val picks = snapshot.get("userPicks") as? MutableList<String> ?: mutableListOf()
+                                    val alreadyPicked = picks.contains(preview.id)
+                                    if (alreadyPicked) {
+                                        picks.remove(preview.id)
+                                        userDoc.update("userPicks", picks)
+                                            .addOnSuccessListener {
+                                                Toast.makeText(this, "Removed from Top Picks.", Toast.LENGTH_SHORT).show()
+                                            }
+                                            .addOnFailureListener {
+                                                Toast.makeText(this, "Failed to update picks.", Toast.LENGTH_SHORT).show()
+                                            }
+                                    } else {
+                                        picks.add(preview.id)
+                                        userDoc.update("userPicks", picks)
+                                            .addOnSuccessListener {
+                                                Toast.makeText(this, "Added to Top Picks!", Toast.LENGTH_SHORT).show()
+                                            }
+                                            .addOnFailureListener {
+                                                Toast.makeText(this, "Failed to update picks.", Toast.LENGTH_SHORT).show()
+                                            }
+                                    }
+                                }
+                            }
                         }
                     }
                     .show()
             }
+
         )
         rv.adapter = adapter
 
@@ -188,7 +249,6 @@ class CreatedListActivity : BaseActivity() {
                             avatar1ResId = R.drawable.icon_01,
                             avatar2ResId = R.drawable.icon_01,
                             rating = p.rating,
-                            mode = p.mode,
                             timestamp = p.timestamp,
                             author = p.author,
                             tags = p.tags,
@@ -231,24 +291,52 @@ class CreatedListActivity : BaseActivity() {
                 rv.adapter = CharacterPreviewAdapter(
                     this,
                     previews,
-                    onClick = { /* ... */ },
+                    onClick = { preview ->
+                        // Get user ID
+                        val userId = currentUserId
+                        if (userId == null) {
+                            Toast.makeText(this, "You must be signed in to continue.", Toast.LENGTH_SHORT).show()
+                            return@CharacterPreviewAdapter
+                        }
+                        startActivity(Intent(this, SessionLandingActivity::class.java).apply {
+                            Log.d("Characterhubactivity", "it has an id of: ${preview.id}")
+                            putExtra("CHARACTER_ID", preview.id)
+                            putExtra("CHARACTER_PROFILES_JSON", preview.rawJson)
+                        })
+                    },
+                    itemLayoutRes = R.layout.character_preview_item,
                     onLongClick = { preview ->
                         // THIS is where the dialog should go!
                         AlertDialog.Builder(this)
                             .setTitle(preview.name)
-                            .setItems(arrayOf("Edit", "Delete")) { _, which ->
+                            .setItems(arrayOf("Profile", "Edit", "Delete","Top Pick")) { _, which ->
                                 when (which) {
-                                    0 -> { // Edit (same as above!)
+                                    0 -> { // Profile
+                                        // Launch CharacterProfileActivity
+                                        startActivity(
+                                            Intent(this, CharacterProfileActivity::class.java)
+                                                .putExtra("characterId", preview.id)
+                                        )
+                                    }
+
+                                    1 -> { // Edit
                                         FirebaseFirestore.getInstance().collection("characters")
                                             .document(preview.id)
                                             .get()
                                             .addOnSuccessListener { snapshot ->
-                                                val fullProfile = snapshot.toObject(CharacterProfile::class.java)
+                                                val fullProfile =
+                                                    snapshot.toObject(CharacterProfile::class.java)
                                                 if (fullProfile != null) {
                                                     startActivity(
-                                                        Intent(this, CharacterCreationActivity::class.java)
+                                                        Intent(
+                                                            this,
+                                                            CharacterCreationActivity::class.java
+                                                        )
                                                             .putExtra("CHAR_EDIT_ID", preview.id)
-                                                            .putExtra("CHAR_PROFILE_JSON", Gson().toJson(fullProfile))
+                                                            .putExtra(
+                                                                "CHAR_PROFILE_JSON",
+                                                                Gson().toJson(fullProfile)
+                                                            )
                                                     )
                                                 } else {
                                                     Toast.makeText(
@@ -267,7 +355,7 @@ class CreatedListActivity : BaseActivity() {
                                             }
                                     }
 
-                                    1 -> { // Delete
+                                    2 -> { // Delete
                                         AlertDialog.Builder(this)
                                             .setTitle("Delete?")
                                             .setMessage("Are you sure you want to delete '${preview.name}'?")
@@ -275,9 +363,9 @@ class CreatedListActivity : BaseActivity() {
                                                 val firestore = FirebaseFirestore.getInstance()
                                                 val storage = FirebaseStorage.getInstance()
                                                 val characterId = preview.id
-                                                val charFolderRef = storage.reference.child("characters/$characterId/")
+                                                val charFolderRef =
+                                                    storage.reference.child("characters/$characterId/")
 
-                                                // Recursively delete all files/folders in character's storage folder
                                                 deleteAllInFolder(charFolderRef) { success, error ->
                                                     if (success) {
                                                         firestore.collection("characters")
@@ -286,25 +374,92 @@ class CreatedListActivity : BaseActivity() {
                                                             .addOnSuccessListener {
                                                                 startActivity(intent)
                                                                 runOnUiThread {
-                                                                    Toast.makeText(this, "Deleted.", Toast.LENGTH_SHORT).show()
+                                                                    Toast.makeText(
+                                                                        this,
+                                                                        "Deleted.",
+                                                                        Toast.LENGTH_SHORT
+                                                                    ).show()
                                                                 }
                                                             }
                                                             .addOnFailureListener { e ->
                                                                 runOnUiThread {
-                                                                    Toast.makeText(this, "Failed: ${e.message}", Toast.LENGTH_SHORT).show()
+                                                                    Toast.makeText(
+                                                                        this,
+                                                                        "Failed: ${e.message}",
+                                                                        Toast.LENGTH_SHORT
+                                                                    ).show()
                                                                 }
                                                             }
                                                         startActivity(intent)
                                                     } else {
                                                         runOnUiThread {
-                                                            Toast.makeText(this, "Failed to delete images: ${error?.message}", Toast.LENGTH_SHORT).show()
+                                                            Toast.makeText(
+                                                                this,
+                                                                "Failed to delete images: ${error?.message}",
+                                                                Toast.LENGTH_SHORT
+                                                            ).show()
                                                         }
                                                     }
                                                 }
                                             }
-
                                             .setNegativeButton("No", null)
                                             .show()
+                                    }
+
+                                    3 -> { // --- Top Pick (for character) ---
+                                        val currentUser = FirebaseAuth.getInstance().currentUser
+                                        if (currentUser == null) {
+                                            Toast.makeText(
+                                                this,
+                                                "You must be signed in.",
+                                                Toast.LENGTH_SHORT
+                                            ).show()
+                                            return@setItems
+                                        }
+                                        val userId = currentUser.uid
+                                        val userDoc = db.collection("users").document(userId)
+                                        userDoc.get().addOnSuccessListener { snapshot ->
+                                            val picks =
+                                                snapshot.get("userPicks") as? MutableList<String>
+                                                    ?: mutableListOf()
+                                            val alreadyPicked = picks.contains(preview.id)
+                                            if (alreadyPicked) {
+                                                picks.remove(preview.id)
+                                                userDoc.update("userPicks", picks)
+                                                    .addOnSuccessListener {
+                                                        Toast.makeText(
+                                                            this,
+                                                            "Removed from Top Picks.",
+                                                            Toast.LENGTH_SHORT
+                                                        ).show()
+                                                    }
+                                                    .addOnFailureListener {
+                                                        Toast.makeText(
+                                                            this,
+                                                            "Failed to update picks.",
+                                                            Toast.LENGTH_SHORT
+                                                        ).show()
+                                                    }
+                                            } else {
+                                                picks.add(preview.id)
+                                                userDoc.update("userPicks", picks)
+                                                    .addOnSuccessListener {
+                                                        Toast.makeText(
+                                                            this,
+                                                            "Added to Top Picks!",
+                                                            Toast.LENGTH_SHORT
+                                                        ).show()
+                                                    }
+                                                    .addOnFailureListener {
+                                                        Toast.makeText(
+                                                            this,
+                                                            "Failed to update picks.",
+                                                            Toast.LENGTH_SHORT
+                                                        ).show()
+                                                    }
+                                            }
+                                        }
+
                                     }
                                 }
                             }

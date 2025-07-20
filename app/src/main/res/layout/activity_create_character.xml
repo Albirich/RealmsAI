@@ -3,6 +3,7 @@
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:fitsSystemWindows="true"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:padding="8dp">
     <LinearLayout
@@ -14,27 +15,30 @@
         <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:padding="8dp">
+            android:padding="8dp"
+            app:counterMaxLength="40">
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/characterNameInput"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:hint="Enter personality"
-                android:inputType="textMultiLine"/>
+                android:hint="Enter Name"/>
         </com.google.android.material.textfield.TextInputLayout>
 
         <!-- Summary -->
         <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:padding="8dp">
+            android:padding="8dp"
+            app:counterEnabled="true"
+            app:counterMaxLength="80"
+            app:helperText="A short description of the character. This is what will show on the preview.">
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/etSummary"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:hint="Short summary (1–2 lines)"
+                android:hint="Enter Summary"
                 android:maxLines="2"
                 android:inputType="textCapSentences|textMultiLine"/>
         </com.google.android.material.textfield.TextInputLayout>
@@ -45,12 +49,17 @@
             android:layout_height="wrap_content"
             android:padding="8dp"
             app:counterEnabled="true"
-            app:counterMaxLength="2000">
+            app:counterMaxLength="2000"
+            app:helperText="This is the main meat, telling the AI how to roleplay the character.">
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/characterPersonalityInput"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:maxHeight="200dp"
+                android:scrollbars="vertical"
+                android:maxLines="5"
+                android:overScrollMode="always"
+                android:gravity="top|start"
                 android:hint="Enter personality"
                 android:inputType="textMultiLine"/>
         </com.google.android.material.textfield.TextInputLayout>
@@ -70,9 +79,14 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:maxHeight="200dp"
+                android:scrollbars="vertical"
+                android:maxLines="5"
+                android:overScrollMode="always"
+                android:gravity="top|start"
                 android:hint="Enter Greeting (First Message)"
                 android:inputType="textMultiLine"/>
         </com.google.android.material.textfield.TextInputLayout>
+
         <!-- Backstory Input -->
         <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"
@@ -88,9 +102,34 @@
                 android:layout_height="wrap_content"
                 app:counterEnabled="true"
                 app:counterMaxLength="2000"
+                android:scrollbars="vertical"
                 android:maxLines="5"
+                android:overScrollMode="always"
+                android:gravity="top|start"
                 android:hint="Character Backstory"
                 android:inputType="textMultiLine" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <!-- Greeting Input-->
+        <com.google.android.material.textfield.TextInputLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:padding="8dp"
+            app:counterEnabled="true"
+            app:counterMaxLength="1000"
+            app:helperText="List and describe any skills/abilites/powers the character has.">
+            >
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/abilitiesInput"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:scrollbars="vertical"
+                android:maxLines="5"
+                android:overScrollMode="always"
+                android:gravity="top|start"
+                android:hint="Enter Skills/Abilities/Powers"
+                android:inputType="textMultiLine"/>
         </com.google.android.material.textfield.TextInputLayout>
 
         <!-- private Input -->
@@ -100,12 +139,16 @@
             android:padding="8dp"
             app:counterEnabled="true"
             app:counterMaxLength="400"
-            app:helperText="Write the character's history, lore, and past in detail.">
+            app:helperText="This does not show up on the character profile, but it is given to the ai when roleplaying">
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/characterprivateDescriptionInput"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:scrollbars="vertical"
+                android:maxLines="5"
+                android:overScrollMode="always"
+                android:gravity="top|start"
                 android:hint="Enter private information (for creator)"
                 app:counterMaxLength="400"/>
         </com.google.android.material.textfield.TextInputLayout>
@@ -261,6 +304,15 @@
             android:layout_height="wrap_content"
             android:text="Safe For Work (SFW only)"
             android:checked="true"
+            android:paddingTop="16dp"
+            android:layout_gravity="start"/>
+
+        <Switch
+            android:id="@+id/privateSwitch"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Private (wont show up in the character page)"
+            android:checked="false"
             android:paddingTop="16dp"
             android:layout_gravity="start"/>
 

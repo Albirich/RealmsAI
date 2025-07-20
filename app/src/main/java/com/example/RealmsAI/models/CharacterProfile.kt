@@ -27,32 +27,20 @@ data class CharacterProfile(
     val eyeColor           : String              = "",
     val hairColor          : String              = "",
     val physicalDescription: String              = "",
+    val abilities           : String              = "",
     val gender             : String              = "",
     val relationships: List<Relationship> = emptyList(),
     val bubbleColor: String = "#FFFFFF",
     val textColor: String = "#000000",
     val sfwOnly: Boolean = true,
+    val private: Boolean = false,
+    val linkedToMap: Map<String, List<CharacterLink>> = emptyMap(),
     val profileType        : String = "bot"
 )
 
-fun characterProfileToPersona(character: CharacterProfile): PersonaProfile {
-    return PersonaProfile(
-        id = character.id,
-        name = character.name,
-        gender = character.gender,
-        height = character.height,
-        weight = character.weight,
-        age = character.age,
-        hair = character.hairColor,
-        eyes = character.eyeColor,
-        physicaldescription = character.physicalDescription,
-        relationships = character.relationships,
-        outfits = character.outfits,
-        currentOutfit = character.currentOutfit,
-        author = character.author,
-        avatarUri = character.avatarUri ?: "",
-        bubbleColor = character.bubbleColor,
-        textColor = character.textColor,
-        profileType = "bot"
-    )
-}
+data class CharacterLink(
+    val targetId: String,   // the linked character
+    val type: String,       // e.g. "transformation", "sidekickTo", etc.
+    val trigger: String,    // e.g. "when he plays games"
+    val notes: String = ""  // optional notes
+)

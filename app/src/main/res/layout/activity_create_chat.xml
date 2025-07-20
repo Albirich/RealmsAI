@@ -2,6 +2,7 @@
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:fitsSystemWindows="true"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:padding="16dp">
 
@@ -17,19 +18,7 @@
             android:layout_height="wrap_content"
             android:hint="Enter chat title" />
 
-        <!-- Game Mode Spinner -->
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:text="Game Mode"
-            android:textStyle="bold" />
-        <Spinner
-            android:id="@+id/modeSpinner"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content" />
-
-        <!-- Description -->
+       <!-- Description -->
         <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -89,6 +78,23 @@
                 android:layout_height="wrap_content"
                 android:layout_marginStart="8dp" />
         </LinearLayout>
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="16dp"
+            android:gravity="center_vertical">
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Private"
+                android:textStyle="bold" />
+            <Switch
+                android:id="@+id/privateSwitch"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp" />
+        </LinearLayout>
 
         <!-- Characters (Load from Collection) -->
         <TextView
@@ -118,6 +124,70 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="Relationships" />
+
+        <!-- Game Mode Spinner -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="Game Modes"
+            android:textStyle="bold" />
+
+        <androidx.constraintlayout.widget.ConstraintLayout
+            android:id="@+id/gameModeCheckboxContainer"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_marginTop="16dp">
+            <CheckBox
+                android:id="@+id/checkboxRPG"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                app:layout_constraintTop_toTopOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                android:text="RPG Mode" />
+            <Button
+                android:id="@+id/rpgButton"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                app:layout_constraintTop_toTopOf="@id/checkboxRPG"
+                app:layout_constraintEnd_toEndOf="parent"
+                android:text="RPG settings"
+                android:visibility="gone"/>
+
+            <CheckBox
+                android:id="@+id/checkboxVisualNovel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                app:layout_constraintTop_toBottomOf="@id/checkboxRPG"
+                app:layout_constraintStart_toStartOf="parent"
+                android:text="Visual Novel Mode" />
+            <Button
+                android:id="@+id/visualNoveButton"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                app:layout_constraintTop_toTopOf="@id/checkboxVisualNovel"
+                app:layout_constraintEnd_toEndOf="parent"
+                android:text="VN settings"
+                android:visibility="gone"/>
+
+            <CheckBox
+                android:id="@+id/checkboxGodMode"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                app:layout_constraintTop_toBottomOf="@id/checkboxVisualNovel"
+                app:layout_constraintStart_toStartOf="parent"
+                android:text="God Mode" />
+            <Button
+                android:id="@+id/godModeButton"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                app:layout_constraintTop_toTopOf="@id/checkboxGodMode"
+                app:layout_constraintEnd_toEndOf="parent"
+                android:text="GOD settings"
+                android:visibility="gone"/>
+            <!-- add more as needed -->
+        </androidx.constraintlayout.widget.ConstraintLayout>
 
         <!-- Tags -->
         <TextView

@@ -1,9 +1,11 @@
 package com.example.RealmsAI
 
 import android.app.Activity
+import android.content.ContentResolver
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.text.method.ScrollingMovementMethod
 import android.util.Log
 import android.view.View
 import android.view.ViewGroup
@@ -22,10 +24,12 @@ import com.example.RealmsAI.models.CharacterProfile
 import com.example.RealmsAI.models.Outfit
 import com.example.RealmsAI.models.Relationship
 import com.google.android.material.button.MaterialButton
+import com.google.common.reflect.TypeToken
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.storage.FirebaseStorage
+import com.google.firebase.storage.StorageReference
 import com.google.gson.Gson
 import java.io.File
 import java.io.FileOutputStream
@@ -35,8 +39,6 @@ class CharacterCreationActivity : AppCompatActivity() {
     private lateinit var avatarView: ImageView
     private lateinit var relationshipBtn: Button
     private lateinit var wardrobeButton: MaterialButton
-    private var areaList: MutableList<Area> = mutableListOf()
-    private lateinit var areaGalleryLauncher: ActivityResultLauncher<Intent>
     private lateinit var bubbleColorSpinner: Spinner
     private lateinit var textColorSpinner: Spinner
     private lateinit var submitBtn: MaterialButton
@@ -55,6 +57,7 @@ class CharacterCreationActivity : AppCompatActivity() {
     private lateinit var physicalDescEt: EditText
     private lateinit var genderEt: EditText
     private lateinit var backstoryEt: EditText
+    private lateinit var abilitiesEt: EditText
     private lateinit var greetingEt: EditText
 
     // State
@@ -64,33 +67,42 @@ class CharacterCreationActivity : AppCompatActivity() {
     private var originalAvatarUrl: String? = null  // Download url from firestore
     private var outfitsList: List<Outfit> = emptyList()
     private var relationships: List<Relationship> = emptyList()
-    private val colorOptions = listOf(
-        "Black" to "#000000",
+    private val bubblecolorOptions = listOf(
         "Blue" to "#2196F3",
         "Green" to "#4CAF50",
         "Orange" to "#FF9800",
-        "Pink" to "#E91E63",
-        "Purple" to "#A200FF",
-        "Red" to "#FF002A",
+        "Pink" to "#e86cbe",
+        "Purple" to "#c778f5",
         "White" to "#FFFFFF",
         "Yellow" to "#FFEB3B"
+    )
+    private val textcolorOptions = listOf(
+        "Black" to "#000000",
+        "Blue" to "#213af3",
+        "Green" to "#098217",
+        "Orange" to "#cd6a00",
+        "Pink" to "#E91E63",
+        "Purple" to "#A200FF",
+        "Red" to "#ce0202",
+        "Yellow" to "#cdd54b"
     )
 
     // Launcher
     private lateinit var wardrobeLauncher: ActivityResultLauncher<Intent>
     private lateinit var avatarPicker: ActivityResultLauncher<String>
     private lateinit var sfwSwitch: Switch
+    private lateinit var privateSwitch: Switch
     companion object {
         private const val RELATIONSHIP_REQ_CODE = 5001
         const val EXTRA_OUTFITS_JSON = "EXTRA_OUTFITS_JSON"
     }
     private fun toast(msg: String) = Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
-    private val presetBackgrounds = listOf(
-        R.drawable.bg_beach, R.drawable.bg_castle, R.drawable.bg_comedy_club,
-        R.drawable.bg_forest, R.drawable.bg_mountain_path,
-        R.drawable.bg_newsroom, R.drawable.bg_office,
-        R.drawable.bg_space, R.drawable.bg_woods
-    )
+    private lateinit var areaMapLauncher: ActivityResultLauncher<Intent>
+    private lateinit var currentCharacter: CharacterProfile
+
+
+    private var characterAreas: MutableList<Area> = mutableListOf()
+    private var assignedAreaId: String? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -113,18 +125,22 @@ class CharacterCreationActivity : AppCompatActivity() {
         eyeColorEt = findViewById(R.id.eyeColorEditText)
         hairColorEt = findViewById(R.id.hairColorEditText)
         physicalDescEt = findViewById(R.id.physicalDescriptionEditText)
+        abilitiesEt = findViewById(R.id.abilitiesInput)
         genderEt = findViewById(R.id.genderEditText)
         backstoryEt = findViewById(R.id.backstoryEditText)
         greetingEt = findViewById(R.id.characterGreetingInput)
         sfwSwitch = findViewById(R.id.sfwSwitch)
+        privateSwitch = findViewById(R.id.privateSwitch)
         val addAreaButton = findViewById<MaterialButton>(R.id.addAreaButton)
 
 
         // Color spinners show names but store hex
-        val adapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, colorOptions.map { it.first })
-        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-        bubbleColorSpinner.adapter = adapter
-        textColorSpinner.adapter = adapter
+        val bubbleadapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, bubblecolorOptions.map { it.first })
+        bubbleadapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        bubbleColorSpinner.adapter = bubbleadapter
+        val textadapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, textcolorOptions.map { it.first })
+        textadapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        textColorSpinner.adapter = textadapter
 
         // Preset avatar
         avatarView.setImageResource(R.drawable.placeholder_avatar)
@@ -155,19 +171,40 @@ class CharacterCreationActivity : AppCompatActivity() {
         }
 
         // Background Picker
-        areaGalleryLauncher = registerForActivityResult(StartActivityForResult()) { result ->
+        areaMapLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
             if (result.resultCode == Activity.RESULT_OK && result.data != null) {
-                val areasJson = result.data?.getStringExtra("EXTRA_AREAS_JSON")
+                val areasJson = result.data?.getStringExtra("AREAS_JSON")
+                val characterToAreaJson = result.data?.getStringExtra("CHARACTER_TO_AREA_JSON")
                 if (!areasJson.isNullOrBlank()) {
-                    areaList = Gson().fromJson(areasJson, Array<Area>::class.java).toMutableList()
+                    characterAreas = Gson().fromJson(areasJson, Array<Area>::class.java).toMutableList()
                 }
+                if (!characterToAreaJson.isNullOrBlank()) {
+                    val mapType = object : TypeToken<Map<String, String>>() {}.type
+                    val map = Gson().fromJson<Map<String, String>>(characterToAreaJson, mapType)
+                    assignedAreaId = map[currentCharacter.id]
+                }
+                // Update your UI if needed (show background, etc)
             }
         }
-        addAreaButton.setOnClickListener {
-            val intent = Intent(this, BackgroundGalleryActivity::class.java)
-            intent.putExtra("EXTRA_AREAS_JSON", Gson().toJson(areaList))
-            areaGalleryLauncher.launch(intent)
+
+        findViewById<Button>(R.id.addAreaButton).setOnClickListener {
+            // If currentCharacter is not set, build it now!
+            if (!::currentCharacter.isInitialized) {
+                currentCharacter = CharacterProfile(
+                    id = System.currentTimeMillis().toString(),
+                    name = nameEt.text.toString().trim(),
+                    avatarUri = avatarUri?.toString(),
+                )
+            }
+            val charJson = Gson().toJson(listOf(currentCharacter))
+            val areaJson = Gson().toJson(characterAreas)
+            val intent = Intent(this, ChatMapActivity::class.java)
+            intent.putExtra("CHARACTER_LIST_JSON", charJson)
+            intent.putExtra("AREA_LIST_JSON", areaJson)
+            areaMapLauncher.launch(intent)
         }
+
+
 
 
         // Relationships button
@@ -213,8 +250,14 @@ class CharacterCreationActivity : AppCompatActivity() {
             val physicalDesc = physicalDescEt.text.toString().trim()
             val gender = genderEt.text.toString().trim()
             val greeting = greetingEt.text.toString().trim()
-            val bubbleColor = colorOptions[bubbleColorSpinner.selectedItemPosition].second
-            val textColor = colorOptions[textColorSpinner.selectedItemPosition].second
+            val bubbleColor = bubblecolorOptions[bubbleColorSpinner.selectedItemPosition].second
+            val textColor = textcolorOptions[textColorSpinner.selectedItemPosition].second
+            val abilities = abilitiesEt.text.toString().trim()
+            makeEditTextScrollable(findViewById(R.id.characterPersonalityInput))
+            makeEditTextScrollable(findViewById(R.id.characterGreetingInput))
+            makeEditTextScrollable(findViewById(R.id.abilitiesInput))
+            makeEditTextScrollable(findViewById(R.id.backstoryEditText))
+            makeEditTextScrollable(findViewById(R.id.characterprivateDescriptionInput))
 
             if (name.isEmpty()) return@setOnClickListener toast("Name required")
             if (originalAvatarUrl.isNullOrBlank() && !avatarChanged) return@setOnClickListener toast("Pick an avatar")
@@ -223,7 +266,7 @@ class CharacterCreationActivity : AppCompatActivity() {
             saveCharacterAndReturnToHub(
                 editCharId,
                 name, bio, personality, privateDesc, backstory, greeting,
-                age, height, weight, eyeColor, hairColor, physicalDesc, gender,
+                age, height, weight, eyeColor, hairColor, physicalDesc, abilities, gender,
                 bubbleColor, textColor
             )
         }
@@ -243,6 +286,7 @@ class CharacterCreationActivity : AppCompatActivity() {
         eyeColor: String,
         hairColor: String,
         physicalDescription: String,
+        abilities: String,
         gender: String,
         bubbleColor: String,
         textColor: String
@@ -294,6 +338,7 @@ class CharacterCreationActivity : AppCompatActivity() {
                         "weight" to weight,
                         "gender" to gender,
                         "physicalDescription" to physicalDescription,
+                        "abilities" to abilities,
                         "eyeColor" to eyeColor,
                         "hairColor" to hairColor,
                         "bubbleColor" to bubbleColor,
@@ -301,7 +346,7 @@ class CharacterCreationActivity : AppCompatActivity() {
                         "author" to currentUserId,
                         "tags" to emptyList<String>(),
                         "avatarUri" to avatarUrl,
-                        "areas" to areaList.map { area ->
+                        "areas" to characterAreas.map { area ->
                             mapOf(
                                 "id" to area.id,
                                 "name" to area.name,
@@ -313,6 +358,7 @@ class CharacterCreationActivity : AppCompatActivity() {
                         "createdAt" to com.google.firebase.firestore.FieldValue.serverTimestamp(),
                         "relationships" to relationships.map { it.copy(fromId = charId) },
                         "sfwOnly" to isSfwOnly,
+                        "private" to privateSwitch.isChecked,
                         "outfits" to updatedOutfits // will save as a list of outfits, each with poseSlots (name+uri)
                     )
                     firestore.collection("characters").document(charId)
@@ -345,8 +391,10 @@ class CharacterCreationActivity : AppCompatActivity() {
                 onError = { e ->
                     dismissProgressDialog()
                     toast("Avatar upload failed: ${e.message}")
-                }
+                },
+                originalAvatarUrl = originalAvatarUrl
             )
+
         }
 
         // Run the chain
@@ -367,10 +415,11 @@ class CharacterCreationActivity : AppCompatActivity() {
         avatarChanged: Boolean,
         avatarUri: Uri?,
         charId: String,
-        contentResolver: android.content.ContentResolver,
-        storage: com.google.firebase.storage.StorageReference,
+        contentResolver: ContentResolver,
+        storage: StorageReference,
         onComplete: (String) -> Unit,
-        onError: (Exception) -> Unit
+        onError: (Exception) -> Unit,
+        originalAvatarUrl: String? = null
     ) {
         if (avatarChanged && avatarUri != null) {
             val ext = contentResolver.getType(avatarUri)
@@ -387,7 +436,8 @@ class CharacterCreationActivity : AppCompatActivity() {
                 .addOnSuccessListener { uri -> onComplete(uri.toString()) }
                 .addOnFailureListener { e -> onError(e) }
         } else {
-            onComplete("") // No change, use previous
+            val fallbackUrl = originalAvatarUrl ?: ""
+            onComplete(fallbackUrl)
         }
     }
 
@@ -476,6 +526,7 @@ class CharacterCreationActivity : AppCompatActivity() {
         eyeColorEt.setText(profile.eyeColor)
         hairColorEt.setText(profile.hairColor)
         physicalDescEt.setText(profile.physicalDescription)
+        abilitiesEt.setText(profile.abilities)
         genderEt.setText(profile.gender)
         backstoryEt.setText(profile.backstory)
         greetingEt.setText(profile.greeting)
@@ -489,7 +540,21 @@ class CharacterCreationActivity : AppCompatActivity() {
                 .error(R.drawable.placeholder_avatar)
                 .into(avatarView)
         }
-        bubbleColorSpinner.setSelection(colorOptions.indexOfFirst { it.second == profile.bubbleColor }.takeIf { it >= 0 } ?: 0)
-        textColorSpinner.setSelection(colorOptions.indexOfFirst { it.second == profile.textColor }.takeIf { it >= 0 } ?: 0)
+        relationships = profile.relationships ?: emptyList()
+        sfwSwitch.isChecked = profile.sfwOnly
+        privateSwitch.isChecked = profile.private
+        bubbleColorSpinner.setSelection(bubblecolorOptions.indexOfFirst { it.second == profile.bubbleColor }.takeIf { it >= 0 } ?: 0)
+        textColorSpinner.setSelection(textcolorOptions.indexOfFirst { it.second == profile.textColor }.takeIf { it >= 0 } ?: 0)
+    }
+
+    fun makeEditTextScrollable(editText: EditText) {
+        editText.setScroller(Scroller(editText.context))
+        editText.isVerticalScrollBarEnabled = true
+        editText.movementMethod = ScrollingMovementMethod()
+        editText.setOnTouchListener { v, event ->
+            // Allow EditText to handle its own touch events (prevents ScrollView from intercepting)
+            v.parent.requestDisallowInterceptTouchEvent(true)
+            false
+        }
     }
 }

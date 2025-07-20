@@ -1,0 +1,271 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:orientation="vertical"
+    android:padding="8dp"
+    android:background="?attr/selectableItemBackground">
+    <ImageView
+        android:id="@+id/rpgCharacterAvatar"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:src="@drawable/placeholder_avatar"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintBottom_toTopOf="@id/characterInfo"
+        android:layout_marginEnd="10dp"
+        android:background="?android:selectableItemBackgroundBorderless"
+        android:scaleType="centerCrop"/>
+    <TextView
+        android:id="@+id/characterName"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        app:layout_constraintTop_toTopOf="@id/rpgCharacterAvatar"
+        app:layout_constraintBottom_toBottomOf="@id/rpgCharacterAvatar"
+        app:layout_constraintStart_toEndOf="@id/rpgCharacterAvatar"
+        android:text="Character Name"
+        android:textStyle="bold"
+        android:textSize="16sp" />
+
+    <LinearLayout
+        android:id="@+id/characterInfo"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        app:layout_constraintTop_toBottomOf="@id/rpgCharacterAvatar"
+        app:layout_constraintBottom_toTopOf="@id/sidekickRow"
+        android:orientation="horizontal"
+        android:layout_marginTop="4dp">
+        <Spinner
+            android:id="@+id/roleSpinner"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"/>
+        <Spinner
+            android:id="@+id/classSpinner"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="8dp"/>
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/sidekickRow"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        app:layout_constraintTop_toBottomOf="@id/characterInfo"
+        app:layout_constraintBottom_toTopOf="@id/statLabelsRow"
+        android:orientation="horizontal">
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Sidekick To:"/>
+        <Spinner
+            android:id="@+id/sidekickSpinner"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"/>
+        <CheckBox
+            android:id="@+id/traitorCheck"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Traitor"/>
+    </LinearLayout>
+
+
+    <!-- Stat Labels Row -->
+    <LinearLayout
+        android:id="@+id/statLabelsRow"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        app:layout_constraintTop_toBottomOf="@id/sidekickRow"
+        android:orientation="horizontal">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="STR"
+            android:gravity="center"
+            android:textStyle="bold"/>
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="AGI"
+            android:gravity="center"
+            android:textStyle="bold"/>
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="INT"
+            android:gravity="center"
+            android:textStyle="bold"/>
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="CHA"
+            android:gravity="center"
+            android:textStyle="bold"/>
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="RES"
+            android:gravity="center"
+            android:textStyle="bold"/>
+
+        <!-- Empty column for points left, if needed -->
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1.2"
+            android:text="Remaining"
+            android:gravity="center"/>
+    </LinearLayout>
+
+    <!-- First Row: Stat Inputs + Points Left -->
+    <LinearLayout
+        android:id="@+id/statsRow"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        app:layout_constraintTop_toBottomOf="@id/statLabelsRow"
+        app:layout_constraintBottom_toTopOf="@id/modifiersRow"
+        android:orientation="horizontal"
+        android:layout_marginTop="4dp">
+
+        <EditText
+            android:id="@+id/strengthEdit"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:hint="STR"
+            android:inputType="number"
+            android:maxLength="2"/>
+
+        <EditText
+            android:id="@+id/agilityEdit"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:hint="AGI"
+            android:inputType="number"
+            android:maxLength="2"/>
+
+        <EditText
+            android:id="@+id/intelligenceEdit"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:hint="INT"
+            android:inputType="number"
+            android:maxLength="2"/>
+
+        <EditText
+            android:id="@+id/charismaEdit"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:hint="CHA"
+            android:inputType="number"
+            android:maxLength="2"/>
+
+        <EditText
+            android:id="@+id/resolveEdit"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:hint="RES"
+            android:inputType="number"
+            android:maxLength="2"/>
+
+        <!-- Points Left (not editable) -->
+        <TextView
+            android:id="@+id/pointsLeftText"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="30"
+            android:gravity="center"
+            android:textStyle="bold"
+            android:textColor="#3F51B5"
+            android:textSize="16sp"/>
+    </LinearLayout>
+
+    <!-- Second Row: Stat Modifiers (Read-only) -->
+    <LinearLayout
+        android:id="@+id/modifiersRow"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        app:layout_constraintTop_toBottomOf="@id/statsRow"
+        app:layout_constraintBottom_toTopOf="@id/equipmentEdit"
+        android:orientation="horizontal"
+        android:layout_marginBottom="4dp">
+
+        <TextView
+            android:id="@+id/strengthMod"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="+0"
+            android:gravity="center"/>
+
+        <TextView
+            android:id="@+id/agilityMod"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="+0"
+            android:gravity="center"/>
+
+        <TextView
+            android:id="@+id/intelligenceMod"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="+0"
+            android:gravity="center"/>
+
+        <TextView
+            android:id="@+id/charismaMod"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="+0"
+            android:gravity="center"/>
+
+        <TextView
+            android:id="@+id/resolveMod"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="+0"
+            android:gravity="center"/>
+
+        <!-- Empty column for alignment with points left -->
+        <TextView
+            android:id="@+id/pointstotalText"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="30"
+            android:gravity="center"
+            android:textStyle="bold"
+            android:textColor="#3F51B5"
+            android:textSize="16sp"/>
+    </LinearLayout>
+
+    <EditText
+        android:id="@+id/equipmentEdit"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        app:layout_constraintTop_toBottomOf="@id/modifiersRow"
+        android:hint="Equipment (comma separated)"
+        android:inputType="text"/>
+</androidx.constraintlayout.widget.ConstraintLayout>

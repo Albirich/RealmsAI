@@ -3,6 +3,7 @@ package com.example.RealmsAI
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.view.View
 import android.widget.ImageButton
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.WindowCompat
@@ -11,11 +12,15 @@ import androidx.core.view.WindowInsetsControllerCompat
 import com.example.RealmsAI.models.CharacterProfile
 import com.example.RealmsAI.models.ChatMessage
 import com.example.RealmsAI.models.ChatProfile
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
 import com.google.gson.Gson
 import org.json.JSONArray
 import org.json.JSONObject
+import com.google.firebase.firestore.ListenerRegistration
 
 open class BaseActivity : AppCompatActivity() {
+    private var messageBadgeListener: ListenerRegistration? = null
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         makeImmersive()
@@ -56,7 +61,32 @@ open class BaseActivity : AppCompatActivity() {
         findViewById<ImageButton>(R.id.navProfile).setOnClickListener {
             startActivity(Intent(this, ProfileActivity::class.java))
         }
+
+        observeMessagesBadge()
     }
+    private fun observeMessagesBadge() {
+        val badge = findViewById<View>(R.id.messagesBadge)
+        val userId = FirebaseAuth.getInstance().currentUser?.uid ?: return
+
+        // Clean up any old listener if already present
+        messageBadgeListener?.remove()
+
+        // Real-time Firestore listener for unopened messages
+        messageBadgeListener = FirebaseFirestore.getInstance()
+            .collection("users").document(userId)
+            .collection("messages")
+            .whereEqualTo("status", "UNOPENED") // Adjust if you use enum/string
+            .addSnapshotListener { snap, _ ->
+                val hasUnopened = snap?.isEmpty == false
+                badge?.visibility = if (hasUnopened) View.VISIBLE else View.GONE
+            }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        messageBadgeListener?.remove()
+    }
+
 
     // in BaseActivity.kt
     protected fun loadAllChatPreviews(): List<ChatPreview> {
@@ -96,7 +126,6 @@ open class BaseActivity : AppCompatActivity() {
                     avatar2Uri   = uri2,
                     rating       = profile.rating,
                     timestamp    = profile.timestamp,
-                    mode         = profile.mode,
                     author       = profile.author,
                     chatProfile  = profile,
                     rawJson      = Gson().toJson(profile)

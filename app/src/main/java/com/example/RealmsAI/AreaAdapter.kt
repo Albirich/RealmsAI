@@ -1,5 +1,7 @@
 package com.example.RealmsAI
 
+import android.graphics.Color
+import android.graphics.drawable.GradientDrawable
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -11,16 +13,17 @@ import com.example.RealmsAI.models.Area
 import com.example.RealmsAI.models.LocationSlot
 
 class AreaAdapter(
-    val areas: MutableList<Area>,
-    val onPickImage: (Int, Int) -> Unit,
-    val onDeleteLocation: (Int, Int) -> Unit,
+    private val areas: MutableList<Area>,
+    private val areaColors: Map<String, Int>? = null,
+    private val onPickImage: (Area, LocationSlot) -> Unit,
     val readonly: Boolean = false
 ) : RecyclerView.Adapter<AreaAdapter.VH>() {
+
     inner class VH(itemView: View) : RecyclerView.ViewHolder(itemView) {
-        val nameEt = itemView.findViewById<EditText>(R.id.areaNameEditText)
-        val locationRecycler = itemView.findViewById<RecyclerView>(R.id.locationRecycler)
-        val addLocationBtn = itemView.findViewById<ImageButton>(R.id.addLocationButton)
-        val deleteLocationBtn = itemView.findViewById<ImageButton>(R.id.deleteLocationButton)
+        val nameEt: EditText = itemView.findViewById(R.id.areaNameEditText)
+        val locationRecycler: RecyclerView = itemView.findViewById(R.id.locationRecycler)
+        val addLocationBtn: ImageButton = itemView.findViewById(R.id.addLocationButton)
+        val deleteLocationBtn: ImageButton = itemView.findViewById(R.id.deleteLocationButton)
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
@@ -34,38 +37,49 @@ class AreaAdapter(
     override fun onBindViewHolder(holder: VH, position: Int) {
         val area = areas[position]
 
-        // EditText for area name
+        // Area name edit
         holder.nameEt.setText(area.name)
         holder.nameEt.setSelection(holder.nameEt.text.length)
+        holder.nameEt.isEnabled = !readonly
         holder.nameEt.setOnFocusChangeListener { _, hasFocus ->
             if (!hasFocus) area.name = holder.nameEt.text.toString()
         }
 
-        // RecyclerView for locations
+        // --- 1. Set colored border ---
+        // Example: if you have a map of area colors, else just use a random or default
+        val color = areaColors?.get(area.id) ?: Color.RED
+        (holder.itemView.background as? GradientDrawable)?.apply {
+            setStroke(8, color)
+        }
+        val nameHaloView = holder.itemView.findViewById<androidx.constraintlayout.widget.ConstraintLayout>(R.id.nameHalo)
+        (nameHaloView.background as? GradientDrawable)?.apply {
+            setStroke(8, color)
+        }
+
+        // --- 2. Set up location recycler ---
         holder.locationRecycler.layoutManager =
             LinearLayoutManager(holder.locationRecycler.context, LinearLayoutManager.HORIZONTAL, false)
-
-        val adapter = LocationAdapter(
+        val locationAdapter = LocationAdapter(
             area.locations,
-            onPickImage = { locIdx -> onPickImage(position, locIdx) },
-            onDeleteLocation = { locIdx -> onDeleteLocation(position, locIdx) }
+            onPickImage = { location -> onPickImage(area, location) },
+            readonly = readonly
         )
-        holder.locationRecycler.adapter = adapter
+        holder.locationRecycler.adapter = locationAdapter
+
+        // --- 3. Add/Delete Location Buttons ---
         holder.addLocationBtn.visibility = if (readonly) View.GONE else View.VISIBLE
         holder.deleteLocationBtn.visibility = if (readonly) View.GONE else View.VISIBLE
 
-        // Add Location Button
         holder.addLocationBtn.setOnClickListener {
-            area.locations.add(LocationSlot())
-            adapter.notifyItemInserted(area.locations.size - 1)
+            val newSlot = LocationSlot()
+            area.locations.add(newSlot)
+            locationAdapter.notifyItemInserted(area.locations.size - 1)
         }
-
-        // Delete Location Button (removes last)
         holder.deleteLocationBtn.setOnClickListener {
-            if (area.locations.isNotEmpty()) {
+            if (area.locations.size > 1) {
                 val removeIdx = area.locations.size - 1
                 area.locations.removeAt(removeIdx)
-                adapter.notifyItemRemoved(removeIdx)
+                locationAdapter.notifyItemRemoved(removeIdx)
             }
         }
     }

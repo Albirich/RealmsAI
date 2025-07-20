@@ -12,8 +12,11 @@ data class ChatProfile(
     val secretDescription: String = "",
     val firstmessage: String = "",
     val characterIds: List<String> = emptyList(),
-    val characterToArea: Map<String, String> = emptyMap(), // NEW!
-    val mode: ChatMode = ChatMode.SANDBOX,
+    val characterToArea: Map<String, String> = emptyMap(),
+    val characterToLocation: Map<String, String> = emptyMap(),
+    val mode: String = "SANDBOX",
+    val enabledModes: List<String> = emptyList(),
+    var modeSettings: MutableMap<String, String> = mutableMapOf(),
     val relationships: List<Relationship> = emptyList(),
     val rating: Float = 0f,
     @ServerTimestamp
@@ -21,7 +24,9 @@ data class ChatProfile(
     val author: String = "",
     val tags: List<String> = emptyList(),
     val areas: List<Area> = emptyList(),
-    val sfwOnly: Boolean = true
+    val sfwOnly: Boolean = true,
+    val private: Boolean = false,
+
 ) {
     constructor() : this(
         id         = "",
@@ -30,7 +35,7 @@ data class ChatProfile(
         secretDescription = "",
         characterIds = emptyList(),
         characterToArea = emptyMap(),
-        mode       = ChatMode.SANDBOX,
+        mode       = "SANDBOX",
         rating     = 0f,
         timestamp  = null,
         author     = "",

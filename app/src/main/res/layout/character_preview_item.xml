@@ -89,17 +89,4 @@
         android:text="★ 0.0"
         android:textSize="15sp"
         android:textColor="#FF8800" />
-
-    <TextView
-        android:id="@+id/previewTypeBadge"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:padding="4dp"
-        android:text="TYPE"
-        android:textSize="13sp"
-        android:textStyle="bold"
-        android:layout_alignBottom="@id/charCardBackground"
-        android:layout_alignParentEnd="true"
-        android:layout_marginEnd="8dp"
-        android:layout_marginBottom="5dp" />
 </RelativeLayout>

@@ -13,6 +13,7 @@ import com.google.android.material.button.MaterialButton
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 
+
 class CharacterSelectionActivity : AppCompatActivity() {
 
     private val selectedIds = mutableSetOf<String>()
@@ -31,6 +32,7 @@ class CharacterSelectionActivity : AppCompatActivity() {
         val preSelected = intent.getStringArrayListExtra("preSelectedIds") ?: emptyList()
         val initialCount = intent.getIntExtra("INITIAL_COUNT", 0)
         isTempMode = intent.getBooleanExtra("TEMP_SELECTION_MODE", false)
+        val fromSource = intent.getStringExtra("from") ?: ""
         selectionCap = 20 - initialCount
 
         selectedIds.addAll(preSelected)
@@ -41,21 +43,38 @@ class CharacterSelectionActivity : AppCompatActivity() {
 
         fun loadCharactersFromFirestore(
             userId: String,
+            from: String,
             onLoaded: (List<CharacterProfile>) -> Unit,
             onError: (Exception) -> Unit = {}
         ) {
             val db = FirebaseFirestore.getInstance()
-            db.collection("characters")
-                .get()
-                .addOnSuccessListener { snapshot ->
-                    val chars = snapshot.documents.mapNotNull { it.toObject(CharacterProfile::class.java) }
-                    onLoaded(chars)
+            val query = db.collection("characters")
+            if (from == "collections") {
+                // Only your characters, regardless of privacy
+                query.whereEqualTo("author", userId)
+                    .get()
+                    .addOnSuccessListener { snapshot ->
+                        val chars = snapshot.documents.mapNotNull { it.toObject(CharacterProfile::class.java) }
+                        onLoaded(chars)
+                    }
+                    .addOnFailureListener(onError)
+            } else {
+                if (from == "chat") {
+                    query.whereNotEqualTo("private", true)
+                        .get()
+                        .addOnSuccessListener { snapshot ->
+                            val chars =
+                                snapshot.documents.mapNotNull { it.toObject(CharacterProfile::class.java) }
+                            onLoaded(chars)
+                        }
+                        .addOnFailureListener(onError)
                 }
-                .addOnFailureListener(onError)
+            }
         }
 
         loadCharactersFromFirestore(
             userId = currentUserId ?: "",
+            from = fromSource,
             onLoaded = { allChars ->
                 val adapter = CharacterSelectAdapter(
                     characters = allChars,
@@ -63,8 +82,10 @@ class CharacterSelectionActivity : AppCompatActivity() {
                     onToggle = { charId ->
                         if (selectedIds.contains(charId)) {
                             selectedIds.remove(charId)
+                            Log.d("CharacterSelection", "Removed $charId, now: $selectedIds")
                         } else if (selectedIds.size < selectionCap) {
                             selectedIds.add(charId)
+                            Log.d("CharacterSelection", "Added $charId, now: $selectedIds")
                         }
                         updateCounter()
                         recycler.adapter?.notifyItemChanged(allChars.indexOfFirst { it.id == charId })
@@ -87,6 +108,7 @@ class CharacterSelectionActivity : AppCompatActivity() {
 
         findViewById<MaterialButton>(R.id.doneButton).setOnClickListener {
             val selectedList = ArrayList(selectedIds)
+            Log.d("CharacterSelection", "Result intent: mode=${intent.getStringExtra("mode")}, collectionId=${intent.getStringExtra("collectionId")}, collectionName=${intent.getStringExtra("collectionName")}, selected=$selectedList")
 
             val result = Intent().apply {
                 putStringArrayListExtra("selectedCharacterIds", selectedList)
@@ -103,6 +125,7 @@ class CharacterSelectionActivity : AppCompatActivity() {
             setResult(RESULT_OK, result)
             finish()
         }
+
     }
 
     private fun updateCounter() {

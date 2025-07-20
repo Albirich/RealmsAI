@@ -8,6 +8,7 @@ import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
+import com.bumptech.glide.Glide
 import com.example.RealmsAI.models.ParticipantPreview
 import com.example.RealmsAI.models.Relationship
 import com.example.RealmsAI.R
@@ -65,16 +66,27 @@ class ParticipantRelationshipAdapter(
         fun bind(participant: ParticipantPreview) {
             name.text = participant.name
             btnAdd.setOnClickListener { onAddRelationship(participant.id) }
+
+            // Load avatar (null or empty fallback to a default drawable)
+            if (!participant.avatarUri.isNullOrEmpty()) {
+                Glide.with(avatar.context)
+                    .load(participant.avatarUri)
+                    .placeholder(R.drawable.placeholder_avatar)  // <-- add a placeholder in res/drawable
+                    .error(R.drawable.placeholder_avatar)
+                    .circleCrop()
+                    .into(avatar)
+            } else {
+                avatar.setImageResource(R.drawable.placeholder_avatar)
+            }
         }
     }
-
     inner class RelationshipRowHolder(view: View) : RecyclerView.ViewHolder(view) {
         private val toNameEdit = view.findViewById<EditText>(R.id.relationshipToNameEdit)
         private val type = view.findViewById<TextView>(R.id.relationshipType)
         private val summary = view.findViewById<TextView>(R.id.relationshipSummaryEdit)
         private val btnDelete = view.findViewById<ImageButton>(R.id.btnDeleteRelationship)
         fun bind(rel: Relationship) {
-            toNameEdit.setText(rel.toName)  // <--- Display arbitrary name
+            toNameEdit.setText(rel.toName)
             type.text = rel.type
             summary.text = rel.description
             btnDelete.setOnClickListener { onDeleteRelationship(rel) }

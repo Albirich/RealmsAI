@@ -59,16 +59,6 @@ class CollectionAdapter(
                 onEditClicked(collection)
             }
 
-            editButton.setOnClickListener {
-                val context = itemView.context
-                val intent = Intent(context, CharacterSelectionActivity::class.java)
-                intent.putExtra("mode", "edit")
-                intent.putExtra("collectionId", collection.id)
-                intent.putExtra("collectionName", collection.name)
-                intent.putStringArrayListExtra("preSelectedIds", ArrayList(collection.characterIds))
-                (context as? android.app.Activity)?.startActivityForResult(intent, 1001)
-            }
-
             deleteButton.setOnClickListener {
                 val userId = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid ?: return@setOnClickListener
                 val db = FirebaseFirestore.getInstance()
@@ -134,6 +124,8 @@ class CollectionAdapter(
         override fun onBindViewHolder(holder: HaloViewHolder, position: Int) {
             val character = characters[position]
             holder.nameText.text = character.name
+            holder.slotNumberText.text = "Character ${position + 1}"
+
             Glide.with(holder.itemView)
                 .load(character.avatarUri)
                 .placeholder(R.drawable.placeholder_avatar)
@@ -151,6 +143,7 @@ class CollectionAdapter(
         class HaloViewHolder(view: View) : RecyclerView.ViewHolder(view) {
             val iconView = view.findViewById<android.widget.ImageView>(R.id.character_image)
             val nameText = view.findViewById<TextView>(R.id.character_name)
+            val slotNumberText = view.findViewById<TextView>(R.id.character_slot_number)
         }
     }
 

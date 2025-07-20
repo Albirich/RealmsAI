@@ -1,0 +1,26 @@
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:gravity="center_horizontal"
+    android:paddingEnd="8dp"
+    android:paddingStart="8dp">
+
+    <ImageView
+        android:id="@+id/characterAvatar"
+        android:layout_width="80dp"
+        android:layout_height="wrap_content"
+        android:scaleType="centerInside"
+        android:src="@drawable/silhouette"
+        android:contentDescription="Character avatar"/>
+
+    <TextView
+        android:id="@+id/characterName"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Char Name"
+        android:textSize="13sp"
+        android:textAlignment="center"
+        android:layout_marginTop="4dp"/>
+</LinearLayout>

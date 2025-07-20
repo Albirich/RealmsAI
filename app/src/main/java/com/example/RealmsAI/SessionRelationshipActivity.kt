@@ -85,11 +85,6 @@ class SessionRelationshipActivity : AppCompatActivity() {
     }
 
     private fun showAddRelationshipDialog(fromId: String) {
-        val targets = participants.filter { it.id != fromId }
-        if (targets.isEmpty()) {
-            Toast.makeText(this, "No valid targets!", Toast.LENGTH_SHORT).show()
-            return
-        }
 
         val dialogView = layoutInflater.inflate(R.layout.dialog_add_relationship, null)
         val toNameEdit = dialogView.findViewById<EditText>(R.id.relationshipToNameEdit)
@@ -109,11 +104,13 @@ class SessionRelationshipActivity : AppCompatActivity() {
                 }
                 val type = RELATIONSHIP_TYPES[typeSpinner.selectedItemPosition]
                 val summary = summaryEdit.text.toString()
+                Log.d("REL_DEBUG", "Adding relationship fromId: $fromId toName: $toName type: $type summary: $summary")
                 relationships.add(Relationship(fromId, toName, type, summary))
                 adapter.refresh()
             }
             .setNegativeButton("Cancel", null)
             .show()
+        Log.d("REL_DEBUG", "showAddRelationshipDialog for fromId: $fromId")
     }
 
     /**

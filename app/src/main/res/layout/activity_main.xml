@@ -1,26 +1,27 @@
 <?xml version="1.0" encoding="utf-8"?>
-
-
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/chatRoot"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    android:fitsSystemWindows="true"
+    android:clipChildren="false"
+    android:clipToPadding="false">
 
+    <!-- Background Image fills the whole screen -->
     <ImageView
         android:id="@+id/backgroundImageView"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
         android:scaleType="centerCrop"
         android:adjustViewBounds="true"
         android:alpha="1.0"
-        android:background="#FF000000"/>
-
-    <!-- All your existing UI (copy-paste your LinearLayout here) -->
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:orientation="vertical"
-        android:padding="16dp">
+        android:background="#FF000000"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"/>
 
     <!-- Title -->
     <TextView
@@ -31,62 +32,70 @@
         android:textSize="41sp"
         android:textColor="@color/teal_200"
         android:layout_marginTop="25dp"
-        />
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"/>
 
+    <!-- Description Header (label + toggle arrow) -->
     <LinearLayout
-        android:orientation="vertical"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content">
+        android:id="@+id/descriptionHeader"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:clickable="true"
+        android:focusable="true"
+        android:padding="18dp"
+        app:layout_constraintTop_toBottomOf="@id/chatTitle"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
 
-        <!-- Header with label and toggle arrow -->
-        <LinearLayout
-            android:id="@+id/descriptionHeader"
-            android:layout_width="match_parent"
+        <TextView
+            android:id="@+id/chatDescriptionLabel"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:clickable="true"
-            android:focusable="true"
-            android:padding="18dp">
+            android:layout_weight="1"
+            android:text="@string/description"
+            android:textAppearance="?attr/textAppearanceSubtitle2"/>
 
-            <TextView
-                android:id="@+id/chatDescriptionLabel"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="@string/description"
-                android:textAppearance="?attr/textAppearanceSubtitle2"/>
-
-            <ImageView
-                android:id="@+id/descriptionToggle"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:src="@drawable/ic_expand_more"/>
-        </LinearLayout>
-
-        <!-- DROPDOWN/COLLAPSIBLE SECTION STARTS HERE -->
-        <LinearLayout
-            android:id="@+id/descriptionDropdown"
-            android:layout_width="match_parent"
+        <ImageView
+            android:id="@+id/descriptionToggle"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:visibility="gone">
-
-            <TextView
-                android:id="@+id/chatDescription"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:paddingStart="16dp"
-                android:paddingEnd="16dp"
-                android:textAppearance="?attr/textAppearanceBody2"/>
-        </LinearLayout>
-        <!-- DROPDOWN/COLLAPSIBLE SECTION ENDS HERE -->
-
+            android:src="@drawable/ic_expand_more"/>
     </LinearLayout>
+
+    <!-- Description Dropdown -->
+    <LinearLayout
+        android:id="@+id/descriptionDropdown"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:visibility="gone"
+        app:layout_constraintTop_toBottomOf="@id/descriptionHeader"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <TextView
+            android:id="@+id/chatDescription"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:textAppearance="?attr/textAppearanceBody2"/>
+    </LinearLayout>
+
+    <!-- Avatar Container with 4 avatar ImageViews and toggle button -->
     <androidx.constraintlayout.widget.ConstraintLayout
-        xmlns:android="http://schemas.android.com/apk/res/android"
-        xmlns:app="http://schemas.android.com/apk/res-auto"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent">
+        android:id="@+id/avatarContainer"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="@id/chatInputGroup"
+        android:layout_marginBottom="20dp"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:clipChildren="false"
+        android:clipToPadding="false">
 
         <!-- Back left (Bot 3) -->
         <ImageView
@@ -119,106 +128,483 @@
             android:src="@drawable/silhouette"
             android:alpha="0.80" />
 
-
         <!-- Front left (Bot 1) -->
         <ImageView
             android:id="@+id/botAvatar0ImageView"
             android:layout_width="0dp"
             android:layout_height="0dp"
             android:translationX="-75dp"
+            app:layout_constraintHeight_percent="1"
             app:layout_constraintWidth_percent="1"
+            app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toTopOf="parent"
-            app:layout_constraintHeight_percent=".9"
             android:scaleType="fitCenter"
-            android:src="@drawable/silhouette"
-            android:scaleX="-1.2"
-            android:scaleY="1.2"/>
+            android:scaleY="1"
+            android:src="@drawable/silhouette" />
 
         <!-- Front right (Bot 2) -->
         <ImageView
             android:id="@+id/botAvatar1ImageView"
             android:layout_width="0dp"
             android:layout_height="0dp"
-
             android:translationX="75dp"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toTopOf="parent"
-            app:layout_constraintHeight_percent=".9"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintHeight_percent="1"
             app:layout_constraintWidth_percent="1"
             android:scaleType="fitCenter"
-            android:src="@drawable/silhouette"
-            android:scaleX="1.2"
-            android:scaleY="1.2" />
+            android:src="@drawable/silhouette" />
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:id="@+id/toggleButtonContainer"
+        android:layout_width="wrap_content"
+        android:layout_height="30dp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        android:layout_marginEnd="20dp"
+        android:layout_marginBottom="300dp">
+
+        <ImageButton
+            android:id="@+id/toggleControlButton"
+            android:layout_width="30dp"
+            android:layout_height="30dp"
+            android:src="@drawable/ic_controls"
+            android:layout_marginEnd="2dp"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintEnd_toStartOf="@id/toggleChatInputButton"
+            app:layout_constraintBottom_toBottomOf="parent"
+            android:contentDescription="Open controls"
+            android:background="?android:selectableItemBackgroundBorderless"
+            android:scaleType="fitCenter"
+            android:layout_marginStart="8dp"
+            android:visibility="visible"
+            />
+        <ImageButton
+            android:id="@+id/toggleChatButton"
+            android:layout_width="30dp"
+            android:layout_height="30dp"
+            android:src="@drawable/ic_chatbubble"
+            android:layout_marginEnd="2dp"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintEnd_toStartOf="@id/toggleChatInputButton"
+            app:layout_constraintBottom_toBottomOf="parent"
+            android:contentDescription="Return to chat"
+            android:background="?android:selectableItemBackgroundBorderless"
+            android:scaleType="fitCenter"
+            android:layout_marginStart="8dp"
+            android:visibility="gone"
+            />
+
         <ImageButton
             android:id="@+id/toggleChatInputButton"
             android:layout_width="30dp"
             android:layout_height="30dp"
-            android:layout_marginBottom="250dp"
-            app:layout_constraintEnd_toEndOf="parent"
+            android:layout_marginEnd="2dp"
+            app:layout_constraintEnd_toStartOf="@+id/resendButton"
+            app:layout_constraintTop_toTopOf="parent"
             app:layout_constraintBottom_toBottomOf="parent"
-            android:translationZ="10dp"
             android:background="?android:selectableItemBackgroundBorderless"
             android:scaleType="fitCenter"
             android:src="@drawable/ic_visible"/>
-    </androidx.constraintlayout.widget.ConstraintLayout>
-    <!-- User Message Display -->
-    <FrameLayout
-        android:id="@+id/topOverlay"
-        android:layout_width="match_parent"
-        android:layout_height="150dp"
-        android:orientation="horizontal"
-        android:layout_marginTop="-150dp"
-        android:background="#DA222222">
-    </FrameLayout>
-    <FrameLayout
-        android:id="@+id/chatOverlayContainer"
-        android:layout_width="match_parent"
-        android:layout_height="200dp"
-        android:orientation="horizontal"
-        android:layout_marginTop="-250dp">
-        <View
-            android:id="@+id/fadeTop"
-            android:layout_width="match_parent"
-            android:layout_height="100dp"
-            android:layout_gravity="top"
-            android:background="@drawable/fade_top" />
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/chatRecyclerView"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:maxHeight="200dp"
-            android:text="@string/user_message_default"
-            android:textColor="#daaaaaaa"
-            android:textSize="20sp"
+        <ImageButton
+            android:id="@+id/resendButton"
+            android:layout_width="30dp"
+            android:layout_height="30dp"
+            android:layout_marginEnd="2dp"
+            android:src="@drawable/ic_resend"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent"
+            android:contentDescription="Resend Last Message"
+            android:background="?android:selectableItemBackgroundBorderless"
+            android:scaleType="fitCenter"
+            android:layout_marginStart="8dp"
+            android:visibility="visible"
             />
-    </FrameLayout>
+    </androidx.constraintlayout.widget.ConstraintLayout>
 
-    <!-- Container for User Input -->
-    <LinearLayout
-        android:id="@+id/inputContainer"
-        android:layout_width="match_parent"
-        android:layout_height="50dp"
-        android:layout_marginTop="0dp"
-        android:orientation="horizontal"
-        android:background="#FFAAAAAA">
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:id="@+id/chatInputGroup"
+        android:layout_width="0dp"
+        android:layout_height="300dp"
+        android:orientation="vertical"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        android:paddingBottom="20dp"
+        android:paddingHorizontal="15dp"
+        android:visibility="visible">
 
-        <!-- EditText for typing messages -->
-        <EditText
-            android:id="@+id/messageEditText"
+            <FrameLayout
+                android:id="@+id/fadeTop"
+                android:layout_width="match_parent"
+                android:layout_height="80dp"
+                android:background="@drawable/fade_top"
+                app:layout_constraintBottom_toTopOf="@id/topOverlay" />
+
+            <FrameLayout
+                android:id="@+id/topOverlay"
+                android:layout_width="match_parent"
+                android:layout_height="150dp"
+                android:background="#DA222222"
+                app:layout_constraintBottom_toTopOf="@id/inputContainer"/>
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/chatRecyclerView"
+                android:layout_width="match_parent"
+                android:layout_height="195dp"
+                app:layout_constraintTop_toTopOf="@id/fadeTop"
+                app:layout_constraintBottom_toTopOf="@id/typingIndicatorBar"
+                android:maxHeight="200dp"
+                android:textColor="#daaaaaaa"
+                android:textSize="20sp"/>
+        <LinearLayout
+            android:id="@+id/typingIndicatorBar"
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:hint="@string/text_prompt"/>
+            android:layout_height="35dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingBottom="4dp"
+            android:background="#00000000"
+            android:visibility="gone"
+            app:layout_constraintTop_toBottomOf="@id/chatRecyclerView"
+            app:layout_constraintStart_toStartOf="@id/inputContainer"
+            app:layout_constraintBottom_toTopOf="@id/inputContainer"
+            app:layout_constraintEnd_toEndOf="@id/inputContainer"
+            />
 
-        <!-- Send Button -->
-        <Button
-            android:id="@+id/sendButton"
-            android:layout_width="wrap_content"
+
+        <LinearLayout
+            android:id="@+id/inputContainer"
+            android:layout_width="match_parent"
+            android:layout_height="50dp"
+            app:layout_constraintBottom_toBottomOf="parent"
+            android:orientation="horizontal"
+            android:background="#FFAAAAAA">
+
+            <EditText
+                android:id="@+id/messageEditText"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:hint="@string/text_prompt"/>
+
+            <Button
+                android:id="@+id/sendButton"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:text="Send"/>
+        </LinearLayout>
+    </androidx.constraintlayout.widget.ConstraintLayout>
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:id="@+id/controlBox"
+        android:layout_width="0dp"
+        android:layout_height="300dp"
+        android:orientation="vertical"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        android:paddingBottom="20dp"
+        android:paddingHorizontal="15dp"
+        android:visibility="gone">
+
+        <FrameLayout
+            android:id="@+id/controlFadeTop"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:background="@drawable/fade_top"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintBottom_toTopOf="@id/controlTopOverlay" />
+
+        <FrameLayout
+            android:id="@+id/controlTopOverlay"
+            android:layout_width="match_parent"
+            android:layout_height="150dp"
+            android:background="#DA222222"
+            app:layout_constraintBottom_toBottomOf="parent"/>
+
+        <LinearLayout
+            android:id="@+id/controlMenuButtons"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Send"/>
-    </LinearLayout>
+            android:orientation="horizontal"
+            app:layout_constraintTop_toTopOf="@id/controlFadeTop"
+            android:gravity="center"
+            android:layout_marginTop="8dp"
+            android:layout_marginBottom="8dp">
+
+            <Button
+                android:id="@+id/controlMoveButton"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Location" />
+
+            <Button
+                android:id="@+id/controlPersonaButton"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="persona" />
+
+            <Button
+                android:id="@+id/controlOptionsButton"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Options" />
+        </LinearLayout>
+
+        <androidx.constraintlayout.widget.ConstraintLayout
+            android:id="@+id/moveOptions"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            app:layout_constraintTop_toBottomOf="@+id/controlMenuButtons"
+            app:layout_constraintBottom_toBottomOf="parent"
+            android:visibility="gone">
+            <TextView
+                android:id="@+id/areaTitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:layout_constraintTop_toTopOf="parent"
+                android:text="Area:"
+                android:textColor="@android:color/white"/>
+
+            <Spinner
+                android:id="@+id/areaSpinner"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:layout_constraintTop_toBottomOf="@+id/areaTitle"
+                android:backgroundTint="@color/white"
+                android:contentDescription="a list of all the areas in this chat"/>
+
+            <TextView
+                android:id="@+id/locationTitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:layout_constraintTop_toBottomOf="@id/areaSpinner"
+                android:text="Location:"
+                android:textColor="@android:color/white"/>
+
+            <Spinner
+                android:id="@+id/locationSpinner"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:layout_constraintTop_toBottomOf="@+id/locationTitle"
+                android:backgroundTint="@color/white"
+                android:contentDescription="list of locations within the area in the area spinner"/>
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/locationChar"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                app:layout_constraintTop_toBottomOf="@id/locationSpinner"
+                app:layout_constraintBottom_toTopOf="@id/moveConfirm"
+                android:contentDescription="icons of characters inside that location"/>
+
+            <Button
+                android:id="@+id/moveConfirm"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="move"
+                app:layout_constraintBottom_toBottomOf="parent"
+                android:contentDescription="sets personas area and location"/>
+        </androidx.constraintlayout.widget.ConstraintLayout>
+
+        <androidx.constraintlayout.widget.ConstraintLayout
+            android:id="@+id/personaOptions"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            app:layout_constraintTop_toBottomOf="@+id/controlMenuButtons"
+            app:layout_constraintBottom_toBottomOf="parent"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/characterSpinnerTitle"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                app:layout_constraintTop_toTopOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toStartOf="@id/slotSelector"
+                android:text="Character Selector"
+                android:textColor="@android:color/white"/>
+
+            <Spinner
+                android:id="@+id/characterSpinner"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                app:layout_constraintTop_toBottomOf="@id/characterSpinnerTitle"
+                android:backgroundTint="@android:color/white"
+                android:contentDescription="a list of all characters in this location, based on useractiveslotid"/>
 
 
-</LinearLayout>
-</FrameLayout>
+
+            <androidx.constraintlayout.widget.ConstraintLayout
+                android:id="@+id/slotSelector"
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintTop_toTopOf="parent"
+                app:layout_constraintStart_toEndOf="@id/setImage"
+                app:layout_constraintBottom_toBottomOf="@id/setImage"
+                app:layout_constraintDimensionRatio="2:1"
+                android:contentDescription="this is just buttons that can be clicked to select which avatar slot should be updated">
+
+                <CheckBox
+                    android:id="@+id/lockSlot0"
+                    android:layout_width="10dp"
+                    android:layout_height="10dp"
+                    android:button="@drawable/lock_checkbox_selector"
+                    app:layout_constraintTop_toTopOf="@id/slotSelector"
+                    app:layout_constraintBottom_toTopOf="@id/selectSlot0"
+                    app:layout_constraintStart_toStartOf="@id/selectSlot0"
+                    app:layout_constraintEnd_toEndOf="@id/selectSlot0"/>
+                <ImageButton
+                    android:id="@+id/selectSlot0"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    app:layout_constraintTop_toBottomOf="@id/lockSlot0"
+                    app:layout_constraintEnd_toStartOf="@id/selectSlot1"
+                    app:layout_constraintStart_toStartOf="parent"
+                    android:src="@drawable/default_01"
+                    android:scaleType="centerCrop"/>
+
+                <CheckBox
+                    android:id="@+id/lockSlot1"
+                    android:layout_width="10dp"
+                    android:layout_height="10dp"
+                    android:button="@drawable/lock_checkbox_selector"
+                    app:layout_constraintTop_toTopOf="@id/slotSelector"
+                    app:layout_constraintBottom_toTopOf="@id/selectSlot1"
+                    app:layout_constraintStart_toStartOf="@id/selectSlot1"
+                    app:layout_constraintEnd_toEndOf="@id/selectSlot1"/>
+
+                <ImageButton
+                    android:id="@+id/selectSlot1"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    app:layout_constraintTop_toBottomOf="@id/lockSlot1"
+                    app:layout_constraintStart_toEndOf="@id/selectSlot0"
+                    app:layout_constraintEnd_toStartOf="@id/selectSlot2"
+                    android:src="@drawable/default_01"
+                    android:scaleType="centerCrop"/>
+
+                <CheckBox
+                    android:id="@+id/lockSlot2"
+                    android:layout_width="10dp"
+                    android:layout_height="10dp"
+                    android:button="@drawable/lock_checkbox_selector"
+                    app:layout_constraintTop_toTopOf="@id/slotSelector"
+                    app:layout_constraintBottom_toTopOf="@id/selectSlot2"
+                    app:layout_constraintStart_toStartOf="@id/selectSlot2"
+                    app:layout_constraintEnd_toEndOf="@id/selectSlot2"/>
+                <ImageButton
+                    android:id="@+id/selectSlot2"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    app:layout_constraintTop_toBottomOf="@id/lockSlot2"
+                    app:layout_constraintStart_toEndOf="@id/selectSlot1"
+                    app:layout_constraintEnd_toStartOf="@id/selectSlot3"
+                    android:src="@drawable/default_01"
+                    android:scaleType="centerCrop"/>
+
+                <CheckBox
+                    android:id="@+id/lockSlot3"
+                    android:layout_width="10dp"
+                    android:layout_height="10dp"
+                    android:button="@drawable/lock_checkbox_selector"
+                    app:layout_constraintTop_toTopOf="@id/slotSelector"
+                    app:layout_constraintBottom_toTopOf="@id/selectSlot3"
+                    app:layout_constraintStart_toStartOf="@id/selectSlot3"
+                    app:layout_constraintEnd_toEndOf="@id/selectSlot3"/>
+                <ImageButton
+                    android:id="@+id/selectSlot3"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    app:layout_constraintTop_toBottomOf="@id/lockSlot3"
+                    app:layout_constraintStart_toEndOf="@id/selectSlot2"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    android:src="@drawable/default_01"
+                    android:scaleType="centerCrop"/>
+
+            </androidx.constraintlayout.widget.ConstraintLayout>
+
+
+            <Button
+                android:id="@+id/takeControl"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                app:layout_constraintTop_toBottomOf="@id/characterSpinner"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toStartOf="@id/setImage"
+                android:text="Take control"
+                android:contentDescription="this will set users activeslotid to the selected characters id. this will allow them to take control of a bot."/>
+
+            <Button
+                android:id="@+id/setImage"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                app:layout_constraintTop_toBottomOf="@id/characterSpinner"
+                app:layout_constraintStart_toEndOf="@id/takeControl"
+                app:layout_constraintEnd_toStartOf="@id/slotSelector"
+                android:text="Set Image"
+                android:layout_marginHorizontal="2dp"
+                android:contentDescription="this button will set the pose selected to the slot selected, and also set the slotid for that avatarslot"/>
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/personaPoseRecycler"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:layout_constraintBottom_toBottomOf="parent"
+                android:contentDescription="this is a horizontal show of poses, clicking one will select it readyto be set by set image button.">
+            </androidx.recyclerview.widget.RecyclerView>
+
+        </androidx.constraintlayout.widget.ConstraintLayout>
+
+        <androidx.constraintlayout.widget.ConstraintLayout
+            android:id="@+id/optionsOptions"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            app:layout_constraintTop_toBottomOf="@+id/controlMenuButtons"
+            app:layout_constraintBottom_toBottomOf="parent"
+            android:paddingBottom="20dp"
+            android:paddingHorizontal="15dp"
+            android:visibility="gone">
+
+            <Button
+                android:id="@+id/resetTyping"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Reset typing"
+                app:layout_constraintTop_toTopOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                android:contentDescription="sets all slotprofiles typing to false"/>
+
+            <Button
+                android:id="@+id/returnHome"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Return Home"
+                android:layout_marginTop="16dp"
+                app:layout_constraintTop_toBottomOf="@id/resetTyping"
+                app:layout_constraintStart_toStartOf="parent"
+                android:contentDescription="Leave this chat and return to the chat hub"/>
+
+            <Button
+                android:id="@+id/reportBug"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Report a Bug"
+                app:layout_constraintTop_toBottomOf="@id/returnHome"
+                app:layout_constraintStart_toStartOf="parent"
+                android:contentDescription="Send a bug report with debug info to the developers"/>
+
+
+        </androidx.constraintlayout.widget.ConstraintLayout>
+
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+
+</androidx.constraintlayout.widget.ConstraintLayout>

@@ -41,14 +41,24 @@ class PersonaCreationActivity : AppCompatActivity() {
     private var currentOutfit: String = ""
     private var editPersonaId: String? = null
 
-    private val colorOptions = listOf(
-        "White" to "#FFFFFF",
-        "Yellow" to "#FFEB3B",
-        "Orange" to "#FF9800",
+    private val bubblecolorOptions = listOf(
         "Blue" to "#2196F3",
-        "Pink" to "#E91E63",
         "Green" to "#4CAF50",
-        "Black" to "#000000"
+        "Orange" to "#FF9800",
+        "Pink" to "#e86cbe",
+        "Purple" to "#c778f5",
+        "White" to "#FFFFFF",
+        "Yellow" to "#FFEB3B"
+    )
+    private val textcolorOptions = listOf(
+        "Black" to "#000000",
+        "Blue" to "#213af3",
+        "Green" to "#098217",
+        "Orange" to "#cd6a00",
+        "Pink" to "#E91E63",
+        "Purple" to "#A200FF",
+        "Red" to "#ce0202",
+        "Yellow" to "#cdd54b"
     )
 
     companion object {
@@ -76,10 +86,12 @@ class PersonaCreationActivity : AppCompatActivity() {
         saveBtn   = findViewById(R.id.savePersonaButton)
 
         // Color spinners
-        val adapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, colorOptions.map { it.first })
-        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-        bubbleColorSpinner.adapter = adapter
-        textColorSpinner.adapter = adapter
+        val bubbleadapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, bubblecolorOptions.map { it.first })
+        bubbleadapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        bubbleColorSpinner.adapter = bubbleadapter
+        val textadapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, textcolorOptions.map { it.first })
+        textadapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        textColorSpinner.adapter = textadapter
 
         // Avatar picker
         val avatarPicker = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
@@ -120,9 +132,10 @@ class PersonaCreationActivity : AppCompatActivity() {
             }
 
             val personaId = editPersonaId ?: System.currentTimeMillis().toString()
-            val colorHexList = colorOptions.map { it.second }
-            val bubbleColorHex = colorHexList[bubbleColorSpinner.selectedItemPosition]
-            val textColorHex = colorHexList[textColorSpinner.selectedItemPosition]
+            val bubblecolorHexList = bubblecolorOptions.map { it.second }
+            val textcolorHexList = textcolorOptions.map { it.second }
+            val bubbleColorHex = bubblecolorHexList[bubbleColorSpinner.selectedItemPosition]
+            val textColorHex = textcolorHexList[textColorSpinner.selectedItemPosition]
 
             val ageStr = ageEt.text.toString().trim()
             val age = ageStr.toIntOrNull() ?: 0
@@ -179,9 +192,10 @@ class PersonaCreationActivity : AppCompatActivity() {
             avatarView.setImageResource(R.drawable.placeholder_avatar)
         }
 
-        val colorHexList = colorOptions.map { it.second }
-        bubbleColorSpinner.setSelection(colorHexList.indexOf(profile.bubbleColor).takeIf { it >= 0 } ?: 0)
-        textColorSpinner.setSelection(colorHexList.indexOf(profile.textColor).takeIf { it >= 0 } ?: 0)
+        val bubblecolorHexList = bubblecolorOptions.map { it.second }
+        val textcolorHexList = textcolorOptions.map { it.second }
+        bubbleColorSpinner.setSelection(bubblecolorHexList.indexOf(profile.bubbleColor).takeIf { it >= 0 } ?: 0)
+        textColorSpinner.setSelection(textcolorHexList.indexOf(profile.textColor).takeIf { it >= 0 } ?: 0)
     }
 
     // Handles wardrobe result

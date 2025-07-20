@@ -1,0 +1,171 @@
+<ScrollView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fillViewport="true">
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#7AAED6">
+
+    <!-- Profile Avatar -->
+    <ImageView
+        android:id="@+id/displayProfileAvatar"
+        android:layout_width="80dp"
+        android:layout_height="80dp"
+        android:src="@drawable/placeholder_avatar"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        android:layout_marginTop="32dp"
+        android:layout_marginStart="24dp"
+        android:contentDescription="profile avatar"
+        android:scaleType="centerCrop"/>
+
+    <!-- Profile Name -->
+    <TextView
+        android:id="@+id/displayProfileName"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:text="Display Name"
+        android:textStyle="bold"
+        android:textSize="24sp"
+        android:textColor="@android:color/black"
+        app:layout_constraintStart_toEndOf="@id/displayProfileAvatar"
+        app:layout_constraintEnd_toStartOf="@id/displayAddFriendButton"
+        app:layout_constraintTop_toTopOf="@id/displayProfileAvatar"
+        android:layout_marginStart="16dp"
+        android:layout_marginEnd="16dp"/>
+
+    <!-- Profile Handle -->
+    <TextView
+        android:id="@+id/displayProfileHandle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="&#64;handle"
+        android:textSize="14sp"
+        android:textColor="#444"
+        app:layout_constraintTop_toBottomOf="@id/displayProfileName"
+        app:layout_constraintStart_toStartOf="@id/displayProfileName"
+        android:layout_marginTop="4dp"/>
+
+    <!-- Add Friend Button -->
+    <ImageButton
+        android:id="@+id/displayAddFriendButton"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:src="@drawable/ic_add"
+        android:scaleType="fitXY"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintBottom_toTopOf="@id/displayReportButton"
+        android:layout_marginTop="32dp"
+        android:layout_marginEnd="24dp"
+        android:layout_marginBottom="40dp"
+        android:contentDescription="Add friend"/>
+
+    <!-- Report Button -->
+    <ImageButton
+        android:id="@+id/displayReportButton"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:src="@drawable/ic_report"
+        android:scaleType="fitXY"
+        app:layout_constraintTop_toBottomOf="@id/displayAddFriendButton"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginEnd="24dp"
+        android:contentDescription="Report user"/>
+
+    <!-- Bio -->
+    <TextView
+        android:id="@+id/displayProfileBio"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:text="User bio goes here..."
+        android:textSize="16sp"
+        android:textColor="@android:color/black"
+        android:maxLines="4"
+        android:ellipsize="end"
+        app:layout_constraintTop_toBottomOf="@id/displayProfileAvatar"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginTop="16dp"
+        android:layout_marginStart="24dp"
+        android:layout_marginEnd="24dp"/>
+
+
+    <!-- Characters Title -->
+    <TextView
+        android:id="@+id/displayCharactersTitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Characters"
+        android:textStyle="bold"
+        android:textSize="18sp"
+        app:layout_constraintTop_toBottomOf="@id/displayProfileBio"
+        app:layout_constraintStart_toStartOf="parent"
+        android:layout_marginTop="20dp"
+        android:layout_marginStart="24dp"/>
+
+    <!-- Characters RecyclerView -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/displayCharactersRecyclerView"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        app:layout_constraintTop_toBottomOf="@id/displayCharactersTitle"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginTop="8dp"
+        android:layout_marginStart="12dp"
+        android:layout_marginEnd="12dp"
+        android:clipToPadding="false"
+        android:paddingEnd="12dp"
+        android:paddingStart="12dp"
+        android:scrollbars="horizontal"/>
+
+    <!-- Chats Title -->
+    <TextView
+        android:id="@+id/displayChatsTitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Chats"
+        android:textStyle="bold"
+        android:textSize="18sp"
+        app:layout_constraintTop_toBottomOf="@id/displayCharactersRecyclerView"
+        app:layout_constraintStart_toStartOf="parent"
+        android:layout_marginTop="20dp"
+        android:layout_marginStart="24dp"/>
+
+    <!-- Chats RecyclerView -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/displayChatsRecyclerView"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        app:layout_constraintTop_toBottomOf="@id/displayChatsTitle"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintBottom_toTopOf="@id/bottomNavBar"
+        android:layout_marginTop="8dp"
+        android:layout_marginStart="12dp"
+        android:layout_marginEnd="12dp"
+        android:clipToPadding="false"
+        android:paddingEnd="12dp"
+        android:paddingStart="12dp"
+        android:scrollbars="horizontal"/>
+
+    <!-- Bottom Navigation Bar -->
+    <include
+        android:id="@+id/bottomNavBar"
+        layout="@layout/bottom_nav"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"/>
+
+</androidx.constraintlayout.widget.ConstraintLayout>
+</ScrollView>

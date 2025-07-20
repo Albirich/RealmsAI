@@ -3,6 +3,8 @@ package com.example.RealmsAI
 import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
+import android.util.Log
+import android.view.View
 import android.widget.*
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
@@ -21,7 +23,7 @@ class ChatCreationActivity : AppCompatActivity() {
     private lateinit var secretDescEt: EditText
     private lateinit var firstMsgEt: EditText
     private lateinit var sfwSwitch: Switch
-    private lateinit var modeSpinner: Spinner
+    private lateinit var privateSwitch: Switch
     private lateinit var tagsEt: EditText
     private lateinit var createBtn: Button
     private lateinit var relationshipBtn: Button
@@ -31,7 +33,10 @@ class ChatCreationActivity : AppCompatActivity() {
     private var selectedCharacters: MutableList<CharacterProfile> = mutableListOf()
     private var loadedAreas: MutableList<Area> = mutableListOf()
     private var characterToAreaMap: MutableMap<String, String> = mutableMapOf()
+    private var characterToLocationMap: MutableMap<String, String> = mutableMapOf()
     private var chatRelationships: MutableList<Relationship> = mutableListOf()
+    private var editingChatId: String? = null
+    private var modeSettings: MutableMap<String, String> = mutableMapOf()
 
     private val gson = Gson()
 
@@ -53,7 +58,6 @@ class ChatCreationActivity : AppCompatActivity() {
                     val mapType = object : TypeToken<Map<String, String>>() {}.type
                     characterToAreaMap = gson.fromJson(assignmentJson, mapType)
                 }
-                // Optionally, update a UI preview here!
             }
         }
 
@@ -63,10 +67,9 @@ class ChatCreationActivity : AppCompatActivity() {
                 val charactersJson = result.data!!.getStringExtra("CHARACTER_LIST_JSON") ?: return@registerForActivityResult
                 val charListType = object : com.google.gson.reflect.TypeToken<List<CharacterProfile>>() {}.type
                 selectedCharacters = gson.fromJson(charactersJson, charListType)
-                // TODO: Optionally update a UI preview here!
+                // Optionally update a UI preview here!
             }
         }
-
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -78,19 +81,61 @@ class ChatCreationActivity : AppCompatActivity() {
         secretDescEt = findViewById(R.id.secretDescriptionEditText)
         firstMsgEt = findViewById(R.id.firstMessageEditText)
         sfwSwitch = findViewById(R.id.sfwSwitch)
-        modeSpinner = findViewById(R.id.modeSpinner)
+        privateSwitch = findViewById(R.id.privateSwitch)
         tagsEt = findViewById(R.id.tagsEditText)
         createBtn = findViewById(R.id.createChatButton)
         relationshipBtn = findViewById(R.id.chatrelationshipBtn)
         btnLoadCollections = findViewById(R.id.btnLoadCollections)
         btnOpenMap = findViewById(R.id.btnOpenMap)
+        val enabledModes = mutableListOf<String>()
+        if (findViewById<CheckBox>(R.id.checkboxRPG).isChecked) enabledModes.add("rpg")
+        if (findViewById<CheckBox>(R.id.checkboxVisualNovel).isChecked) enabledModes.add("visual_novel")
+        if (findViewById<CheckBox>(R.id.checkboxGodMode).isChecked) enabledModes.add("god_mode")
+        val checkboxRPG = findViewById<CheckBox>(R.id.checkboxRPG)
+        val rpgButton = findViewById<Button>(R.id.rpgButton)
+        val checkboxVN = findViewById<CheckBox>(R.id.checkboxVisualNovel)
+        val VNButton = findViewById<Button>(R.id.visualNoveButton)
+        val checkboxGodMode = findViewById<CheckBox>(R.id.checkboxGodMode)
+        val godModeButton = findViewById<Button>(R.id.godModeButton)
 
-        // Spinner setup
-        ArrayAdapter.createFromResource(
-            this, R.array.chat_creation_modes, android.R.layout.simple_spinner_item
-        ).also { adapter ->
-            adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-            modeSpinner.adapter = adapter
+        // --- Check if editing a chat ---
+        val chatProfileJson = intent.getStringExtra("CHAT_PROFILE_JSON")
+        editingChatId = intent.getStringExtra("CHAT_EDIT_ID") // Track edit mode for save
+
+        if (chatProfileJson != null) {
+            val profile = gson.fromJson(chatProfileJson, ChatProfile::class.java)
+            // Populate UI fields
+            titleEt.setText(profile.title)
+            descEt.setText(profile.description)
+            secretDescEt.setText(profile.secretDescription)
+            firstMsgEt.setText(profile.firstmessage)
+            sfwSwitch.isChecked = profile.sfwOnly
+            privateSwitch.isChecked = profile.private
+            tagsEt.setText(profile.tags.joinToString(", "))
+            // Store areas and characterToArea
+            loadedAreas = profile.areas.toMutableList()
+            characterToAreaMap = profile.characterToArea.toMutableMap()
+            chatRelationships = profile.relationships.toMutableList()
+
+            // Load full character objects by ID for UI use (avatars/relationships)
+            if (profile.characterIds.isNotEmpty()) {
+                loadCharactersFromFirestoreByIds(profile.characterIds) { chars ->
+                    selectedCharacters = chars.toMutableList()
+                }
+            }
+            // Set modeSettings from loaded profile!
+            modeSettings = profile.modeSettings.toMutableMap()
+
+            // If rpg settings exist, check RPG mode
+            if (!modeSettings["rpg"].isNullOrBlank()) {
+                checkboxRPG.isChecked = true
+                rpgButton.isEnabled = true
+                rpgButton.visibility = View.VISIBLE
+            } else {
+                checkboxRPG.isChecked = false
+                rpgButton.isEnabled = false
+                rpgButton.visibility = View.GONE
+            }
         }
 
         // Load collections (multi-select via CharacterSelectionActivity)
@@ -110,6 +155,12 @@ class ChatCreationActivity : AppCompatActivity() {
 
         // Relationships (launches ChatRelationshipActivity)
         relationshipBtn.setOnClickListener {
+            // If new, build from selectedCharacters; if editing, use chatRelationships
+            if (chatRelationships.isEmpty()) {
+                chatRelationships = selectedCharacters
+                    .flatMap { it.relationships ?: emptyList() }
+                    .toMutableList()
+            }
             val previews = selectedCharacters.map {
                 ParticipantPreview(it.id, it.name, it.avatarUri ?: "")
             }
@@ -120,7 +171,51 @@ class ChatCreationActivity : AppCompatActivity() {
             startActivityForResult(intent, 8080)
         }
 
-        // Create Chat button
+        checkboxRPG.setOnCheckedChangeListener { _, isChecked ->
+            rpgButton.isEnabled = isChecked
+            rpgButton.visibility = View.VISIBLE
+            if (!isChecked) {
+                modeSettings.remove("rpg")
+                rpgButton.visibility = View.GONE
+            }
+        }
+        rpgButton.setOnClickListener {
+            val intent = Intent(this, RPGSettingsActivity::class.java)
+            Log.d("RPG_SETTINGS", "Sending: ${modeSettings["rpg"]}")
+            intent.putExtra("CURRENT_SETTINGS_JSON", modeSettings["rpg"] ?: "")
+            intent.putExtra("SELECTED_CHARACTERS_JSON", gson.toJson(selectedCharacters))
+            intent.putExtra("AREAS_JSON", gson.toJson(loadedAreas))
+            startActivityForResult(intent, REQUEST_CODE_RPG_SETTINGS)
+        }
+
+
+        checkboxVN.setOnCheckedChangeListener { _, isChecked ->
+            VNButton.isEnabled = isChecked
+            VNButton.visibility = View.VISIBLE
+            if (!isChecked) {
+                modeSettings.remove("visual_novel")
+                VNButton.visibility = View.GONE
+            }
+        }
+
+        VNButton.setOnClickListener {
+            Toast.makeText(this, "Visual Novel settings is not created yet", Toast.LENGTH_SHORT).show()
+        }
+
+        checkboxGodMode.setOnCheckedChangeListener { _, isChecked ->
+            godModeButton.isEnabled = isChecked
+            godModeButton.visibility = View.VISIBLE
+            if (!isChecked) {
+                modeSettings.remove("god_mode")
+                godModeButton.visibility = View.GONE
+            }
+        }
+
+        godModeButton.setOnClickListener {
+            Toast.makeText(this, "God Mode settings is not created yet", Toast.LENGTH_SHORT).show()
+        }
+
+        // Create or Save Chat button
         createBtn.setOnClickListener {
             if (titleEt.text.isNullOrBlank()) {
                 titleEt.error = "Title required"
@@ -128,6 +223,12 @@ class ChatCreationActivity : AppCompatActivity() {
             }
             saveAndLaunchChat()
         }
+    }
+    companion object {
+        private const val REQUEST_CODE_RPG_SETTINGS = 1001
+        private const val REQUEST_CODE_VISUAL_NOVEL_SETTINGS = 1002
+        private const val REQUEST_CODE_GOD_MODE_SETTINGS = 1003
+        // ...add more if you have more mode settings screens
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
@@ -140,18 +241,39 @@ class ChatCreationActivity : AppCompatActivity() {
                 chatRelationships = gson.fromJson(relationshipsJson, relType)
             }
         }
+        when (requestCode) {
+            REQUEST_CODE_RPG_SETTINGS -> {
+                if (resultCode == Activity.RESULT_OK && data != null) {
+                    val rpgSettingsJson = data.getStringExtra("RPG_SETTINGS_JSON")
+                    if (!rpgSettingsJson.isNullOrEmpty()) {
+                        val rpgSettings = gson.fromJson(rpgSettingsJson, ModeSettings.RPGSettings::class.java)
+                        modeSettings["rpg"] = rpgSettingsJson
+                    }
+                }
+            }
+            REQUEST_CODE_VISUAL_NOVEL_SETTINGS -> {
+                // handle Visual Novel settings result
+            }
+            REQUEST_CODE_GOD_MODE_SETTINGS -> {
+                // handle Visual Novel settings result
+            }
+        }
     }
 
     private fun saveAndLaunchChat() {
-        val chatId = System.currentTimeMillis().toString()
+        val chatId = editingChatId ?: System.currentTimeMillis().toString()
         val title = titleEt.text.toString().trim()
         val desc = descEt.text.toString().trim()
         val secretDesc = secretDescEt.text.toString().trim()
         val firstMsg = firstMsgEt.text.toString().trim()
         val tags = tagsEt.text.toString().split(",").map { it.trim() }.filter { it.isNotEmpty() }
         val sfwOnly = sfwSwitch.isChecked
-        val modeLabel = modeSpinner.selectedItem as String
-        val mode = ChatMode.valueOf(modeLabel.uppercase().replace(' ', '_'))
+        val private = privateSwitch.isChecked
+        val enabledModes = mutableListOf<String>()
+        if (findViewById<CheckBox>(R.id.checkboxRPG).isChecked) enabledModes.add("rpg")
+        if (findViewById<CheckBox>(R.id.checkboxVisualNovel).isChecked) enabledModes.add("visual_novel")
+        if (findViewById<CheckBox>(R.id.checkboxGodMode).isChecked) enabledModes.add("god_mode")
+
         val authorId = FirebaseAuth.getInstance().currentUser?.uid ?: ""
 
         val profile = ChatProfile(
@@ -160,16 +282,20 @@ class ChatCreationActivity : AppCompatActivity() {
             description = desc,
             secretDescription = secretDesc,
             firstmessage = firstMsg,
-            mode = mode,
+            mode = "SANDBOX",
+            enabledModes = enabledModes,
+            modeSettings = modeSettings,
             areas = loadedAreas,
             characterIds = selectedCharacters.map { it.id },
             characterToArea = characterToAreaMap,
+            characterToLocation = characterToLocationMap,
             relationships = chatRelationships,
             rating = 0f,
             timestamp = Timestamp.now(),
             author = authorId,
             tags = tags,
-            sfwOnly = sfwOnly
+            sfwOnly = sfwOnly,
+            private = private
         )
 
         val chatData = mapOf(
@@ -178,7 +304,9 @@ class ChatCreationActivity : AppCompatActivity() {
             "description" to profile.description,
             "secretDescription" to profile.secretDescription,
             "firstmessage" to profile.firstmessage,
-            "mode" to profile.mode.name,
+            "mode" to profile.mode,
+            "enabledModes" to profile.enabledModes,
+            "modeSettings" to profile.modeSettings,
             "areas" to profile.areas.map { area ->
                 mapOf(
                     "id" to area.id,
@@ -190,12 +318,14 @@ class ChatCreationActivity : AppCompatActivity() {
             },
             "characterIds" to profile.characterIds,
             "characterToArea" to profile.characterToArea,
+            "characterToLocation" to profile.characterToLocation,
             "relationships" to profile.relationships,
             "rating" to profile.rating,
             "timestamp" to Timestamp.now(),
             "author" to authorId,
             "tags" to profile.tags,
             "sfwOnly" to profile.sfwOnly,
+            "private" to profile.private,
             "lastMessage" to "",
             "lastTimestamp" to FieldValue.serverTimestamp()
         )
@@ -217,13 +347,16 @@ class ChatCreationActivity : AppCompatActivity() {
             }
     }
 
-    private fun loadCharactersFromFirestore(onLoaded: (List<CharacterProfile>) -> Unit) {
-        val db = FirebaseFirestore.getInstance()
-        db.collection("characters")
+    private fun loadCharactersFromFirestoreByIds(ids: List<String>, onLoaded: (List<CharacterProfile>) -> Unit) {
+        if (ids.isEmpty()) { onLoaded(emptyList()); return }
+        FirebaseFirestore.getInstance()
+            .collection("characters")
+            .whereIn("id", ids)
             .get()
-            .addOnSuccessListener { snapshot ->
-                val chars = snapshot.documents.mapNotNull { it.toObject(CharacterProfile::class.java) }
+            .addOnSuccessListener { snap ->
+                val chars = snap.documents.mapNotNull { it.toObject(CharacterProfile::class.java) }
                 onLoaded(chars)
             }
+            .addOnFailureListener { onLoaded(emptyList()) }
     }
 }

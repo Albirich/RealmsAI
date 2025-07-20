@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:padding="8dp"
+    android:background="?attr/selectableItemBackground">
+
+    <TextView
+        android:id="@+id/actHeader"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:text="ACT 1"
+        android:textStyle="bold"
+        android:textSize="16sp"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toStartOf="@id/expandButton"
+        app:layout_constraintBottom_toTopOf="@id/actSummary"
+        android:layout_marginBottom="4dp"/>
+
+    <ImageButton
+        android:id="@+id/expandButton"
+        android:layout_width="32dp"
+        android:layout_height="32dp"
+        android:src="@drawable/ic_expand_more"
+        android:background="?android:selectableItemBackgroundBorderless"
+        android:contentDescription="Expand/collapse act"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintBottom_toBottomOf="@id/actHeader" />
+
+    <EditText
+        android:id="@+id/actSummary"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:hint="Act summary (1000 chars max)"
+        android:maxLength="1000"
+        android:inputType="textMultiLine"
+        app:layout_constraintTop_toBottomOf="@id/actHeader"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginTop="8dp"
+        android:layout_marginBottom="8dp"/>
+
+    <EditText
+        android:id="@+id/actGoal"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:hint="Goal (how does this act end?)"
+        android:maxLength="200"
+        android:inputType="text"
+        app:layout_constraintTop_toBottomOf="@id/actSummary"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginBottom="8dp"/>
+
+    <Spinner
+        android:id="@+id/areaSpinner"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        app:layout_constraintTop_toBottomOf="@id/actGoal"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:contentDescription="Select an area for this act" />
+
+</androidx.constraintlayout.widget.ConstraintLayout>

@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout
-    xmlns:android="http://schemas.android.com/apk/res/android"
+
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:orientation="vertical"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
@@ -12,12 +13,15 @@
         android:id="@+id/outfitNameEditText"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        app:layout_constraintTop_toTopOf="parent"
         android:hint="Outfit Name"/>
 
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/poseRecycler"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        app:layout_constraintTop_toBottomOf="@id/outfitNameEditText"
+        app:layout_constraintEnd_toStartOf="@id/addPoseButton"
         android:layout_marginTop="8dp"/>
     <ImageButton
         android:id="@+id/addPoseButton"
@@ -26,6 +30,8 @@
         android:src="@drawable/ic_add"
         android:background="?attr/selectableItemBackgroundBorderless"
         android:contentDescription="Add Pose"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/outfitNameEditText"
         android:scaleType="fitXY"
         android:layout_gravity="end"
         android:layout_marginTop="8dp" />
@@ -37,9 +43,11 @@
         android:src="@drawable/ic_delete"
         android:background="?attr/selectableItemBackgroundBorderless"
         android:contentDescription="Delete Pose"
+        app:layout_constraintTop_toBottomOf="@id/addPoseButton"
+        app:layout_constraintEnd_toEndOf="parent"
         android:scaleType="fitXY"
         android:layout_gravity="end"
         android:layout_marginStart="8dp"
         android:layout_marginTop="8dp"/>
 
-</LinearLayout>
+</androidx.constraintlayout.widget.ConstraintLayout>

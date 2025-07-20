@@ -7,6 +7,7 @@ import android.widget.AdapterView
 import android.widget.ArrayAdapter
 import android.widget.Spinner
 import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.example.RealmsAI.SessionManager.findSessionForUser
@@ -57,7 +58,30 @@ class ChatHubActivity : BaseActivity() {
                         })
                     }
                 )
+            },
+            itemLayoutRes = R.layout.chat_preview_item,
+            onLongClick = { preview ->
+                AlertDialog.Builder(this)
+                    .setTitle(preview.title)
+                    .setItems(arrayOf("Profile", "Creator")) { _, which ->
+                        when (which) {
+                            0 -> { // --- Profile ---
+                                startActivity(
+                                    Intent(this, ChatProfileActivity::class.java)
+                                        .putExtra("chatId", preview.id)
+                                )
+                            }
+                            1 -> { // --- Creator ---
+                                startActivity(
+                                    Intent(this, DisplayProfileActivity::class.java)
+                                        .putExtra("userId", preview.author)
+                                )
+                            }
+                        }
+                    }
+                    .show()
             }
+
         )
         chatsRv.adapter = adapter
 
@@ -107,7 +131,7 @@ class ChatHubActivity : BaseActivity() {
     ) {
         FirebaseFirestore.getInstance()
             .collection("chats")
-            .whereNotEqualTo("mode", "ONE_ON_ONE")
+            .whereNotEqualTo("private", true)
             .orderBy(orderBy, Query.Direction.DESCENDING)
             .get()
             .addOnSuccessListener { snap ->
@@ -127,7 +151,6 @@ class ChatHubActivity : BaseActivity() {
                         avatar2ResId = R.drawable.placeholder_avatar,
                         rating = profile.rating,
                         timestamp = profile.timestamp,
-                        mode = profile.mode,
                         author = profile.author,
                         tags = profile.tags,
                         sfwOnly = profile.sfwOnly,

@@ -11,7 +11,6 @@
         <item>Rpg</item>
         <item>God</item>
         <item>VN</item>
-        <item>ONE ON ONE</item>
     </string-array>
     <string-array name="character_hub_sort_options">
         <item>Name</item>

@@ -35,8 +35,8 @@ class BackgroundGalleryActivity : AppCompatActivity() {
     private lateinit var areaAdapter: AreaAdapter
 
     private lateinit var imagePicker: ActivityResultLauncher<String>
-    private var currentAreaIndex: Int = 0
-    private var currentLocationIndex: Int = 0
+    private var currentArea: Area? = null
+    private var currentLocation: LocationSlot? = null
     private var progressDialog: AlertDialog? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -47,16 +47,10 @@ class BackgroundGalleryActivity : AppCompatActivity() {
         val recycler = findViewById<RecyclerView>(R.id.areaRecycler)
         areaAdapter = AreaAdapter(
             areas = areas,
-            onPickImage = { areaIdx, locIdx ->
-                currentAreaIndex = areaIdx
-                currentLocationIndex = locIdx
+            onPickImage = { area, location ->
+                currentArea = area
+                currentLocation = location
                 imagePicker.launch("image/*")
-            },
-            onDeleteLocation = { areaIdx, locIdx ->
-                if (areas[areaIdx].locations.size > 1) {
-                    areas[areaIdx].locations.removeAt(locIdx)
-                    areaAdapter.notifyItemChanged(areaIdx)
-                }
             },
             readonly = false
         )
@@ -66,13 +60,8 @@ class BackgroundGalleryActivity : AppCompatActivity() {
         // Image Picker
         imagePicker = registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
             uri?.let {
-                val area = areas[currentAreaIndex]
-                if (area.locations.isNotEmpty() && currentLocationIndex < area.locations.size) {
-                    val locationSlot = area.locations[currentLocationIndex]
-                    locationSlot.uri = uri.toString()  // Just store the uri string
-                    areaAdapter.notifyItemChanged(currentAreaIndex)
-                    // Optionally: Toast.makeText(this, "Image selected!", Toast.LENGTH_SHORT).show()
-                }
+                currentLocation?.uri = uri.toString()
+                areaAdapter.notifyDataSetChanged() // Or notify the right item
             }
         }
 

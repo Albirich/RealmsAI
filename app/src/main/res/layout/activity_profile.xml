@@ -4,6 +4,7 @@
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
+    android:fitsSystemWindows="true"
     android:layout_height="match_parent">
 
     <ScrollView
@@ -62,7 +63,7 @@
                     android:id="@+id/saveHandleButton"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Set Handle"/>
+                    android:text="Set Creator ID"/>
             </LinearLayout>
 
             <EditText
@@ -80,15 +81,53 @@
                     android:maxLines="4" android:textSize="16sp"
                     android:paddingTop="8dp"/>
 
+
+            <androidx.constraintlayout.widget.ConstraintLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content">
                 <Button
                     android:id="@+id/logoutButton"
-                    android:layout_width="match_parent" android:layout_height="wrap_content"
-                    android:text="Log Out" android:layout_marginTop="8dp"/>
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    app:layout_constraintTop_toTopOf="parent"
+                    android:text="Log Out"
+                    android:layout_marginTop="8dp"/>
 
                 <Button
                     android:id="@+id/saveProfileButton"
-                    android:layout_width="match_parent" android:layout_height="wrap_content"
-                    android:text="Save" android:layout_marginTop="18dp"/>
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    app:layout_constraintTop_toBottomOf="@id/logoutButton"
+                    android:text="Save"
+                    android:layout_marginTop="18dp"/>
+
+                <Button
+                    android:id="@+id/viewProfileButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    app:layout_constraintTop_toBottomOf="@id/saveProfileButton"
+                    android:text="view profile"
+                    android:layout_marginTop="18dp"/>
+
+                <Button
+                    android:id="@+id/messageButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    app:layout_constraintTop_toBottomOf="@id/viewProfileButton"
+                    android:text="Messages"
+                    android:layout_marginTop="18dp"/>
+
+                <View
+                android:id="@+id/messagesBadge"
+                android:layout_width="32dp"
+                android:layout_height="24dp"
+                android:background="@drawable/new_message"
+                app:layout_constraintTop_toTopOf="@id/messageButton"
+                app:layout_constraintEnd_toEndOf="@id/messageButton"
+                android:translationZ="10dp"
+                android:visibility="gone"/>
+
+            </androidx.constraintlayout.widget.ConstraintLayout>
 
 
 

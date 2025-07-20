@@ -34,6 +34,7 @@ class ChatMapActivity : AppCompatActivity() {
 
     // characterId -> areaId
     private val characterToAreaMap = mutableMapOf<String, String>()
+    private val characterToLocationMap = mutableMapOf<String, String>()
     // areaId -> color
     private val areaColors = mutableMapOf<String, Int>()
     // Colors to cycle through
@@ -72,7 +73,9 @@ class ChatMapActivity : AppCompatActivity() {
             LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
         characterRecycler.adapter = CharacterRowAdapter(
             characters = selectedCharacters,
-            onClick = { character -> showAreaSelectionPopup(character) }
+            onClick = { character ->
+                showAreaSelectionPopup(character)
+            }
         ) { character, itemView ->
             // Here you set the border color based on area assignment
             val areaId = characterToAreaMap[character.id]
@@ -90,10 +93,11 @@ class ChatMapActivity : AppCompatActivity() {
         areaRecycler.layoutManager = LinearLayoutManager(this)
         areaRecycler.adapter = AreaAdapter(
             areas = loadedAreas,
+            areaColors = areaColors,
             onPickImage = { _, _ -> },
-            onDeleteLocation = { _, _ -> },
             readonly = true
         )
+
 
         addAreaButton.setOnClickListener {
             loadAreasForPicker { userAreas, defaultAreas ->
@@ -131,6 +135,26 @@ class ChatMapActivity : AppCompatActivity() {
         }
 
     }
+    private fun showLocationSelectionPopup(character: CharacterProfile, area: Area) {
+        val locations = area.locations
+        if (locations.isEmpty()) {
+            Toast.makeText(this, "No locations in this area.", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val popup = PopupMenu(this, characterRecycler)
+        locations.forEachIndexed { idx, location ->
+            popup.menu.add(0, idx, 0, location.name)
+        }
+        popup.setOnMenuItemClickListener { item: MenuItem ->
+            val location = locations[item.itemId]
+            characterToLocationMap[character.id] = location.id
+            characterRecycler.adapter?.notifyDataSetChanged()
+            true
+        }
+        popup.show()
+    }
+
+
 
     private fun showAreaSelectionPopup(character: CharacterProfile) {
         val popup = PopupMenu(this, characterRecycler)
@@ -141,6 +165,7 @@ class ChatMapActivity : AppCompatActivity() {
             val area = loadedAreas[item.itemId]
             characterToAreaMap[character.id] = area.id
             characterRecycler.adapter?.notifyDataSetChanged()
+            showLocationSelectionPopup(character, area)
             true
         }
         popup.show()

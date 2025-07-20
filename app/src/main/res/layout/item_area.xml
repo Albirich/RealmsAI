@@ -9,18 +9,30 @@
     android:background="@drawable/halo_shape"
     android:layout_marginBottom="16dp">
 
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:id="@+id/nameHalo"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        app:layout_constraintTop_toTopOf="parent"
+        android:background="@drawable/halo"        >
+
     <EditText
         android:id="@+id/areaNameEditText"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:textColor="@android:color/black"
+        app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent"
-        android:hint="Area Name"/>
+        android:paddingStart="8dp"
+        android:background="@android:color/transparent"
+        android:hint="Area Name" />
+    </androidx.constraintlayout.widget.ConstraintLayout>
 
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/locationRecycler"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        app:layout_constraintTop_toBottomOf="@id/areaNameEditText"
+        app:layout_constraintTop_toBottomOf="@id/nameHalo"
         app:layout_constraintEnd_toStartOf="@id/addLocationButton"
         app:layout_constraintStart_toStartOf="parent"
         android:layout_marginTop="8dp"/>
@@ -32,7 +44,7 @@
         android:src="@drawable/ic_add"
         android:background="?attr/selectableItemBackgroundBorderless"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/areaNameEditText"
+        app:layout_constraintTop_toBottomOf="@id/nameHalo"
         android:contentDescription="Add Location"
         android:scaleType="fitXY"
         android:layout_gravity="end"
@@ -50,4 +62,5 @@
         android:layout_gravity="end"
         android:layout_marginTop="8dp"
         android:layout_marginStart="8dp"/>
+
 </androidx.constraintlayout.widget.ConstraintLayout>

@@ -3,6 +3,7 @@
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/sessionLandingRoot"
+    android:fitsSystemWindows="true"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:padding="18dp">
@@ -34,16 +35,27 @@
 
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/playerRecycler"
-        android:layout_width="match_parent"
+        android:layout_width="0dp"
         android:layout_height="72dp"
         android:layout_marginTop="6dp"
         app:layout_constraintTop_toBottomOf="@id/playerLabel"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintEnd_toStartOf="@id/addPlayerButton"
         android:clipToPadding="false"
         android:paddingBottom="4dp"
         android:paddingTop="4dp"
         android:overScrollMode="always" />
+
+    <ImageButton
+        android:id="@+id/addPlayerButton"
+        android:layout_width="30dp"
+        android:layout_height="30dp"
+        android:src="@drawable/ic_add"
+        android:background="?android:selectableItemBackgroundBorderless"
+        android:scaleType="fitCenter"
+        app:layout_constraintStart_toEndOf="@id/playerRecycler"
+        app:layout_constraintTop_toTopOf="@id/playerRecycler"
+        app:layout_constraintEnd_toEndOf="parent"/>
 
     <!-- Character (NPC/Bot) row -->
     <TextView
@@ -58,14 +70,35 @@
 
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/charactersRecycler"
-        android:layout_width="match_parent"
-        android:layout_height="100dp"
+        android:layout_width="wrap_content"
+        android:layout_height="112dp"
         android:layout_marginTop="6dp"
+        android:paddingEnd="50dp"
         app:layout_constraintTop_toBottomOf="@id/charactertext"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        android:clipToPadding="false"
+        app:layout_constraintEnd_toStartOf="@id/spacer"
         android:overScrollMode="always" />
+    <ImageView
+        android:id="@+id/spacer"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+
+        app:layout_constraintTop_toTopOf="@id/addcharacter"
+        app:layout_constraintBottom_toBottomOf="@id/addcharacter"
+        app:layout_constraintStart_toEndOf="@id/charactersRecycler"
+        app:layout_constraintEnd_toStartOf="@id/addcharacter"/>
+
+    <ImageButton
+        android:id="@+id/addcharacter"
+        android:layout_width="30dp"
+        android:layout_height="30dp"
+        android:src="@drawable/ic_add"
+        android:background="?android:selectableItemBackgroundBorderless"
+        android:scaleType="fitCenter"
+        app:layout_constraintBottom_toBottomOf="@id/charactersRecycler"
+        app:layout_constraintTop_toTopOf="@id/charactersRecycler"
+        app:layout_constraintEnd_toEndOf="parent"/>
+
 
     <!-- Description Block -->
     <TextView
@@ -86,7 +119,6 @@
         android:layout_width="0dp"
         android:layout_height="0dp"
         android:textSize="16sp"
-        android:background="#EFEFEF"
         android:padding="12dp"
         android:gravity="start|top"
         android:minHeight="96dp"

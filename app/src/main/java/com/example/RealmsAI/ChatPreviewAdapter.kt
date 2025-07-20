@@ -7,6 +7,7 @@ import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.ScrollView
 import android.widget.TextView
+import androidx.annotation.LayoutRes
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.example.RealmsAI.models.CharacterProfile
@@ -16,6 +17,7 @@ import com.google.gson.Gson
 class ChatPreviewAdapter(
     private val context: Context,
     private var chatList: List<ChatPreview>,
+    @LayoutRes private val itemLayoutRes: Int,
     private val onClick: (ChatPreview) -> Unit,
     private val onLongClick: (ChatPreview) -> Unit = {}
 ) : RecyclerView.Adapter<ChatPreviewAdapter.PreviewViewHolder>() {
@@ -25,7 +27,6 @@ class ChatPreviewAdapter(
         private val description : TextView  = itemView.findViewById(R.id.chatPreview)
         private val avatar1     : ImageView = itemView.findViewById(R.id.chatAvatar1)
         private val avatar2     : ImageView = itemView.findViewById(R.id.chatAvatar2)
-        private val badge       : TextView  = itemView.findViewById(R.id.previewTypeBadge)
         private val ratingText  : TextView  = itemView.findViewById(R.id.chatRating)
 
 
@@ -33,7 +34,6 @@ class ChatPreviewAdapter(
             title.text       = preview.title
             description.text = preview.description
             ratingText.text  = "★ %.1f".format(preview.rating)
-            badge.text       = preview.mode.name
 
             // Avatar 1
             if (!preview.avatar1Uri.isNullOrBlank()) {
@@ -54,7 +54,7 @@ class ChatPreviewAdapter(
                     .error(R.drawable.placeholder_avatar)
                     .into(avatar2)
             } else {
-                avatar2.setImageResource(preview.avatar2ResId)
+                avatar2.visibility = View.GONE
             }
             val descScrollView = itemView.findViewById<ScrollView>(R.id.descScrollView)
             descScrollView.setOnTouchListener { v, event ->
@@ -73,10 +73,10 @@ class ChatPreviewAdapter(
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): PreviewViewHolder {
-        val view = LayoutInflater.from(parent.context)
-            .inflate(R.layout.chat_preview_item, parent, false)
+        val view = LayoutInflater.from(parent.context).inflate(itemLayoutRes, parent, false)
         return PreviewViewHolder(view)
     }
+
 
     override fun onBindViewHolder(holder: PreviewViewHolder, position: Int) {
         holder.bind(chatList[position])
@@ -139,7 +139,6 @@ fun loadChatPreviewsAndDisplay(
                             avatar2ResId = R.drawable.placeholder_avatar,
                             rating = chat.rating,
                             timestamp = chat.timestamp,
-                            mode = chat.mode,
                             author = chat.author,
                             tags = chat.tags,
                             sfwOnly = chat.sfwOnly,

@@ -30,9 +30,7 @@ class CharacterRelationshipActivity : AppCompatActivity() {
                 relationships.remove(rel)
                 adapter.notifyDataSetChanged()
             },
-            onChanged = {
-                // Optionally: persist changes live
-            }
+           // onChanged = {Optionally: persist changes live}
         )
         recyclerView.layoutManager = LinearLayoutManager(this)
         recyclerView.adapter = adapter
