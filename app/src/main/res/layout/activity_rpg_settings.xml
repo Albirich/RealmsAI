@@ -19,22 +19,58 @@
             android:textSize="16dp"
             app:layout_constraintTop_toTopOf="parent"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintBottom_toTopOf="@id/rpgsettingspacer1"/>
+            app:layout_constraintEnd_toEndOf="@id/genreSpinner"/>
+        <TextView
+            android:id="@+id/perspectiveTitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Perspective:"
+            app:layout_constraintStart_toStartOf="@id/aboveLabel"
+            app:layout_constraintEnd_toEndOf="@id/onLabel"
+            app:layout_constraintTop_toBottomOf="@id/genreSpinner"/>
         <Spinner
             android:id="@+id/genreSpinner"
-            android:layout_width="0dp"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            app:layout_constraintTop_toTopOf="parent"
-            app:layout_constraintStart_toEndOf="@id/genreSpinnerLabel"
-            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/genreSpinnerLabel"
+            app:layout_constraintStart_toStartOf="parent"
             android:contentDescription="a list of genre to dictate what the options are given"/>
+
+        <TextView
+            android:id="@+id/aboveLabel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Above the table"
+            android:maxLines="2"
+            app:layout_constraintTop_toTopOf="@id/perspectiveSwitch"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toStartOf="@id/perspectiveSwitch"/>
+        <Switch
+            android:id="@+id/perspectiveSwitch"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            app:layout_constraintTop_toBottomOf="@id/perspectiveTitle"
+            app:layout_constraintStart_toEndOf="@id/aboveLabel"
+            app:layout_constraintEnd_toStartOf="@id/onLabel"/>
+
+        <TextView
+            android:id="@+id/onLabel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            app:layout_constraintEnd_toEndOf="parent"
+            android:text="On the table"
+            android:maxLines="2"
+            app:layout_constraintStart_toEndOf="@id/perspectiveSwitch"
+            app:layout_constraintTop_toTopOf="@id/perspectiveSwitch" />
+
+
         <View
             android:id="@+id/rpgsettingspacer1"
             android:layout_width="match_parent"
             android:layout_height="2dp"
-            app:layout_constraintTop_toBottomOf="@id/genreSpinnerLabel"
+            app:layout_constraintTop_toBottomOf="@id/perspectiveSwitch"
             android:background="#000000"
-            android:layout_marginTop="18dp"
+            android:layout_marginTop="8dp"
             android:layout_marginBottom="8dp" />
 
             <!-- Characters header -->

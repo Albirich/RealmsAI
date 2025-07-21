@@ -29,6 +29,7 @@ class RPGSettingsActivity : AppCompatActivity() {
     private lateinit var actAdapter: RPGActAdapter
     private var selectedCharacters: MutableList<CharacterProfile> = mutableListOf()
     private lateinit var rpgCharacters: MutableList<RPGCharacter>
+    private lateinit var perspectiveSwitch:Switch
 
     private val gson = Gson()
 
@@ -53,6 +54,7 @@ class RPGSettingsActivity : AppCompatActivity() {
         characterRecyclerView = findViewById(R.id.characterRecyclerView)
         actsRecyclerView = findViewById(R.id.actsRecyclerView)
         addActButton = findViewById(R.id.addActButton)
+        perspectiveSwitch = findViewById(R.id.perspectiveSwitch)
 
         // Parse incoming settings if editing an existing chat
         val currentSettingsJson = intent.getStringExtra("CURRENT_SETTINGS_JSON")
@@ -69,6 +71,10 @@ class RPGSettingsActivity : AppCompatActivity() {
         selectedCharacters = gson.fromJson(
             selectedCharactersJson, object : TypeToken<List<CharacterProfile>>() {}.type
         )
+        perspectiveSwitch.isChecked = (rpgSettings.perspective == "onTable")
+        perspectiveSwitch.setOnCheckedChangeListener { _, isChecked ->
+            rpgSettings.perspective = if (isChecked) "onTable" else "aboveTable"
+        }
 
         rpgSettings = if (!currentSettingsJson.isNullOrEmpty() && currentSettingsJson.trim().startsWith("{")) {
             gson.fromJson(currentSettingsJson, RPGSettings::class.java) ?: RPGSettings(
@@ -84,6 +90,10 @@ class RPGSettingsActivity : AppCompatActivity() {
                 acts = mutableListOf(),
                 currentAct = 0
             )
+        }
+
+        perspectiveSwitch.setOnCheckedChangeListener { _, isChecked ->
+            rpgSettings.perspective = if (isChecked) "onTable" else "aboveTable"
         }
 
         val charMap = rpgSettings.characters.associateBy { it.characterId }

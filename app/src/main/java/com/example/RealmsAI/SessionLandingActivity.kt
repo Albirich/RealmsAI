@@ -529,7 +529,6 @@ class SessionLandingActivity : AppCompatActivity() {
                         )
                     } ?: emptyList()
                     val currentAct = rpgSettings?.currentAct ?: 0
-                    val modeFlags = chatProfile?.modeSettings?.keys?.associateWith { "true" }?.toMutableMap() ?: mutableMapOf()
                     val fixedProfile = SessionProfile(
                         sessionId = sessionId,
                         chatId = chatProfile?.id ?: "",
@@ -551,7 +550,8 @@ class SessionLandingActivity : AppCompatActivity() {
                         multiplayer = currentIsMultiplayer,
                         acts = parsedActs,
                         currentAct = currentAct,
-                        modeSettings = chatProfile?.modeSettings?.keys?.associateWith { "true" }?.toMutableMap() ?: mutableMapOf()
+                        modeSettings = chatProfile?.modeSettings?.toMutableMap() ?: mutableMapOf()
+
                     )
 
                     // Save session and update Firestore

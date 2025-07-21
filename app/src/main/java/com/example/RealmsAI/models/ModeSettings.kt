@@ -6,7 +6,8 @@ sealed class ModeSettings : java.io.Serializable {
         var characters: MutableList<RPGCharacter> = mutableListOf(),
         var acts: MutableList<RPAct> = mutableListOf(),
         var currentAct: Int = 0,
-        var linkedToMap: MutableMap<String, MutableList<CharacterLink>> = mutableMapOf()
+        var linkedToMap: MutableMap<String, MutableList<CharacterLink>> = mutableMapOf(),
+        var perspective: String = "aboveTable"
     ) : ModeSettings()
     enum class RPGGenre {
         FANTASY,

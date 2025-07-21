@@ -866,12 +866,8 @@ class MainActivity : AppCompatActivity() {
                     saveSessionProfile(sessionProfile, sessionId)
 
                     playerSlot = sessionProfile.slotRoster.find { it.profileType == "player" }
-                    if (playerSlot == null) {
-                        Log.w("AI_CYCLE", "No player slot found. Aborting.")
-                        return@withTimeoutOrNull
-                    }
-                    val playerArea = playerSlot.lastActiveArea
-                    val playerLocation = playerSlot.lastActiveLocation
+                    val playerArea = playerSlot?.lastActiveArea
+                    val playerLocation = playerSlot?.lastActiveLocation
 
                     // 3. NOW do your background lookup as before
                     fun String.normalize(): String = this.trim().lowercase().replace("\\s+".toRegex(), " ")
