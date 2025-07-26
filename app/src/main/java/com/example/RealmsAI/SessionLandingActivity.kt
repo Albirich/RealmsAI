@@ -528,13 +528,18 @@ class SessionLandingActivity : AppCompatActivity() {
                             areaId = act.areaId
                         )
                     } ?: emptyList()
+                    val cleanedAssignments = sessionProfile?.slotRoster!!.mapIndexed { idx, slot ->
+                        "character${idx + 1}" to slot.name // or whatever placeholder syntax you use
+                    }.toMap()
+
+                    val cleaned = cleanSessionDescriptionsAndRelationships(sessionProfile!!, cleanedAssignments)
                     val currentAct = rpgSettings?.currentAct ?: 0
                     val fixedProfile = SessionProfile(
                         sessionId = sessionId,
                         chatId = chatProfile?.id ?: "",
                         title = titleView.text.toString(),
-                        sessionDescription = cleanedDescription,
-                        secretDescription = cleanedSecretDescription,
+                        sessionDescription = cleaned.cleanedDescription,
+                        secretDescription = cleaned.cleanedSecretDescription,
                         chatMode = chatMode,
                         startedAt = startedAt,
                         sfwOnly = sfwToggle.isChecked,
@@ -574,9 +579,6 @@ class SessionLandingActivity : AppCompatActivity() {
                     } else {
                         fixedProfile.slotRoster.firstOrNull()?.greeting ?: ""
                     }
-                    val cleanedAssignments = sessionProfile?.slotRoster!!.mapIndexed { idx, slot ->
-                        "character${idx + 1}" to slot.name // or whatever placeholder syntax you use
-                    }.toMap()
                     val cleanedGreeting = substitutePlaceholders(greeting, cleanedAssignments)
                     intent.putExtra("GREETING", cleanedGreeting)
 

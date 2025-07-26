@@ -36,6 +36,7 @@ import android.text.Editable
 import androidx.constraintlayout.widget.ConstraintLayout
 import com.example.RealmsAI.adapters.CollectionAdapter.CharacterRowAdapter
 import android.net.Uri
+import com.example.RealmsAI.models.ModeSettings.RPGSettings
 import org.json.JSONArray
 
 class MainActivity : AppCompatActivity() {
@@ -77,6 +78,8 @@ class MainActivity : AppCompatActivity() {
     private var personalHistoryListener: ListenerRegistration? = null
     private var myPersonalHistory: List<ChatMessage> = emptyList()
     private var lastTypingState = false
+    private var ignoreTextWatcher = false
+
     private var typingTimeoutJob: Job? = null
 
 
@@ -339,7 +342,6 @@ class MainActivity : AppCompatActivity() {
                 // Now assign this slot to the user and update Firestore
                 assignSlotToUser(myUserId!!, selectedSlot.slotId)
             }
-            return
         }
 
         // Toggle input visibility
@@ -663,7 +665,8 @@ class MainActivity : AppCompatActivity() {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
 
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
-                setPlayerTyping(true)
+                if (ignoreTextWatcher) return
+                if (!lastTypingState) setPlayerTyping(true)
                 typingTimeoutJob?.cancel()
                 typingTimeoutJob = lifecycleScope.launch {
                     delay(2000)
@@ -671,10 +674,9 @@ class MainActivity : AppCompatActivity() {
                 }
             }
 
-            override fun afterTextChanged(s: Editable?) {
-                // Optional: you can debounce here if you want
-            }
+            override fun afterTextChanged(s: Editable?) {}
         })
+
 
         resendButton.setOnClickListener {
             val lastMessage = chatAdapter.getMessages()
@@ -703,6 +705,7 @@ class MainActivity : AppCompatActivity() {
                     setPlayerTyping(false)
                     sendMessageAndCallAI(text)
                     messageEditText.text.clear()
+                    ignoreTextWatcher = false
                 }
             } else if (currentState == ButtonState.INTERRUPT) {
                 interruptAILoop()
@@ -729,11 +732,13 @@ class MainActivity : AppCompatActivity() {
 
         aiJob = lifecycleScope.launch(Dispatchers.IO) {
             try {
-                val timeoutMillis = 30_000L
+                Log.d("ai_cycle", "actually processing normal round")
+                val timeoutMillis = 45_000L
                 var nextSlot: String? = null
                 val didComplete = withTimeoutOrNull(timeoutMillis) {
                     withContext(Dispatchers.Main) {
                         updateButtonState(ButtonState.INTERRUPT)
+                        setPlayerTyping(false)
                     }
                     // Build activation prompt
                     val activeSlotId = sessionProfile.userMap[userId]?.activeSlotId
@@ -770,7 +775,7 @@ class MainActivity : AppCompatActivity() {
                     val historyString = buildHistoryString(chatHistory.takeLast(10))
                     val activationPrompt = PromptBuilder.buildActivationPrompt(
                         activeSlotId = activeSlotId,
-                        sessionSummary = sessionProfile.sessionSummary,
+                        sessionSummary = sessionProfile.sessionDescription + sessionProfile.secretDescription,
                         areas = if (sessionProfile.areas.isNullOrEmpty()) listOf("DM's") else sessionProfile.areas.map { it.name },
                         locations = locationMap,
                         condensedCharacterInfo = condensedMap, // Map: slotId → summary
@@ -917,7 +922,7 @@ class MainActivity : AppCompatActivity() {
                                 ""
                             }
                             val narratorPrompt = PromptBuilder.buildNarratorPrompt(
-                                sessionSummary = sessionProfile.sessionSummary,
+                                sessionSummary = sessionProfile.sessionDescription + sessionProfile.secretDescription,
                                 area = playerArea,
                                 location = playerLocation,
                                 condensedCharacterInfo = condensedCharacterInfo,
@@ -1038,7 +1043,7 @@ class MainActivity : AppCompatActivity() {
 
                             val roleplayPrompt = PromptBuilder.buildRoleplayPrompt(
                                 slotProfile = slotProfile,
-                                sessionSummary = sessionProfile.sessionSummary,
+                                sessionSummary = sessionProfile.sessionDescription + sessionProfile.secretDescription,
                                 sceneSlotIds = sceneSlotIds,
                                 condensedCharacterInfo = condensedCharacterInfo,
                                 chatHistory = historyString,
@@ -1046,11 +1051,14 @@ class MainActivity : AppCompatActivity() {
                             )
 
                             Log.d("AI_response", "History: $chatHistory")
+                            val nsfwinstructions =  "/n - Be descriptive and explicit. The more sexual and erotic the better"
+
+                            val nsfwPrompt = roleplayPrompt + nsfwinstructions
 
                             // Switch models as needed
                             val roleplayResponse =
                                 if (isNSFW)
-                                    Facilitator.callMixtralApi(roleplayPrompt, BuildConfig.MIXTRAL_API_KEY)
+                                    Facilitator.callMixtralApi(nsfwPrompt, BuildConfig.MIXTRAL_API_KEY)
                                 else
                                     Facilitator.callOpenAiApi(roleplayPrompt, BuildConfig.OPENAI_API_KEY)
 
@@ -1083,7 +1091,7 @@ class MainActivity : AppCompatActivity() {
                             }
                             val filteredMessages = roleplayResult.messages.map { msg ->
                                 val timestamp = msg.timestamp ?: com.google.firebase.Timestamp.now()
-                                val senderSlotProfile = sessionProfile.slotRoster.find { it.slotId == msg.senderId }
+                                val senderSlotProfile = sessionProfile.slotRoster.find { it.slotId == nextSlot }
                                 val cleanedPose = msg.pose?.filterValues { !it.isNullOrBlank() } // optional, if you want to clean out blanks
                                 msg.copy(
                                     area = senderSlotProfile?.lastActiveArea,
@@ -1215,11 +1223,13 @@ class MainActivity : AppCompatActivity() {
 
         aiJob = lifecycleScope.launch(Dispatchers.IO) {
             try {
-                val timeoutMillis = 30_000L
+                Log.d("ai_cycle", "actually processing abovetable round")
+                val timeoutMillis = 45_000L
                 var nextSlot: String? = null
                 val didComplete = withTimeoutOrNull(timeoutMillis) {
                     withContext(Dispatchers.Main) {
                         updateButtonState(ButtonState.INTERRUPT)
+                        setPlayerTyping(false)
                     }
                     // Build activation prompt
                     val activeSlotId = sessionProfile.userMap[userId]?.activeSlotId
@@ -1244,7 +1254,6 @@ class MainActivity : AppCompatActivity() {
                                     it.lastActiveLocation == playerSlot?.lastActiveLocation &&
                                     it.slotId != activeSlotId &&
                                     it.slotId != lastNonNarratorId &&
-                                    it.profileType != "player" &&
                                     !it.typing
                         }
                         .map { it.slotId }
@@ -1256,7 +1265,7 @@ class MainActivity : AppCompatActivity() {
                     val historyString = buildHistoryString(chatHistory.takeLast(10))
                     val activationPrompt = PromptBuilder.buildActivationPrompt(
                         activeSlotId = activeSlotId,
-                        sessionSummary = sessionProfile.sessionSummary,
+                        sessionSummary = sessionProfile.sessionDescription + sessionProfile.secretDescription,
                         areas = if (sessionProfile.areas.isNullOrEmpty()) listOf("DM's") else sessionProfile.areas.map { it.name },
                         locations = locationMap,
                         condensedCharacterInfo = condensedMap, // Map: slotId → summary
@@ -1407,7 +1416,7 @@ class MainActivity : AppCompatActivity() {
                                 ""
                             }
                             val narratorPrompt = PromptBuilder.buildNarratorPrompt(
-                                sessionSummary = sessionProfile.sessionSummary,
+                                sessionSummary = sessionProfile.sessionDescription + sessionProfile.secretDescription,
                                 area = playerArea,
                                 location = playerLocation,
                                 condensedCharacterInfo = condensedCharacterInfo,
@@ -1528,7 +1537,7 @@ class MainActivity : AppCompatActivity() {
 
                             val roleplayPrompt = PromptBuilder.buildRoleplayPrompt(
                                 slotProfile = slotProfile,
-                                sessionSummary = sessionProfile.sessionSummary,
+                                sessionSummary = sessionProfile.sessionDescription + sessionProfile.secretDescription,
                                 sceneSlotIds = sceneSlotIds,
                                 condensedCharacterInfo = condensedCharacterInfo,
                                 chatHistory = historyString,
@@ -1548,11 +1557,23 @@ class MainActivity : AppCompatActivity() {
                                 gmSlot = gmProfile!!
                             )
 
+                            val nsfwinstructions =  "/n - Be descriptive and explicit. The more sexual and erotic the better"
+
+                            val nsfwPrompt = roleplayPrompt + nsfwinstructions
+
                             Log.d("AI_response", "History: $chatHistory")
                             val rpgPrompt = if (slotProfile.hiddenRoles == "GM"){
-                                roleplayPrompt + gmPrompt + PromptBuilder.buildRPGLiteRules()
+                                if (isNSFW){
+                                    nsfwPrompt + gmPrompt + PromptBuilder.buildRPGLiteRules()
+                                }else {
+                                    roleplayPrompt + gmPrompt + PromptBuilder.buildRPGLiteRules()
+                                }
                             }else{
-                                roleplayPrompt + playerPrompt + PromptBuilder.buildRPGLiteRules()
+                                if (isNSFW){
+                                    nsfwPrompt + playerPrompt + PromptBuilder.buildRPGLiteRules()
+                                }else {
+                                    roleplayPrompt + playerPrompt + PromptBuilder.buildRPGLiteRules()
+                                }
                             }
 
                             // Switch models as needed
@@ -1564,7 +1585,7 @@ class MainActivity : AppCompatActivity() {
 
 
                             ensureActive()
-                            Log.d("ai_cycle", "Roleplay Prompt is: $roleplayPrompt")
+                            Log.d("ai_cycle", "RPG Prompt is: $rpgPrompt")
                             Log.d("AI_response", "Roleplay Response:\n$roleplayResponse")
 
                             // Parse AI output to ChatMessage list
@@ -1591,7 +1612,7 @@ class MainActivity : AppCompatActivity() {
                             }
                             val filteredMessages = roleplayResult.messages.map { msg ->
                                 val timestamp = msg.timestamp ?: com.google.firebase.Timestamp.now()
-                                val senderSlotProfile = sessionProfile.slotRoster.find { it.slotId == msg.senderId }
+                                val senderSlotProfile = sessionProfile.slotRoster.find { it.slotId == nextSlot }
                                 val cleanedPose = msg.pose?.filterValues { !it.isNullOrBlank() } // optional, if you want to clean out blanks
                                 msg.copy(
                                     area = senderSlotProfile?.lastActiveArea,
@@ -1722,11 +1743,13 @@ class MainActivity : AppCompatActivity() {
 
         aiJob = lifecycleScope.launch(Dispatchers.IO) {
             try {
+                Log.d("ai_cycle", "actually processing ontable round")
                 val timeoutMillis = 45_000L
                 var nextSlot: String? = null
                 val didComplete = withTimeoutOrNull(timeoutMillis) {
                     withContext(Dispatchers.Main) {
                         updateButtonState(ButtonState.INTERRUPT)
+                        setPlayerTyping(false)
                     }
                     // Build activation prompt
                     val activeSlotId = sessionProfile.userMap[userId]?.activeSlotId
@@ -1767,7 +1790,7 @@ class MainActivity : AppCompatActivity() {
                     val historyString = buildHistoryString(chatHistory.takeLast(10))
                     val activationPrompt = PromptBuilder.buildActivationPrompt(
                         activeSlotId = activeSlotId,
-                        sessionSummary = sessionProfile.sessionSummary,
+                        sessionSummary = sessionProfile.sessionDescription + sessionProfile.secretDescription,
                         areas = if (sessionProfile.areas.isNullOrEmpty()) listOf("DM's") else sessionProfile.areas.map { it.name },
                         locations = locationMap,
                         condensedCharacterInfo = condensedMap, // Map: slotId → summary
@@ -1799,7 +1822,7 @@ class MainActivity : AppCompatActivity() {
                         slotProfile = gmSlot!!,
                         act = act,
                         activeSlotId = activeSlotId,
-                        sessionSummary = sessionProfile.sessionSummary,
+                        sessionSummary = sessionProfile.sessionDescription + sessionProfile.secretDescription,
                         areas = if (sessionProfile.areas.isNullOrEmpty()) listOf("DM's") else sessionProfile.areas.map { it.name },
                         locations = locationMap,
                         sessionProfile = sessionProfile,
@@ -2064,7 +2087,7 @@ class MainActivity : AppCompatActivity() {
                                 ""
                             }
                             val narratorPrompt = PromptBuilder.buildNarratorPrompt(
-                                sessionSummary = sessionProfile.sessionSummary,
+                                sessionSummary = sessionProfile.sessionDescription + sessionProfile.secretDescription,
                                 area = playerArea,
                                 location = playerLocation,
                                 condensedCharacterInfo = condensedCharacterInfo,
@@ -2184,7 +2207,7 @@ class MainActivity : AppCompatActivity() {
 
                             val roleplayPrompt = PromptBuilder.buildRoleplayPrompt(
                                 slotProfile = slotProfile,
-                                sessionSummary = sessionProfile.sessionSummary,
+                                sessionSummary = sessionProfile.sessionDescription + sessionProfile.secretDescription,
                                 sceneSlotIds = sceneSlotIds,
                                 condensedCharacterInfo = condensedCharacterInfo,
                                 chatHistory = historyString,
@@ -2458,8 +2481,16 @@ class MainActivity : AppCompatActivity() {
 
     private fun sendToAI(userInput: String) {
         val messages = chatAdapter.getMessages()
-        val isOnTable = sessionProfile.modeSettings["rpg"] == "onTable"
-        val isAboveTable = sessionProfile.modeSettings["rpg"] == "aboveTable"
+        val rpgSettingsJson = sessionProfile.modeSettings["rpg"]
+        var isOnTable = false
+        var isAboveTable = false
+        if (!rpgSettingsJson.isNullOrBlank() && rpgSettingsJson.trim().startsWith("{")) {
+            val rpgSettings = Gson().fromJson(rpgSettingsJson, RPGSettings::class.java)
+            when (rpgSettings.perspective) {
+                "onTable" -> isOnTable = true
+                "aboveTable" -> isAboveTable = true
+            }
+        }
         val slotIdsList = sessionProfile.slotRoster.joinToString(", ") { it.slotId }
         if (messages.isEmpty() && !initialGreeting.isNullOrBlank()) {
             val greetingWithInit =
@@ -2475,22 +2506,29 @@ class MainActivity : AppCompatActivity() {
                 visibility = false
             )
             if (isOnTable) {
+                Log.d("ai_cycle", "proccessing isOnTable")
                 activationRound = 1
                 processOnTableRPGRound(userInput, listOf(greetingMessage))
             }else if (isAboveTable){
+                Log.d("ai_cycle", "proccessing isAboveTable")
                 activationRound = 1
                 processAboveTableRound(userInput, listOf(greetingMessage))
             } else {
+                Log.d("ai_cycle", "proccessing normal roleplay")
+
                 activationRound = 1
                 processActivationRound(userInput, listOf(greetingMessage))
             }
         } else {
 
             if (isOnTable) {
+                Log.d("ai_cycle", "proccessing isOnTable")
                 processOnTableRPGRound(userInput, messages)
             }else if (isAboveTable){
+                Log.d("ai_cycle", "proccessing isAboveTable")
                 processAboveTableRound(userInput, messages)
             } else {
+                Log.d("ai_cycle", "proccessing normal roleplay")
                 processActivationRound(userInput, messages)
             }
         }
@@ -2685,6 +2723,7 @@ class MainActivity : AppCompatActivity() {
         slotProfiles: List<SlotProfile>,
         visibleAvatarSlotIds: List<String>
     ) {
+        if (isDestroyed || isFinishing) return
         if (msg.pose.isNullOrEmpty()) return
         Log.d("avatardebug", "updateAvatarsFromMessage Activated $visibleAvatarSlotIds")
 
@@ -2833,15 +2872,6 @@ class MainActivity : AppCompatActivity() {
         lastTypingState = isTyping
 
         setSlotTyping(sessionId, activeSlotId, isTyping)
-
-        // Optional: auto turn off after some seconds of inactivity
-        typingTimeoutJob?.cancel()
-        if (isTyping) {
-            typingTimeoutJob = lifecycleScope.launch {
-                delay(3000) // 3 seconds without typing = not typing
-                setPlayerTyping(false)
-            }
-        }
     }
 
     private fun updateLocationCharRecycler(area: Area, location: LocationSlot?) {
@@ -2905,29 +2935,37 @@ class MainActivity : AppCompatActivity() {
                     }
                     lastMultiplayerValue = newMultiplayer
 
+                    // 1. Track the last seen messageId globally or inside your class/scope
+                    var lastMessageId: String? = null
+
                     SessionManager.listenMessages(sessionId) { newMessage ->
                         runOnUiThread {
-                            if (newMessage.pose != null) {
-                                sessionProfile.slotRoster = updatePosesOnSlotProfiles(newMessage.pose, sessionProfile.slotRoster)
+                            // 2. Skip if messageId is null or already processed
+                            val currentMessageId = newMessage.id ?: return@runOnUiThread
+                            if (currentMessageId == lastMessageId) {
+                                Log.d("MessageFilter", "Skipping duplicate message: $currentMessageId")
+                                return@runOnUiThread
                             }
-                            val msgMillis = newMessage.timestamp?.toDate()?.time ?: 0L
-                            if (msgMillis > System.currentTimeMillis() - 3000) {
-                                // Only process messages newer than when the listener was attached (within 3 seconds)
-                                val messageArea = newMessage.area
-                                val messageLocation = newMessage.location
 
-                                val recipients = sessionProfile.slotRoster.filter { slot ->
-                                    slot.lastActiveArea == messageArea && slot.lastActiveLocation == messageLocation
-                                }
-                                recipients.forEach { slot ->
-                                    addToPersonalHistoryFirestore(sessionId, slot.slotId, newMessage)
-                                }
-                                updateButtonState(ButtonState.SEND)
-                            } else {
-                                Log.d("MessageFilter", "Skipping old message: ${newMessage.text}")
+                            // 4. Check location and assign message to relevant slots
+                            val messageArea = newMessage.area
+                            val messageLocation = newMessage.location
+
+                            val recipients = sessionProfile.slotRoster.filter { slot ->
+                                slot.lastActiveArea == messageArea && slot.lastActiveLocation == messageLocation
                             }
+
+                            recipients.forEach { slot ->
+                                addToPersonalHistoryFirestore(sessionId, slot.slotId, newMessage)
+                            }
+
+                            updateButtonState(ButtonState.SEND)
+
+                            // 5. Update lastMessageId
+                            lastMessageId = currentMessageId
                         }
                     }
+
                 }
             }
     }

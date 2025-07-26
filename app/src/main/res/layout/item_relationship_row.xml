@@ -11,18 +11,15 @@
     android:paddingTop="2dp"
     android:paddingBottom="2dp">
 
-    <LinearLayout
-        android:id="@+id/relationshipcontent"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintBottom_toTopOf="@id/RelationshipDivider">
     <TextView
         android:id="@+id/relationshipToNameEdit"
         android:layout_width="70dp"
         android:layout_height="wrap_content"
         android:hint="With (Name)"
         android:textSize="16sp"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toTopOf="@id/relationshipSpacer"
         android:inputType="textPersonName|textMultiLine"/>
 
     <TextView
@@ -31,6 +28,9 @@
         android:layout_height="wrap_content"
         android:text="Type"
         android:textSize="16sp"
+        app:layout_constraintStart_toEndOf="@id/relationshipToNameEdit"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toTopOf="@id/relationshipSpacer"
         android:layout_marginStart="6dp"/>
     <TextView
         android:id="@+id/relationshipSummaryEdit"
@@ -39,6 +39,10 @@
         android:hint="Short desc"
         android:textSize="14sp"
         android:layout_marginStart="10dp"
+        app:flow_horizontalAlign="start"
+        app:layout_constraintStart_toEndOf="@id/relationshipType"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toTopOf="@id/relationshipSpacer"
         android:layout_weight="2"
         android:inputType="textCapSentences|textMultiLine"
         />
@@ -51,21 +55,29 @@
         android:layout_height="28dp"
         android:background="?android:selectableItemBackgroundBorderless"
         android:scaleType="fitCenter"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
         android:src="@drawable/ic_delete"
         android:contentDescription="Delete"
-        android:layout_marginStart="4dp"/>
-    </LinearLayout>
-    <LinearLayout
-        android:id="@+id/RelationshipDivider"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        app:layout_constraintTop_toBottomOf="@id/relationshipcontent">
+        android:layout_margin="5dp"/>
+
+    <ImageButton
+        android:id="@+id/btnRelationshipLvl"
+        android:layout_width="28dp"
+        android:layout_height="28dp"
+        android:background="?android:selectableItemBackgroundBorderless"
+        android:scaleType="fitCenter"
+        android:layout_margin="5dp"
+        android:src="@drawable/ic_lvl"
+        android:contentDescription="levels"
+        app:layout_constraintTop_toBottomOf="@id/btnDeleteRelationship"
+        app:layout_constraintEnd_toEndOf="parent"/>
     <View
         android:id="@+id/relationshipSpacer"
         android:layout_width="match_parent"
         android:layout_height="2dp"
         android:background="#000000"
-        android:layout_marginTop="8dp"
-        android:layout_marginBottom="8dp" />
-    </LinearLayout>
+        android:layout_marginTop="5dp"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/btnRelationshipLvl"/>
 </androidx.constraintlayout.widget.ConstraintLayout>

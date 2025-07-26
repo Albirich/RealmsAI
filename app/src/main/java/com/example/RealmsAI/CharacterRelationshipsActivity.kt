@@ -11,7 +11,9 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.example.RealmsAI.models.RELATIONSHIP_TYPES
 import com.example.RealmsAI.models.Relationship
+import com.example.RealmsAI.RelationshipLevelEditorActivity
 import com.google.gson.Gson
+import kotlin.jvm.java
 
 class CharacterRelationshipActivity : AppCompatActivity() {
 
@@ -30,7 +32,12 @@ class CharacterRelationshipActivity : AppCompatActivity() {
                 relationships.remove(rel)
                 adapter.notifyDataSetChanged()
             },
-           // onChanged = {Optionally: persist changes live}
+            onEditLevel = { rel, index ->
+                val intent = Intent(this, RelationshipLevelEditorActivity::class.java)
+                intent.putExtra("RELATIONSHIP_JSON", Gson().toJson(rel))
+                intent.putExtra("REL_INDEX", index)
+                startActivityForResult(intent, REQUEST_EDIT_RELATIONSHIP_LEVEL)
+            }
         )
         recyclerView.layoutManager = LinearLayoutManager(this)
         recyclerView.adapter = adapter
@@ -60,6 +67,25 @@ class CharacterRelationshipActivity : AppCompatActivity() {
             setResult(Activity.RESULT_OK, data)
             finish()
         }
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+
+        if (requestCode == REQUEST_EDIT_RELATIONSHIP_LEVEL && resultCode == Activity.RESULT_OK) {
+            val updatedJson = data?.getStringExtra("UPDATED_RELATIONSHIP_JSON")
+            val index = data?.getIntExtra("REL_INDEX", -1) ?: -1
+
+            if (!updatedJson.isNullOrBlank() && index in relationships.indices) {
+                val updatedRel = Gson().fromJson(updatedJson, Relationship::class.java)
+                relationships[index] = updatedRel
+                adapter.notifyItemChanged(index)
+            }
+        }
+    }
+
+    companion object {
+        const val REQUEST_EDIT_RELATIONSHIP_LEVEL = 211
     }
 
     private fun showAddRelationshipDialog() {

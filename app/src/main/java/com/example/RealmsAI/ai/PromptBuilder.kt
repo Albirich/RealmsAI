@@ -449,7 +449,6 @@ object PromptBuilder {
                     - Choose poses ONLY from the list of AVAILABLE POSES FOR NEARBY CHARACTERS.
                     - You can change a character’s pose if it makes sense for the scene or message.
                     - To clear or remove a character’s pose, set it to "clear", "none", or "" (empty string).
-
                     
                 - If the message is important add a new memory:
                     - Only add a memory for truly important, *novel* events, major relationship shifts, or facts not already captured in memories above.
@@ -502,7 +501,7 @@ object PromptBuilder {
                                         outfit.poseSlots.joinToString("\n") { pose -> "    - ${pose.name}" }
                             }
                         }
-                - Relationships: ${slotProfile.relationships.joinToString(", ") { "${it.type} to ${it.toName}" }}
+                - Relationships: ${slotProfile.relationships.joinToString(", ") { "${it.toName} is your ${it.type}. Additional information: ${it.description}" }}
             
             SESSION SUMMARY:            
             $sessionSummary
@@ -546,13 +545,26 @@ object PromptBuilder {
     ): String {
         return """
             === GM INSTRUCTIONS ===
-            You are roleplaying as ${gmSlot.name}, the Game Master (GM).
-            As GM, you must:
-            - Narrate the world, NPCs, and challenges.
-            - Come up with the area the players characters are at based on the summary.
-            - You are still in a room with the other characters talking to them as you all play the game.
+            You are the Game Master (GM).
+            You are sitting at a table with your friends, playing a tabletop RPG.            
+                - Interact with other players outside of the game, as well as interacting within the game.
+                - Include small talk
+                - Describe what your character does in the game, but also include table-talk, jokes, arguments, etc.
+                - You are at the table, discussing and playing the game.
+                - Stay in character as you interact with the other players.
+                - If you describe your character’s in-game action, preface with: “My character tries to...” or “In the game, I...”
+                - Talk outside of the game around, rather than in the game.
+                - Roleplay as if you are in the room with the players
+                - You DO NOT have a character in the game!
+                
+            As GM, you:
+            - Stay in character as you narrate the world, NPCs, and challenges.
+                - DO NOT use narrator to narrate the world, narrator only narrates your actions.
+            - Come up with the area the players characters are at based on the act summary.
             - Progress the party through the story according to the current Act.
             - Request dice rolls or call for player decisions when needed.
+            - You can react to dice rolls, game rules, snacks, etc., as yourself.
+            
             - When requestion a dice roll you need to set a target number for the roll, based on the difficulty of the action that triggered the dice roll
                 The target number should:
                 - Between 1 and 5 for trivial challenge
@@ -569,6 +581,7 @@ object PromptBuilder {
             
         You should end each message by stating what happens next or asking the players what they do.
         If the party completes the Act's goal, include in your output: { \"advance_act\": true }
+        PRIORITIZE ROLEPLAYING THE PLAYER NOT THE CHARACTER IN THE GAME! INTERACT WITH OTHER PLAYERS AND ENJOYING HANGING OUT, TALKING ABOUT THINGS OTHER THAN THE GAME AS WELL!
         """.trimIndent()
         }
 
@@ -579,9 +592,18 @@ object PromptBuilder {
         gmSlot: SlotProfile
     ): String {
         return """
+        You are sitting at a table with your friends, playing a tabletop RPG.            
+            - Interact with other players outside of the game, as well as interacting within the game.
+            - Describe what your character does in the game, but also include table-talk, jokes, arguments, etc.
+            - You are at the table, discussing and playing the game.
+            - Stay in character as you interact with the other players.
+            - If you describe your character’s in-game action, preface with: “My character tries to...” or “In the game, I...”
+            - Talk outside of the game around, rather than in the game.
+            - Roleplay as if you are in the room with the players
+        
         === YOU ARE PLAYING A TABLETOP RPG SESSION ===
         The Game Master (GM) is: ${gmSlot.name}
-        The GM will narrate, describe the world, and play all NPCs.
+        The GM will narrate, describe the world, and play all NPCs.        
 
         How it works:
         - The GM will describe whats going on and ask you what you want to do.
@@ -589,6 +611,9 @@ object PromptBuilder {
         - The GM will ask you for rolls or make decisions for the world.
         - Your actions should fit your stats, equipment, and current situation.
         - Use creativity and teamwork with the rest of the party.
+        - Refer to the GM as the GM, not as an in-universe authority.
+        - You can react to dice rolls, game rules, snacks, etc., as yourself.
+        - Interact with other players outside of the game, as well as interacting within the game.
 
         If you wish to attempt something difficult, risky, or creative, say what you want to try. 
         The GM will tell you if you need to roll or use a stat.
@@ -608,6 +633,7 @@ object PromptBuilder {
         Physical Description: ${playerSlot.physicalDescription}
 
         If you want to change equipment, heal, use an item, or do something special, just say so in your message!
+        PRIORITIZE ROLEPLAYING THE PLAYER NOT THE CHARACTER IN THE GAME! INTERACT WITH OTHER PLAYERS AND ENJOYING HANGING OUT, TALKING ABOUT THINGS OTHER THAN THE GAME AS WELL!
     """.trimIndent()
     }
 

@@ -3,24 +3,20 @@ package com.example.RealmsAI
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.AdapterView
-import android.widget.EditText
 import android.widget.ImageButton
-import android.widget.Spinner
-import androidx.recyclerview.widget.RecyclerView
-import com.example.RealmsAI.models.RELATIONSHIP_TYPES
-import com.example.RealmsAI.models.Relationship
-import androidx.core.widget.addTextChangedListener
-import android.widget.ArrayAdapter
 import android.widget.TextView
+import androidx.recyclerview.widget.RecyclerView
+import com.example.RealmsAI.models.Relationship
 
 class SimpleRelationshipAdapter(
     private val relationships: MutableList<Relationship>,
-    private val onDelete: (Relationship) -> Unit
+    private val onDelete: (Relationship) -> Unit,
+    private val onEditLevel: (Relationship, Int) -> Unit
 ) : RecyclerView.Adapter<SimpleRelationshipAdapter.RelationshipRowHolder>() {
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RelationshipRowHolder {
-        val view = LayoutInflater.from(parent.context).inflate(R.layout.item_relationship_row, parent, false)
+        val view = LayoutInflater.from(parent.context)
+            .inflate(R.layout.item_relationship_row, parent, false)
         return RelationshipRowHolder(view)
     }
 
@@ -35,6 +31,7 @@ class SimpleRelationshipAdapter(
         private val typeText = view.findViewById<TextView>(R.id.relationshipType)
         private val summaryText = view.findViewById<TextView>(R.id.relationshipSummaryEdit)
         private val btnDelete = view.findViewById<ImageButton>(R.id.btnDeleteRelationship)
+        private val btnLevel = view.findViewById<ImageButton>(R.id.btnRelationshipLvl)
 
         fun bind(rel: Relationship) {
             toNameText.text = rel.toName
@@ -47,7 +44,13 @@ class SimpleRelationshipAdapter(
                     onDelete(rel)
                 }
             }
+
+            btnLevel.setOnClickListener {
+                val pos = adapterPosition
+                if (pos != RecyclerView.NO_POSITION) {
+                    onEditLevel(rel, pos)
+                }
+            }
         }
     }
 }
-

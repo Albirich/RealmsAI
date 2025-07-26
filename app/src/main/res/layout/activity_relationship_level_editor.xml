@@ -1,0 +1,66 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/relationshipLevelRoot"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:padding="24dp"
+    android:orientation="vertical">
+
+    <!-- Up Trigger -->
+    <EditText
+        android:id="@+id/upTriggerEdit"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="What makes the level go UP? (max 50 chars)"
+        android:maxLength="50"
+        android:inputType="text"/>
+
+    <!-- Down Trigger -->
+    <EditText
+        android:id="@+id/downTriggerEdit"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="What makes the level go DOWN? (max 50 chars)"
+        android:maxLength="50"
+        android:inputType="text"/>
+
+    <!-- Levels List -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Relationship Levels:"
+        android:textStyle="bold"
+        android:paddingTop="16dp"/>
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/levelsRecycler"
+        android:layout_width="match_parent"
+        android:layout_height="150dp"
+        android:layout_marginBottom="8dp"/>
+
+    <!-- Add Level Button -->
+    <Button
+        android:id="@+id/btnAddLevel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Add Level" />
+
+    <!-- Current Level Picker -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Set Current Level:"
+        android:paddingTop="16dp"/>
+    <Spinner
+        android:id="@+id/currentLevelSpinner"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"/>
+
+    <!-- Save Button -->
+    <Button
+        android:id="@+id/btnSaveLevel"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Done"
+        android:layout_marginTop="16dp"/>
+
+</LinearLayout>
