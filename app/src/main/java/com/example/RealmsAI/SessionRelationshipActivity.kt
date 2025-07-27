@@ -25,7 +25,9 @@ class SessionRelationshipActivity : AppCompatActivity() {
     private lateinit var adapter: ParticipantRelationshipAdapter
     private val participants = mutableListOf<ParticipantPreview>()
     private val relationships = mutableListOf<Relationship>()
-
+    companion object {
+        const val REQUEST_EDIT_REL_LEVEL = 212
+    }
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_relationships)
@@ -67,6 +69,12 @@ class SessionRelationshipActivity : AppCompatActivity() {
                 onDeleteRelationship = { rel ->
                     relationships.remove(rel)
                     adapter.refresh()
+                },
+                onEditLevel = { rel, index ->
+                    val intent = Intent(this, RelationshipLevelEditorActivity::class.java)
+                    intent.putExtra("RELATIONSHIP_JSON", Gson().toJson(rel))
+                    intent.putExtra("REL_INDEX", index)
+                    startActivityForResult(intent, REQUEST_EDIT_REL_LEVEL)
                 }
             )
             recyclerView.adapter = adapter
@@ -162,6 +170,18 @@ class SessionRelationshipActivity : AppCompatActivity() {
                     .addOnFailureListener { checkDone() }
             } else {
                 checkDone()
+            }
+        }
+    }
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == REQUEST_EDIT_REL_LEVEL && resultCode == Activity.RESULT_OK && data != null) {
+            val updatedJson = data.getStringExtra("UPDATED_RELATIONSHIP_JSON")
+            val index = data.getIntExtra("REL_INDEX", -1)
+            if (!updatedJson.isNullOrBlank() && index in relationships.indices) {
+                val updatedRel = Gson().fromJson(updatedJson, Relationship::class.java)
+                relationships[index] = updatedRel
+                adapter.refresh()
             }
         }
     }

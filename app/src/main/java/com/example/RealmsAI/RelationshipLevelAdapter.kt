@@ -38,7 +38,32 @@ class RelationshipLevelAdapter(
             levelNumber.setText(level.level.toString())
             threshold.setText(level.threshold.toString())
             personality.setText(level.personality)
-            // Optionally add listeners to update the model as the user edits.
+
+            // Remove existing listeners before adding new ones if reusing view holders (optional but good for production)
+            // Or use .doOnTextChanged in androidx.core
+
+            // Level number editing
+            levelNumber.setOnFocusChangeListener { _, hasFocus ->
+                if (!hasFocus) {
+                    val newVal = levelNumber.text.toString().toIntOrNull() ?: 0
+                    level.level = newVal
+                }
+            }
+
+            // Threshold editing
+            threshold.setOnFocusChangeListener { _, hasFocus ->
+                if (!hasFocus) {
+                    val newVal = threshold.text.toString().toIntOrNull() ?: 0
+                    level.threshold = newVal
+                }
+            }
+
+            // Personality editing
+            personality.setOnFocusChangeListener { _, hasFocus ->
+                if (!hasFocus) {
+                    level.personality = personality.text.toString()
+                }
+            }
         }
     }
 }

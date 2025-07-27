@@ -5,6 +5,7 @@ import android.util.Log
 import android.widget.Toast
 import com.example.RealmsAI.MainActivity
 import com.example.RealmsAI.models.ChatMessage
+import com.example.RealmsAI.models.Relationship
 import com.example.RealmsAI.models.SlotProfile
 import com.example.RealmsAI.models.TaggedMemory
 import com.google.gson.Gson
@@ -174,9 +175,19 @@ object FacilitatorResponseParser {
                 )
             }
 
+            val relationshipChanges = roleplayResponse.relationship?.mapNotNull { entry ->
+                val match = Regex("RELATIONSHIPPOINTS([+-]\\d+):(.*)").find(entry)
+                match?.let {
+                    val delta = it.groupValues[1].toIntOrNull() ?: 0
+                    val relationshipId = it.groupValues[2].trim()
+                    RelationshipPointChange(relationshipId, delta)
+                }
+            } ?: emptyList()
+
             return ParsedRoleplayResult(
                 messages = safeMessages,
-                newMemory = roleplayResponse.new_memory
+                newMemory = roleplayResponse.new_memory,
+                relationshipChanges = relationshipChanges
             )
         } catch (e: Exception) {
             Log.e("FacilitatorResponseParser", "Malformed JSON (roleplay): $response", e)
@@ -186,13 +197,39 @@ object FacilitatorResponseParser {
 
     data class RoleplayResponse(
         val messages: List<ChatMessage>,
-        val new_memory: NewMemory? = null
+        val new_memory: NewMemory? = null,
+        val relationship: List<String>? = null
+    )
+
+    data class RelationshipPointChange(
+        val relationshipId: String,
+        val delta: Int
     )
 
     data class ParsedRoleplayResult(
         val messages: List<ChatMessage>,
-        val newMemory: NewMemory? = null
+        val newMemory: NewMemory? = null,
+        val relationshipChanges: List<RelationshipPointChange> = emptyList()
     )
+
+    fun updateRelationshipLevel(relationship: Relationship) {
+        // Sort levels by threshold (ascending), just in case
+        val levels = relationship.levels.sortedBy { it.threshold }
+        val points = relationship.points
+
+        // Default to the lowest level if no match (shouldn't happen if level 0 is 0)
+        var newLevel = 0
+
+        // Iterate and find the highest level whose threshold is <= points
+        for (level in levels) {
+            if (points >= level.threshold) {
+                newLevel = level.level
+            } else {
+                break // Stop once points are below the threshold
+            }
+        }
+        relationship.currentLevel = newLevel
+    }
 
     data class NewMemory(
         val tags: List<String>,

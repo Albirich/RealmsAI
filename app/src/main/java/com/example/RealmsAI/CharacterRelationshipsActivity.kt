@@ -3,6 +3,7 @@ package com.example.RealmsAI
 import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
+import android.util.Log
 import android.widget.Button
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
@@ -12,6 +13,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.example.RealmsAI.models.RELATIONSHIP_TYPES
 import com.example.RealmsAI.models.Relationship
 import com.example.RealmsAI.RelationshipLevelEditorActivity
+import com.example.RealmsAI.models.RelationshipLevel
 import com.google.gson.Gson
 import kotlin.jvm.java
 
@@ -37,6 +39,7 @@ class CharacterRelationshipActivity : AppCompatActivity() {
                 intent.putExtra("RELATIONSHIP_JSON", Gson().toJson(rel))
                 intent.putExtra("REL_INDEX", index)
                 startActivityForResult(intent, REQUEST_EDIT_RELATIONSHIP_LEVEL)
+                Log.d("Relationship", "Edit level clicked at index $index for ${rel.toName}")
             }
         )
         recyclerView.layoutManager = LinearLayoutManager(this)
@@ -109,7 +112,13 @@ class CharacterRelationshipActivity : AppCompatActivity() {
                 val summary = summaryEdit.text.toString()
                 if (toName.isNotEmpty()) {
                     relationships.add(
-                        Relationship(fromId = "", toName = toName, type = type, description = summary)
+                        Relationship(
+                            fromId = "",
+                            toName = toName,
+                            type = type,
+                            description = summary,
+                            levels = mutableListOf(RelationshipLevel(level = 0, threshold = 0, personality = ""))
+                        )
                     )
                     adapter.notifyDataSetChanged()
                 } else {

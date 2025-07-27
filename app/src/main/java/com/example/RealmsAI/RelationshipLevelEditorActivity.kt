@@ -80,6 +80,15 @@ class RelationshipLevelEditorActivity : AppCompatActivity() {
         val adapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, levelsList)
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
         currentLevelSpinner.adapter = adapter
+
+        if (levels.isEmpty()) {
+            currentLevelSpinner.isEnabled = false
+            // Optionally set selection to -1 or 0 safely, or leave blank
+            return
+        }
+
+        currentLevelSpinner.isEnabled = true
         currentLevelSpinner.setSelection(currentLevel.coerceIn(levels.indices))
     }
+
 }

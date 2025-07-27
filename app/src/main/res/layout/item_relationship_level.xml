@@ -1,6 +1,7 @@
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:orientation="horizontal"
     android:padding="6dp"
     android:gravity="center_vertical">
@@ -9,15 +10,32 @@
         android:id="@+id/levelNumberEdit"
         android:layout_width="40dp"
         android:layout_height="wrap_content"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toStartOf="@id/thresholdEdit"
         android:hint="Lvl"
         android:inputType="number" />
+    <TextView
+        android:layout_width="40dp"
+        android:layout_height="wrap_content"
+        app:layout_constraintStart_toStartOf="@id/levelNumberEdit"
+        app:layout_constraintTop_toBottomOf="@id/levelNumberEdit"
+        android:text="LVL"/>
 
     <EditText
         android:id="@+id/thresholdEdit"
         android:layout_width="60dp"
         android:layout_height="wrap_content"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toEndOf="@id/levelNumberEdit"
         android:hint="Threshold"
         android:inputType="number" />
+    <TextView
+        android:layout_width="40dp"
+        android:layout_height="wrap_content"
+        app:layout_constraintStart_toStartOf="@id/thresholdEdit"
+        app:layout_constraintTop_toBottomOf="@id/thresholdEdit"
+        android:text="Threshold"/>
 
     <EditText
         android:id="@+id/personalityEdit"
@@ -25,6 +43,9 @@
         android:layout_height="wrap_content"
         android:layout_weight="1"
         android:hint="Personality for this level"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toEndOf="@id/thresholdEdit"
+        app:layout_constraintEnd_toStartOf="@id/btnDeleteLevel"
         android:maxLength="100"
         android:inputType="text"/>
 
@@ -34,5 +55,7 @@
         android:layout_height="36dp"
         android:src="@android:drawable/ic_delete"
         android:contentDescription="Delete Level"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
         android:background="?android:attr/selectableItemBackgroundBorderless"/>
-</LinearLayout>
+</androidx.constraintlayout.widget.ConstraintLayout>

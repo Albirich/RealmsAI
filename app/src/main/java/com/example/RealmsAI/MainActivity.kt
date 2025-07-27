@@ -761,9 +761,7 @@ class MainActivity : AppCompatActivity() {
                         .filter {
                             it.lastActiveArea == playerSlot?.lastActiveArea &&
                                     it.lastActiveLocation == playerSlot?.lastActiveLocation &&
-                                    it.slotId != activeSlotId &&
                                     it.slotId != lastNonNarratorId &&
-                                    it.profileType != "player" &&
                                     !it.typing
                         }
                         .map { it.slotId }
@@ -1006,7 +1004,7 @@ class MainActivity : AppCompatActivity() {
                             if (activeSlotId != null) {
                                 sessionProfile = sessionProfile.copy(
                                     slotRoster = sessionProfile.slotRoster.map { slot ->
-                                        if (slot.slotId == activeSlotId) slot.copy(typing = true)
+                                        if (slot.slotId == nextSlot) slot.copy(typing = true)
                                         else slot
                                     }
                                 )
@@ -1039,10 +1037,11 @@ class MainActivity : AppCompatActivity() {
                             val memoriesMap = mapOf(nextSlot!! to relevantMemories)
                             val myPersonalHistory = fetchPersonalHistory(sessionId, slotId)
                             val historyString = buildHistoryString(myPersonalHistory.takeLast(10))
-
+                            val modeSettings = sessionProfile.modeSettings
 
                             val roleplayPrompt = PromptBuilder.buildRoleplayPrompt(
                                 slotProfile = slotProfile,
+                                modeSettings = modeSettings,
                                 sessionSummary = sessionProfile.sessionDescription + sessionProfile.secretDescription,
                                 sceneSlotIds = sceneSlotIds,
                                 condensedCharacterInfo = condensedCharacterInfo,
@@ -1089,6 +1088,27 @@ class MainActivity : AppCompatActivity() {
                                 activationRound = 0
                                 return@withTimeoutOrNull
                             }
+
+                            val speakerSlotId = roleplayResult.messages.firstOrNull()?.senderId ?: nextSlot
+                            val speakerSlot = sessionProfile.slotRoster.find { it.slotId == speakerSlotId }
+                            if (speakerSlot != null && roleplayResult.relationshipChanges.isNotEmpty()) {
+                                val updatedRelationships = speakerSlot.relationships.toMutableList()
+                                for (change in roleplayResult.relationshipChanges) {
+                                    val relIdx = updatedRelationships.indexOfFirst { it.id == change.relationshipId }
+                                    if (relIdx != -1) {
+                                        val rel = updatedRelationships[relIdx]
+                                        rel.points += change.delta
+                                        FacilitatorResponseParser.updateRelationshipLevel(rel)
+                                        updatedRelationships[relIdx] = rel
+                                    }
+                                }
+                                val updatedSlot = speakerSlot.copy(relationships = updatedRelationships)
+                                val updatedSlotRoster = sessionProfile.slotRoster.map { slot ->
+                                    if (slot.slotId == updatedSlot.slotId) updatedSlot else slot
+                                }
+                                sessionProfile = sessionProfile.copy(slotRoster = updatedSlotRoster)
+                            }
+
                             val filteredMessages = roleplayResult.messages.map { msg ->
                                 val timestamp = msg.timestamp ?: com.google.firebase.Timestamp.now()
                                 val senderSlotProfile = sessionProfile.slotRoster.find { it.slotId == nextSlot }
@@ -1252,7 +1272,6 @@ class MainActivity : AppCompatActivity() {
                         .filter {
                             it.lastActiveArea == playerSlot?.lastActiveArea &&
                                     it.lastActiveLocation == playerSlot?.lastActiveLocation &&
-                                    it.slotId != activeSlotId &&
                                     it.slotId != lastNonNarratorId &&
                                     !it.typing
                         }
@@ -1500,7 +1519,7 @@ class MainActivity : AppCompatActivity() {
                             if (activeSlotId != null) {
                                 sessionProfile = sessionProfile.copy(
                                     slotRoster = sessionProfile.slotRoster.map { slot ->
-                                        if (slot.slotId == activeSlotId) slot.copy(typing = true)
+                                        if (slot.slotId == nextSlot) slot.copy(typing = true)
                                         else slot
                                     }
                                 )
@@ -1527,6 +1546,7 @@ class MainActivity : AppCompatActivity() {
                                         "available_poses" to availablePoses
                                     )
                                 }
+                            val modeSettings = sessionProfile.modeSettings
                             val memoryIds = result.memoryIds ?: emptyList()
                             val nextSlotProfile = sessionProfile.slotRoster.find { it.slotId == nextSlot }
                             val relevantMemories = nextSlotProfile?.memories?.filter { memoryIds.contains(it.id) } ?: emptyList()
@@ -1537,6 +1557,7 @@ class MainActivity : AppCompatActivity() {
 
                             val roleplayPrompt = PromptBuilder.buildRoleplayPrompt(
                                 slotProfile = slotProfile,
+                                modeSettings = modeSettings,
                                 sessionSummary = sessionProfile.sessionDescription + sessionProfile.secretDescription,
                                 sceneSlotIds = sceneSlotIds,
                                 condensedCharacterInfo = condensedCharacterInfo,
@@ -1776,9 +1797,7 @@ class MainActivity : AppCompatActivity() {
                         .filter {
                             it.lastActiveArea == playerSlot?.lastActiveArea &&
                                     it.lastActiveLocation == playerSlot?.lastActiveLocation &&
-                                    it.slotId != activeSlotId &&
                                     it.slotId != lastNonNarratorId &&
-                                    it.profileType != "player" &&
                                     !it.typing
                         }
                         .map { it.slotId }
@@ -2171,7 +2190,7 @@ class MainActivity : AppCompatActivity() {
                             if (activeSlotId != null) {
                                 sessionProfile = sessionProfile.copy(
                                     slotRoster = sessionProfile.slotRoster.map { slot ->
-                                        if (slot.slotId == activeSlotId) slot.copy(typing = true)
+                                        if (slot.slotId == nextSlot) slot.copy(typing = true)
                                         else slot
                                     }
                                 )
@@ -2201,12 +2220,14 @@ class MainActivity : AppCompatActivity() {
                             val nextSlotProfile = sessionProfile.slotRoster.find { it.slotId == nextSlot }
                             val relevantMemories = nextSlotProfile?.memories?.filter { memoryIds.contains(it.id) } ?: emptyList()
                             val memoriesMap = mapOf(nextSlot!! to relevantMemories)
+                            val modeSettings = sessionProfile.modeSettings
                             val myPersonalHistory = fetchPersonalHistory(sessionId, slotId)
                             val historyString = buildHistoryString(myPersonalHistory.takeLast(10))
 
 
                             val roleplayPrompt = PromptBuilder.buildRoleplayPrompt(
                                 slotProfile = slotProfile,
+                                modeSettings = modeSettings,
                                 sessionSummary = sessionProfile.sessionDescription + sessionProfile.secretDescription,
                                 sceneSlotIds = sceneSlotIds,
                                 condensedCharacterInfo = condensedCharacterInfo,
@@ -2470,7 +2491,7 @@ class MainActivity : AppCompatActivity() {
             area = area,
             location = location,
             delay = 0,
-            timestamp = com.google.firebase.Timestamp.now(),
+            timestamp = Timestamp.now(),
             pose = null,
             imageUpdates = null,
             visibility = true
@@ -2493,13 +2514,10 @@ class MainActivity : AppCompatActivity() {
         }
         val slotIdsList = sessionProfile.slotRoster.joinToString(", ") { it.slotId }
         if (messages.isEmpty() && !initialGreeting.isNullOrBlank()) {
-            val greetingWithInit =
-                initialGreeting + "\n\nAt the start of the session, you MUST assign explicit, valid locations and areas for ALL characters in the 'area_changes' section. No character can have null or empty area/location. \n" +
-                        "Characters present (slotIds): $slotIdsList\n" + " VALID NEXT_SLOT CHOICES: \n $slotIdsList"
             val greetingMessage = ChatMessage(
                 id = UUID.randomUUID().toString(),
                 senderId = "system",
-                text = greetingWithInit,
+                text = initialGreeting!!,
                 delay = 0,
                 timestamp = com.google.firebase.Timestamp.now(),
                 imageUpdates = null,

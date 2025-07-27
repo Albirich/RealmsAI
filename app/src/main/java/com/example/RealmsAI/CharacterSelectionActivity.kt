@@ -49,6 +49,7 @@ class CharacterSelectionActivity : AppCompatActivity() {
         ) {
             val db = FirebaseFirestore.getInstance()
             val query = db.collection("characters")
+
             if (from == "collections") {
                 // Only your characters, regardless of privacy
                 query.whereEqualTo("author", userId)
@@ -58,17 +59,22 @@ class CharacterSelectionActivity : AppCompatActivity() {
                         onLoaded(chars)
                     }
                     .addOnFailureListener(onError)
-            } else {
-                if (from == "chat") {
-                    query.whereNotEqualTo("private", true)
-                        .get()
-                        .addOnSuccessListener { snapshot ->
-                            val chars =
-                                snapshot.documents.mapNotNull { it.toObject(CharacterProfile::class.java) }
-                            onLoaded(chars)
-                        }
-                        .addOnFailureListener(onError)
-                }
+            } else if (from == "chat") {
+                // Fetch public characters
+                val publicQuery = query.whereNotEqualTo("private", true)
+                // Fetch user's characters
+                val userQuery = query.whereEqualTo("author", userId)
+
+                publicQuery.get().continueWithTask { publicTask ->
+                    val publicChars = publicTask.result?.documents?.mapNotNull { it.toObject(CharacterProfile::class.java) } ?: emptyList()
+                    userQuery.get().addOnSuccessListener { userSnapshot ->
+                        val userChars = userSnapshot.documents.mapNotNull { it.toObject(CharacterProfile::class.java) }
+
+                        // Merge and remove duplicates (based on ID)
+                        val combined = (publicChars + userChars).distinctBy { it.id }
+                        onLoaded(combined)
+                    }.addOnFailureListener(onError)
+                }.addOnFailureListener(onError)
             }
         }
 

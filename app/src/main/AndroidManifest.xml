@@ -49,6 +49,8 @@
         <activity android:name=".ChatProfileActivity"/>
         <activity android:name=".MessagesActivity"/>
         <activity android:name=".RPGSettingsActivity"/>
+        <activity android:name=".RelationshipLevelEditorActivity"/>
+
 
     </application>
     <uses-permission android:name="android.permission.INTERNET"/>

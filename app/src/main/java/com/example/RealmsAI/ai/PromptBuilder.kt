@@ -50,7 +50,8 @@ object PromptBuilder {
         - When choosing the next_slot or describing an action, you may reference any relevant memories by their id.
             - In your JSON output, include a field "memories" listing up to 5 relevant memory ids for the acting character. Do not include the full text.
             
-        - If there is a new character that's not on the list that should talk, add them to a "new_npcs" array in your JSON output, with all following fields: slotId, name, profileType, summary, lastActiveArea, lastActiveLocation, memories, age, abilities, bubbleColor, textColor, gender, height, weight, eyeColor, hairColor, physicalDescription, personality, privateDescripton, sfwOnly 
+        - If there is a new character that's not on the list that should talk, add them to a "new_npcs" array in your JSON output
+        - The profile MUST HAVE ALL following fields: slotId, name, profileType, summary, lastActiveArea, lastActiveLocation, memories, age, abilities, bubbleColor, textColor, gender, height, weight, eyeColor, hairColor, physicalDescription, personality, privateDescripton, sfwOnly 
             - Each should have profileType: "npc", a unique slotId, and valid area/location.
             - Create a character with a personality and description needed for the character.
             - Summary should be a short description of who they are.
@@ -78,7 +79,7 @@ object PromptBuilder {
                 #cdd54b
             - gender list their prounouns
             - physical description is be about 100 characters worth describing what the character looks like, include their race if its a fantasy setting. DO NOT include eye color, hair color, height, weight, or age
-            - personality is be 1000 characters explaining how they act and speak.
+            - personality is 1000 characters explaining how they act and speak.
             - privateDescription is 400 characters of their secrets, desires, kinks, goals
             - sfwOnly should be true ONLY if the character is under 18 years old.
             
@@ -418,6 +419,7 @@ object PromptBuilder {
 
     fun buildRoleplayPrompt(
         slotProfile: SlotProfile,
+        modeSettings: Map<String, String>,
         sessionSummary: String,
         sceneSlotIds: List<String>,
         condensedCharacterInfo: Map<String, Map<String, Any?>>,
@@ -425,7 +427,6 @@ object PromptBuilder {
         memories: Map<String, List<TaggedMemory>>,
     ): String {
         val relevantMemories = memories[slotProfile.slotId].orEmpty()
-
         val memoriesPromptSection =
             if (relevantMemories.isEmpty()) "None"
             else relevantMemories.joinToString("\n") { m -> "- [${m.id}] (${m.tags.joinToString(", ")}) ${m.text}" }
@@ -457,6 +458,10 @@ object PromptBuilder {
                         - example tags: a persons name (naruto), where it happened (leaf_village), what its about (trauma), an event (hokages_death), what the character is feeling (sad)
                     - Add up to 5 tags for each memory, it can be any combination of the types of tags (example: [Sasuke, Sakura, Training, combo]) 
             
+                - For each message in RECENT CHAT HISTORY:
+                    - Check the relationship for the sender
+                    - If your message meets the upTrigger or downTrigger for any relationship, append RELATIONSHIPPOINTS+1:<relationshipId> or RELATIONSHIPPOINTS-1:<relationshipId> to the JSON text as appropriate.
+
             ---
             
             # OUTPUT FORMAT (STRICT JSON ONLY)
@@ -481,6 +486,11 @@ object PromptBuilder {
                     "text": "Concise memory of the event.",
                     "nsfw": true/false
               }
+              "relationship": [
+              RELATIONSHIPPOINTS+1:<relationshipId>,
+              RELATIONSHIPPOINTS+1:<relationshipId>,
+              RELATIONSHIPPOINTS-1:<relationshipId>
+              ]
             }
             
             CHARACTER PROFILE:
@@ -501,8 +511,20 @@ object PromptBuilder {
                                         outfit.poseSlots.joinToString("\n") { pose -> "    - ${pose.name}" }
                             }
                         }
-                - Relationships: ${slotProfile.relationships.joinToString(", ") { "${it.toName} is your ${it.type}. Additional information: ${it.description}" }}
-            
+                - Relationships: ${
+                 slotProfile.relationships.joinToString(separator = "\n") { rel ->
+                        val base = "[ID: ${rel.id}] ${rel.toName} is your ${rel.type}: ${rel.description}"
+                        if (modeSettings["visual_novel"] == "true") {
+                            val personality = rel.levels.getOrNull(rel.currentLevel)?.personality.orEmpty()
+                            val up = rel.upTriggers?.takeIf { !it.isNullOrBlank() } ?: "(none)"
+                            val down = rel.downTriggers?.takeIf { !it.isNullOrBlank() } ?: "(none)"
+                            "$base. At this level: $personality | upTrigger: $up | downTrigger: $down"
+                        } else {
+                            "$base."
+                        }
+                    }
+                }
+
             SESSION SUMMARY:            
             $sessionSummary
             
@@ -510,14 +532,14 @@ object PromptBuilder {
             $memoriesPromptSection
             
             LOCATION:
-                - Area: ${slotProfile.lastActiveArea ?: "unknown"}
-                - Location: ${slotProfile.lastActiveLocation ?: "unknown"}
+            - Area: ${slotProfile.lastActiveArea ?: "unknown"}
+            - Location: ${slotProfile.lastActiveLocation ?: "unknown"}
             
             NEARBY CHARACTERS:
-                ${
-                            if (sceneSlotIds.isEmpty()) "None"
-                            else sceneSlotIds.joinToString(", ")
-                        }
+            ${
+                if (sceneSlotIds.isEmpty()) "None"
+                else sceneSlotIds.joinToString(", ")
+            }
         
             CONDENSED INFO FOR NEARBY CHARACTERS:
             $condensedCharacterInfo
@@ -538,6 +560,8 @@ object PromptBuilder {
             Begin your response. Do not include any extra text, explanations, or system notes—**JSON only**.
         """.trimIndent()
     }
+
+
 
     fun buildGMPrompt(
         gmSlot: SlotProfile,
@@ -584,8 +608,6 @@ object PromptBuilder {
         PRIORITIZE ROLEPLAYING THE PLAYER NOT THE CHARACTER IN THE GAME! INTERACT WITH OTHER PLAYERS AND ENJOYING HANGING OUT, TALKING ABOUT THINGS OTHER THAN THE GAME AS WELL!
         """.trimIndent()
         }
-
-
 
     fun buildPlayerPrompt(
         playerSlot: SlotProfile,

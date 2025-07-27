@@ -158,7 +158,11 @@ class ChatCreationActivity : AppCompatActivity() {
             // If new, build from selectedCharacters; if editing, use chatRelationships
             if (chatRelationships.isEmpty()) {
                 chatRelationships = selectedCharacters
-                    .flatMap { it.relationships ?: emptyList() }
+                    .flatMap { char ->
+                        (char.relationships ?: emptyList()).map { rel ->
+                            rel.copy(fromId = char.id)
+                        }
+                    }
                     .toMutableList()
             }
             val previews = selectedCharacters.map {
@@ -192,7 +196,9 @@ class ChatCreationActivity : AppCompatActivity() {
         checkboxVN.setOnCheckedChangeListener { _, isChecked ->
             VNButton.isEnabled = isChecked
             VNButton.visibility = View.VISIBLE
-            if (!isChecked) {
+            if (isChecked) {
+                modeSettings["visual_novel"] = "true"
+            } else {
                 modeSettings.remove("visual_novel")
                 VNButton.visibility = View.GONE
             }

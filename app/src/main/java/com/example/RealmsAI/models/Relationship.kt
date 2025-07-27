@@ -1,21 +1,22 @@
 package com.example.RealmsAI.models
 
 data class RelationshipLevel(
-    val level: Int,
-    val threshold: Int,
-    val personality: String = ""
+    var level: Int = 0,
+    var threshold: Int = 0,
+    var personality: String = ""
 )
 
 data class Relationship(
+    val id: String = System.currentTimeMillis().toString(), // or UUID.randomUUID().toString()
     val fromId: String = "",
     val toName: String = "",
     val type: String = "",
     val description: String? = null,
-    // ... other fields ...
     var upTriggers: String? = "",
     var downTriggers: String? = "",
     var levels: List<RelationshipLevel> = emptyList(),
-    var currentLevel: Int = 0   // Or you can set this elsewhere!
+    var currentLevel: Int = 0,
+    var points: Int = 0
 )
 
 data class ParticipantPreview(
