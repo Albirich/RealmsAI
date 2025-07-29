@@ -12,7 +12,8 @@ interface MixtralApiService {
 }
 
 data class MixtralChatRequest(
-    val model: String = "deepseek/deepseek-chat-v3-0324",
+    // deepseek/deepseek-chat-v3-0324"
+    val model: String = "x-ai/grok-3-mini-beta",
     val messages: List<Message>
 )
 

@@ -21,14 +21,15 @@ class ChatAdapter(
     private val slotProfiles: List<SlotProfile>,
     private val sessionUsers: List<SessionUser>,
     private val currentUserId: String,
+    private val mode: AdapterMode = AdapterMode.CHAT,
+    private val onReRoll: ((ChatMessage, Int) -> Unit)? = null,
     private val onEditMessage: (editedMessage: ChatMessage, position: Int) -> Unit,
     private val onDeleteMessages: (fromPosition: Int) -> Unit,
     private val isMultiplayer: Boolean
 
 
-) : RecyclerView.Adapter<ChatAdapter.ChatViewHolder>() {
-
-
+) : RecyclerView.Adapter<ChatAdapter.ChatViewHolder>()
+{
     data class MessageStyle(val backgroundColor: Int, val textColor: Int)
     inner class ChatViewHolder(view: View) : RecyclerView.ViewHolder(view) {
         val messageTextView: TextView = view.findViewById(R.id.messageTextView)
@@ -75,10 +76,21 @@ class ChatAdapter(
         // Set colors
         val style = when {
             isBot -> slotProfiles.find { it.slotId == msg.senderId }
-                ?.let { MessageStyle(safeParseColor(it.bubbleColor, 0xFFCCCCCC.toInt()), safeParseColor(it.textColor, 0xFF000000.toInt())) }
+                ?.let {
+                    MessageStyle(
+                        safeParseColor(it.bubbleColor, 0xFFCCCCCC.toInt()),
+                        safeParseColor(it.textColor, 0xFF000000.toInt())
+                    )
+                }
+
             msg.senderId == "narrator" -> MessageStyle(0xFFEEEEEE.toInt(), 0xFF000000.toInt())
             else -> sessionUsers.find { it.userId == msg.senderId }
-                ?.let { MessageStyle(safeParseColor(it.bubbleColor, 0xFF99CCFF.toInt()), safeParseColor(it.textColor, 0xFF000000.toInt())) }
+                ?.let {
+                    MessageStyle(
+                        safeParseColor(it.bubbleColor, 0xFF99CCFF.toInt()),
+                        safeParseColor(it.textColor, 0xFF000000.toInt())
+                    )
+                }
         } ?: MessageStyle(0xFFCCCCCC.toInt(), 0xFF000000.toInt())
 
         holder.messageContainer.setBackgroundColor(style.backgroundColor)
@@ -92,30 +104,48 @@ class ChatAdapter(
 
         // Long-press: edit/delete dialog
         holder.itemView.setOnLongClickListener {
-            if (isMultiplayer) {
-                // Do nothing, block popup entirely in multiplayer
-                return@setOnLongClickListener true
-            }
-            val ctx = holder.itemView.context
-            val edit = EditText(ctx).apply { setText(msg.text) }
-            AlertDialog.Builder(ctx)
-                .setTitle("Edit Message")
-                .setView(edit)
-                .setPositiveButton("Resend + Delete following") { _, _ ->
-                    val newText = edit.text.toString()
-                    val newMsg = msg.copy(text = newText)
-                    messages[position] = newMsg
-                    notifyItemChanged(position)
+            when (mode) {
+                AdapterMode.CHAT -> {
+                    if (isMultiplayer) {
+                        // Do nothing, block popup entirely in multiplayer
+                        return@setOnLongClickListener true
+                    }
+                    val ctx = holder.itemView.context
+                    val edit = EditText(ctx).apply { setText(msg.text) }
+                    AlertDialog.Builder(ctx)
+                        .setTitle("Edit Message")
+                        .setView(edit)
+                        .setPositiveButton("Resend + Delete following") { _, _ ->
+                            val newText = edit.text.toString()
+                            val newMsg = msg.copy(text = newText)
+                            messages[position] = newMsg
+                            notifyItemChanged(position)
+                            // Notify MainActivity to handle saving, deletion after this message, and AI restart
+                            onEditMessage(newMsg, position)
+                        }
+                        .setNeutralButton("Delete this + following") { _, _ ->
+                            onDeleteMessages(position)
+                        }
+                        .setNegativeButton("Cancel", null)
+                        .show()
+                    true
+                }
 
-                    // Notify MainActivity to handle saving, deletion after this message, and AI restart
-                    onEditMessage(newMsg, position)
+                AdapterMode.ROLL_HISTORY -> {
+                    // Only show reroll/delete
+                    AlertDialog.Builder(holder.itemView.context)
+                        .setTitle("Roll Options")
+                        .setItems(arrayOf("Re-Roll", "Delete")) { dialog, which ->
+                            when (which) {
+                                0 -> onReRoll?.invoke(msg, position)
+                                1 -> onDeleteMessages(position)
+                            }
+                        }
+                        .show()
+                    true
                 }
-                .setNeutralButton("Delete this + following") { _, _ ->
-                    onDeleteMessages(position)
-                }
-                .setNegativeButton("Cancel", null)
-                .show()
-            true
+            }
+
         }
     }
     fun insertMessageAt(position: Int, message: ChatMessage) {
@@ -153,4 +183,13 @@ class ChatAdapter(
     }
 
     fun getMessages(): List<ChatMessage> = messages.toList()
+    enum class AdapterMode {
+        CHAT, ROLL_HISTORY
+    }
+
+    fun updateMessageAt(position: Int, message: ChatMessage) {
+        messages[position] = message
+        notifyItemChanged(position)
+    }
+
 }

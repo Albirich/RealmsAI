@@ -660,10 +660,12 @@ class SessionLandingActivity : AppCompatActivity() {
         val actualCurrentOutfit = if (profile.currentOutfit.isNullOrBlank()) defaultOutfit else profile.currentOutfit
         val startArea = null // You can set this if you want, or pull from chatProfile/area logic
         val slotId = UUID.randomUUID().toString()
-        val rpgSettingsJson = sessionProfile?.modeSettings["rpg"]
+        val rpgSettingsRaw = sessionProfile?.modeSettings?.get("rpg")
+        val rpgSettingsJson = rpgSettingsRaw as? String
         val rpgSettings = if (!rpgSettingsJson.isNullOrBlank() && rpgSettingsJson.trim().startsWith("{"))
             Gson().fromJson(rpgSettingsJson, ModeSettings.RPGSettings::class.java)
         else null
+
         val matchingRpgCharacter = rpgSettings?.characters?.find { it.characterId == profile.id }
 
         fun calcHp(stats: Map<String, Int>, rpgClass: String): Int {

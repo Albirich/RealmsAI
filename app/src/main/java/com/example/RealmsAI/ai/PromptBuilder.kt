@@ -419,7 +419,7 @@ object PromptBuilder {
 
     fun buildRoleplayPrompt(
         slotProfile: SlotProfile,
-        modeSettings: Map<String, String>,
+        modeSettings: Map<String, Any>,
         sessionSummary: String,
         sceneSlotIds: List<String>,
         condensedCharacterInfo: Map<String, Map<String, Any?>>,
@@ -491,6 +491,7 @@ object PromptBuilder {
               RELATIONSHIPPOINTS+1:<relationshipId>,
               RELATIONSHIPPOINTS-1:<relationshipId>
               ]
+              {{EXTRA_FIELDS}}
             }
             
             CHARACTER PROFILE:
@@ -576,7 +577,7 @@ object PromptBuilder {
                 - Describe what your character does in the game, but also include table-talk, jokes, arguments, etc.
                 - You are at the table, discussing and playing the game.
                 - Stay in character as you interact with the other players.
-                - If you describe your character’s in-game action, preface with: “My character tries to...” or “In the game, I...”
+                - If you describe npcs in-game action, preface with: “They try to...” or “In the game, they...”
                 - Talk outside of the game around, rather than in the game.
                 - Roleplay as if you are in the room with the players
                 - You DO NOT have a character in the game!
@@ -604,8 +605,19 @@ object PromptBuilder {
                 Goal: ${act?.goal}")
             
         You should end each message by stating what happens next or asking the players what they do.
-        If the party completes the Act's goal, include in your output: { \"advance_act\": true }
-        PRIORITIZE ROLEPLAYING THE PLAYER NOT THE CHARACTER IN THE GAME! INTERACT WITH OTHER PLAYERS AND ENJOYING HANGING OUT, TALKING ABOUT THINGS OTHER THAN THE GAME AS WELL!
+        If the party completes the Act's goal, include "advance_act" in the extra fields section of your output: 
+        { 
+            "advance_act": true 
+        }
+        At the end of each message, if you need to Roll a dice add "actions" into the extra fields section of your output:
+        {
+            "actions": [
+              { "type": "roll_dice", "slot": "SLOTID" }
+            ]
+        }
+        Do not include any other text on that line.
+        PRIORITIZE ROLEPLAYING THE PLAYER NOT THE NPCS IN THE GAME! INTERACT WITH OTHER PLAYERS AND ENJOYING HANGING OUT, TALKING ABOUT THINGS OTHER THAN THE GAME AS WELL!
+        IMPORTANT: you can only reply as ${gmSlot.name}
         """.trimIndent()
         }
 
@@ -655,7 +667,15 @@ object PromptBuilder {
         Physical Description: ${playerSlot.physicalDescription}
 
         If you want to change equipment, heal, use an item, or do something special, just say so in your message!
+        At the end of each message, if you need to Roll a dice add "actions" into the extra fields section of your output:
+        {
+            "actions": [
+              { "type": "roll_dice", "slot": "SLOTID" }
+            ]
+        }
+        Do not include any other text on that line.
         PRIORITIZE ROLEPLAYING THE PLAYER NOT THE CHARACTER IN THE GAME! INTERACT WITH OTHER PLAYERS AND ENJOYING HANGING OUT, TALKING ABOUT THINGS OTHER THAN THE GAME AS WELL!
+        IMPORTANT: you can only reply as ${playerSlot.name}
     """.trimIndent()
     }
 
@@ -698,7 +718,6 @@ object PromptBuilder {
         - GM: Runs the story, world, enemies, and NPCs
         
         =============================
-        After you roleplay as the gm, you do your job activating the next speaker:
     """.trimIndent()
     }
 }

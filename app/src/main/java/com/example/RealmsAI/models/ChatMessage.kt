@@ -12,7 +12,8 @@ data class ChatMessage(
     var imageUpdates: Map<Int, String?>? = null,
     val area: String? = null,
     val location: String? = null,
-    var visibility: Boolean = true
+    var visibility: Boolean = true,
+    val messageType: String = "message"
 )
 
 

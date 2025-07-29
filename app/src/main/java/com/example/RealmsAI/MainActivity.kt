@@ -1,6 +1,7 @@
 package com.example.RealmsAI
 
 import ChatAdapter
+import ChatAdapter.AdapterMode
 import android.content.Intent
 import android.graphics.Color
 import android.graphics.Rect
@@ -34,10 +35,13 @@ import kotlinx.coroutines.tasks.await
 import android.text.TextWatcher
 import android.text.Editable
 import androidx.constraintlayout.widget.ConstraintLayout
+import androidx.constraintlayout.widget.ConstraintSet
+import com.example.RealmsAI.FacilitatorResponseParser.Action
 import com.example.RealmsAI.adapters.CollectionAdapter.CharacterRowAdapter
-import android.net.Uri
 import com.example.RealmsAI.models.ModeSettings.RPGSettings
 import org.json.JSONArray
+import com.google.gson.JsonObject
+import com.google.gson.JsonArray
 
 class MainActivity : AppCompatActivity() {
     companion object { private const val TAG = "MainActivity" }
@@ -46,12 +50,17 @@ class MainActivity : AppCompatActivity() {
     private lateinit var chatTitleView: TextView
     private lateinit var chatDescriptionView: TextView
     private lateinit var chatRecycler: RecyclerView
+    private lateinit var rollRecyclerView: RecyclerView
     private lateinit var messageEditText: EditText
     private lateinit var sendButton: Button
     private lateinit var topOverlay: View
     private lateinit var toggleChatInputButton: ImageButton
     private lateinit var avatarViews: List<ImageView>
     private lateinit var chatInputGroup: View
+    private lateinit var toggleButtonContainer: View
+    private lateinit var rpgToggleContainer: View
+    private lateinit var rollHistoryButton: ImageButton
+    private lateinit var characterSheetButton: ImageButton
     private lateinit var backgroundImageView:ImageView
     private var isDescriptionExpanded = false
     private var lastMultiplayerValue: Boolean? = null
@@ -62,13 +71,17 @@ class MainActivity : AppCompatActivity() {
     private lateinit var moveButton: Button
     private lateinit var personaButton: Button
     private lateinit var optionButton: Button
-
+    // Dice roll UI elements
+    private lateinit var rollButton: ImageButton
+    private lateinit var diceImageView: ImageView
 
     // State
     private lateinit var sessionProfile: SessionProfile
     private lateinit var chatAdapter: ChatAdapter
+    private lateinit var rollAdapter: ChatAdapter
     private val visibleAvatarSlotIds = MutableList(4) { "" }
     private val avatarSlotLocked = BooleanArray(4) { false }
+    private var historyLoaded = false
 
     private var lastBackgroundArea: String? = null
     private var lastBackgroundLocation: String? = null
@@ -127,6 +140,7 @@ class MainActivity : AppCompatActivity() {
         chatTitleView = findViewById(R.id.chatTitle)
         chatDescriptionView = findViewById(R.id.chatDescription)
         chatRecycler = findViewById(R.id.chatRecyclerView)
+        rollRecyclerView = findViewById(R.id.rollRecyclerView)
         messageEditText = findViewById(R.id.messageEditText)
         sendButton = findViewById(R.id.sendButton)
         topOverlay = findViewById(R.id.topOverlay)
@@ -139,6 +153,7 @@ class MainActivity : AppCompatActivity() {
             findViewById(R.id.botAvatar3ImageView)
         )
         chatInputGroup = findViewById(R.id.chatInputGroup)
+        toggleButtonContainer = findViewById(R.id.toggleButtonContainer)
         resendButton = findViewById(R.id.resendButton)
         toggleControlButton = findViewById(R.id.toggleControlButton)
         toggleChatButton = findViewById(R.id.toggleChatButton)
@@ -146,7 +161,11 @@ class MainActivity : AppCompatActivity() {
         moveButton = findViewById(R.id.controlMoveButton)
         personaButton = findViewById(R.id.controlPersonaButton)
         optionButton = findViewById(R.id.controlOptionsButton)
-
+        rollButton = findViewById(R.id.rollButton)
+        diceImageView = findViewById(R.id.diceImageView)
+        rpgToggleContainer = findViewById(R.id.rpgToggleContainer)
+        characterSheetButton = findViewById(R.id.characterSheetButton)
+        rollHistoryButton = findViewById(R.id.rollHistoryButton)
         // UI display
         chatTitleView.text = sessionProfile.title
         val descriptionHeader = findViewById<LinearLayout>(R.id.descriptionHeader)
@@ -158,9 +177,11 @@ class MainActivity : AppCompatActivity() {
         val rootView = findViewById<View>(R.id.chatRoot)
         val avatarContainer = findViewById<View>(R.id.avatarContainer)
         val chatInputGroup = findViewById<View>(R.id.chatInputGroup)
+        val toggleButtonContainer = findViewById<View>(R.id.toggleButtonContainer)
+        val rpgToggleContainer = findViewById<View>(R.id.rpgToggleContainer)
         val controlBox = findViewById<View>(R.id.controlBox)
-        val visibleAvatarSlotIds = MutableList(4) { "" }
-        val avatarSlotLocked = BooleanArray(4) { false }
+        val characterSheetBox = findViewById<View>(R.id.characterSheetBox)
+        val rollHistoryBox = findViewById<View>(R.id.rollHistoryBox)
 
         rootView.viewTreeObserver.addOnGlobalLayoutListener {
             val rect = Rect()
@@ -173,17 +194,15 @@ class MainActivity : AppCompatActivity() {
                 // Move only avatar + chat input container up by keypad height (or customize)
                 avatarContainer.translationY = -keypadHeight.toFloat() + 125f
                 chatInputGroup.translationY = -keypadHeight.toFloat() + 125f
-                toggleChatInputButton.translationY = -keypadHeight.toFloat() + 125f
-                resendButton.translationY = -keypadHeight.toFloat() + 125f
+                toggleButtonContainer.translationY = -keypadHeight.toFloat() + 125f
+                rpgToggleContainer.translationY = -keypadHeight.toFloat() + 125f
                 backgroundImageView.translationY = -keypadHeight.toFloat() + 125f
-                toggleControlButton.translationY = -keypadHeight.toFloat() + 125f
             } else {
                 avatarContainer.translationY = 0f
                 chatInputGroup.translationY = 0f
-                toggleChatInputButton.translationY = 0f
-                resendButton.translationY = 0f
+                toggleButtonContainer.translationY = 0f
+                rpgToggleContainer.translationY = 0f
                 backgroundImageView.translationY = 0f
-                toggleControlButton.translationY = 0f
             }
         }
         chatDescriptionView.text = sessionProfile.sessionDescription
@@ -201,16 +220,11 @@ class MainActivity : AppCompatActivity() {
                 descriptionToggle.setImageResource(R.drawable.ic_expand_more) // down arrow
             }
         }
-
-        if (sessionProfile.chatMode == "ONE_ON_ONE")
-        {
-            maxActivationRounds = 2
-        } else {
-            maxActivationRounds = 3
-        }
-
+        var activeSlotId = sessionProfile.userMap[userId]?.activeSlotId
         // Adapter setup (pass in modern fields)
         val isMultiplayer = sessionProfile.userMap.size > 1
+
+
 
         chatAdapter = ChatAdapter(
             mutableListOf(),
@@ -240,9 +254,26 @@ class MainActivity : AppCompatActivity() {
             },
             isMultiplayer = isMultiplayer
         )
+
         Log.d("loading in", "after setting up chatadapter laoding multiplayer check: ${sessionProfile.multiplayer}")
         chatRecycler.layoutManager = LinearLayoutManager(this)
         chatRecycler.adapter = chatAdapter
+
+        rollAdapter = ChatAdapter(
+            mutableListOf(),
+            { /* scroll logic if needed */ },
+            sessionProfile.slotRoster,
+            sessionProfile.userMap.values.toList(),
+            userId,
+            onEditMessage = { _, _ -> }, // not needed for rolls
+            onDeleteMessages = { pos -> /* delete logic */ },
+            isMultiplayer = isMultiplayer,
+            mode = AdapterMode.ROLL_HISTORY,
+            onReRoll = { msg, pos ->
+                rerollAndUpdateMessage(msg) }
+        )
+        rollRecyclerView.layoutManager = LinearLayoutManager(this)
+        rollRecyclerView.adapter = rollAdapter
 
         // Hide all avatars, then show only those in use
         avatarViews.forEach { it.visibility = View.INVISIBLE }
@@ -332,6 +363,8 @@ class MainActivity : AppCompatActivity() {
                 // Use your helper:
                 updateBackgroundIfChanged(playerArea, playerLocation, sessionProfile.areas)
                 loadSessionHistory()
+
+                Log.d("rpg mode", "RAW SESSION DOC: $rawMapOrDoc")
             }
         }
 
@@ -344,19 +377,30 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // Toggle input visibility
-        toggleChatInputButton.setOnClickListener {
-            val isVisible = chatInputGroup.visibility == View.VISIBLE
-            chatInputGroup.visibility = if (isVisible) View.GONE else View.VISIBLE
+        val isRPG = sessionProfile.modeSettings.containsKey("rpg")
+        Log.d("rpg mode", "sessionProfile = $sessionProfile")
+        Log.d("rpg mode", "modeSettings keys: ${sessionProfile.modeSettings.keys}")
+        Log.d("rpg mode", "${sessionProfile.title} rpg mode is $isRPG")
+
+        val rpgSettingRaw = sessionProfile.modeSettings["rpg"]
+        val rpgSetting: String? = when (rpgSettingRaw) {
+            is String -> rpgSettingRaw
+            is Map<*, *> -> Gson().toJson(rpgSettingRaw) // Optional: if sometimes stored as Map
+            else -> null
         }
 
+        Log.d("rpg mode", "rpgSetting: $rpgSetting")
+        if (isRPG && !rpgSetting.isNullOrBlank()) {
+            rpgToggleContainer.visibility = View.VISIBLE
+        } else {
+            rpgToggleContainer.visibility = View.GONE // (optional)
+        }
 
-
-        toggleChatButton.setOnClickListener {
-            controlBox.visibility = View.GONE
-            chatInputGroup.visibility = View.VISIBLE
-            toggleChatButton.visibility = View.GONE
-            toggleControlButton.visibility = View.VISIBLE
+        // Toggle input visibility
+        toggleChatInputButton.setOnClickListener {
+            Log.d("togglebutton debug", "toggle chatinputbutton")
+            val isVisible = chatInputGroup.visibility == View.VISIBLE
+            chatInputGroup.visibility = if (isVisible) View.GONE else View.VISIBLE
         }
 
         val moveOptions = findViewById<ConstraintLayout>(R.id.moveOptions)
@@ -366,8 +410,6 @@ class MainActivity : AppCompatActivity() {
         val moveBtn = findViewById<Button>(R.id.controlMoveButton)
         val avatarBtn = findViewById<Button>(R.id.controlPersonaButton)
         val optionsBtn = findViewById<Button>(R.id.controlOptionsButton)
-
-
 
         fun showMove() {
             moveOptions.visibility = View.VISIBLE
@@ -649,14 +691,6 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        toggleControlButton.setOnClickListener {
-            chatInputGroup.visibility = View.GONE
-            controlBox.visibility = View.VISIBLE
-            toggleControlButton.visibility = View.GONE
-            toggleChatButton.visibility = View.VISIBLE
-            optionsOptions.visibility = View.VISIBLE
-            showOptions()
-        }
         moveBtn.setOnClickListener { showMove() }
         avatarBtn.setOnClickListener { showAvatar() }
         optionsBtn.setOnClickListener { showOptions() }
@@ -677,8 +711,14 @@ class MainActivity : AppCompatActivity() {
             override fun afterTextChanged(s: Editable?) {}
         })
 
+        rollButton.setOnClickListener {
+            if (!activeSlotId.isNullOrBlank()) {
+                handleDiceRoll(activeSlotId!!)
+            }
+        }
 
         resendButton.setOnClickListener {
+            Log.d("togglebutton debug", "resend button")
             val lastMessage = chatAdapter.getMessages()
                 .lastOrNull { it.senderId == sessionProfile.userMap[userId]?.activeSlotId }
 
@@ -694,6 +734,80 @@ class MainActivity : AppCompatActivity() {
                 // (Optional: Trigger AI if you want this to start a new round)
                 sendToAI("")
             }
+        }
+
+        val expandChatButton = findViewById<ImageButton>(R.id.expandChatButton)
+
+        var isFullscreen = false
+
+        expandChatButton.setOnClickListener {
+            val params = chatInputGroup.layoutParams
+            if (!isFullscreen) {
+                // Expand to fill parent minus 50dp
+                val parentHeight = rootView.height
+                val newHeight = parentHeight - (50 * resources.displayMetrics.density).toInt()
+                params.height = newHeight
+                chatInputGroup.layoutParams = params
+                isFullscreen = true
+                expandChatButton.setImageResource(R.drawable.ic_fullscreen_exit)
+            } else {
+                // Collapse back to original height (example: 300dp)
+                val collapsedHeight = (300 * resources.displayMetrics.density).toInt()
+                params.height = collapsedHeight
+                chatInputGroup.layoutParams = params
+                isFullscreen = false
+                expandChatButton.setImageResource(R.drawable.ic_fullscreen)
+            }
+        }
+        // -- TOGGLING VIEWS
+        toggleControlButton.setOnClickListener {
+            Log.d("togglebutton debug", "toggle control button")
+            chatInputGroup.visibility = View.GONE
+            controlBox.visibility = View.VISIBLE
+            toggleButtonContainer.visibility = View.GONE
+            toggleChatButton.visibility = View.VISIBLE
+            optionsOptions.visibility = View.VISIBLE
+            characterSheetBox.visibility = View.GONE
+            rollHistoryBox.visibility = View.GONE
+            dockTogglesAbove(R.id.controlBox)
+            showOptions()
+        }
+
+        toggleChatButton.setOnClickListener {
+            Log.d("togglebutton debug", "toggle chat back on button")
+            controlBox.visibility = View.GONE
+            chatInputGroup.visibility = View.VISIBLE
+            toggleButtonContainer.visibility = View.VISIBLE
+            toggleChatButton.visibility = View.GONE
+            characterSheetBox.visibility = View.GONE
+            rollHistoryBox.visibility = View.GONE
+            toggleControlButton.visibility = View.VISIBLE
+            dockTogglesAbove(R.id.chatInputGroup)
+        }
+
+        // -- Charactersheet --
+        characterSheetButton.setOnClickListener {
+            characterSheetBox.visibility = View.VISIBLE
+            controlBox.visibility = View.GONE
+            toggleButtonContainer.visibility = View.GONE
+            toggleChatButton.visibility = View.VISIBLE
+            chatInputGroup.visibility = View.GONE
+            rollHistoryBox.visibility = View.GONE
+            dockTogglesAbove(R.id.characterSheetBox)
+        }
+
+        // -- Roll History --
+        rollHistoryButton.setOnClickListener {
+            characterSheetBox.visibility = View.GONE
+            toggleButtonContainer.visibility = View.GONE
+            controlBox.visibility = View.GONE
+            toggleChatButton.visibility = View.VISIBLE
+            chatInputGroup.visibility = View.GONE
+            rollHistoryBox.visibility = View.VISIBLE
+            rollRecyclerView.visibility = View.VISIBLE
+            dockTogglesAbove(R.id.rollHistoryBox)
+            fetchAndShowRollHistory()
+            Log.d("ROLL_DEBUG", "Starting roll history fetch for slot: $activeSlotId")
         }
 
         // Send button logic
@@ -714,13 +828,78 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    // ========== AI Activation & Roleplay Loop (Modernized) ==========
-    private fun processActivationRound(
-        input: String,
-        chatHistory: List<ChatMessage>,
-        retryCount: Int = 0,
-        maxRetries: Int = 3
-    ) {
+    fun dockTogglesAbove(viewBelowId: Int) {
+        val root = findViewById<ConstraintLayout>(R.id.chatRoot)
+        val cs = ConstraintSet()
+        cs.clone(root)
+        cs.connect(R.id.toggleButtonContainer, ConstraintSet.BOTTOM, viewBelowId, ConstraintSet.TOP)
+        cs.connect(R.id.toggleChatButton, ConstraintSet.BOTTOM, viewBelowId, ConstraintSet.TOP)
+        cs.connect(R.id.rpgToggleContainer, ConstraintSet.BOTTOM, viewBelowId, ConstraintSet.TOP)
+        cs.applyTo(root)
+    }
+
+    fun mapToChatMessage(map: Map<String, Any>): ChatMessage? {
+        // Safely extract all needed fields, handle missing/nulls as appropriate
+        val id = map["id"] as? String ?: return null
+        val senderId = map["senderId"] as? String ?: "narrator"
+        val text = map["text"] as? String ?: ""
+        val messageType = map["messageType"] as? String ?: "message"        // ... extract the rest
+        return ChatMessage(
+            id = id,
+            senderId = senderId,
+            text = text,
+            messageType = messageType,
+        )
+    }
+
+    private fun fetchAndShowRollHistory() {
+        val activeSlotId = sessionProfile.userMap[userId]?.activeSlotId ?: return
+        Log.d("ROLL_DEBUG", "activeSlotId = $activeSlotId")
+        val messagesRef  = FirebaseFirestore.getInstance()
+            .collection("sessions")
+            .document(sessionId)
+            .collection("slotPersonalHistory")
+            .document(activeSlotId)
+            .collection("messages")
+
+        messagesRef.get().addOnSuccessListener { querySnapshot ->
+            Log.d("ROLL_DEBUG", "Found ${querySnapshot.size()} roll messages in Firestore subcollection!")
+            val chatMessages = querySnapshot.documents.mapNotNull { doc ->
+                doc.data?.let { mapToChatMessage(it) }
+            }
+            val rollMessages = chatMessages.filter { it.messageType == "roll" }
+            rollAdapter.setMessages(rollMessages)
+        }
+    }
+
+    fun rerollAndUpdateMessage(oldMessage: ChatMessage) {
+    val slotId = oldMessage.senderId
+    val slot = sessionProfile.slotRoster.find { it.slotId == slotId }
+    if (slot == null) {
+        Toast.makeText(this, "No character found for dice roll.", Toast.LENGTH_SHORT).show()
+        return
+    }
+    val name = slot.name
+    val area = slot.lastActiveArea
+    val location = slot.lastActiveLocation
+    val roll = (1..20).random()
+    // Post result to chat
+    val rollMessage = "$name rolled $roll"
+    val chatMessage = ChatMessage(
+        id = UUID.randomUUID().toString(),
+        senderId = slotId,
+        text = rollMessage,
+        area = area,
+        location = location,
+        delay = 0,
+        timestamp = Timestamp.now(),
+        visibility = true,
+        messageType = "roll"
+    )
+    SessionManager.sendMessage(chatId, sessionId, chatMessage)
+}
+
+    private fun processActivationRound(input: String, chatHistory: List<ChatMessage>, retryCount: Int = 0, maxRetries: Int = 3) {
         if (retryCount > maxRetries) {
             Log.w(TAG, "Max retries reached, aborting activation round")
             activationRound = 0
@@ -973,27 +1152,35 @@ class MainActivity : AppCompatActivity() {
                             val slotId = nextSlot ?: run {
                                 Log.w("AI_CYCLE", "nextSlot is null, retrying.")
                                 processActivationRound(input, chatHistory, retryCount + 1)
+                                withContext(Dispatchers.Main) {
+                                    updateButtonState(ButtonState.INTERRUPT)
+                                }
                                 return@withTimeoutOrNull
                             }
                             val slotProfile = sessionProfile.slotRoster.find { it.slotId == slotId }
                             if (slotProfile == null) {
-                                Log.w("AI_CYCLE", "Slot '$slotId' not found in slotRoster")
-                                activationRound = 0
-                                withContext(Dispatchers.Main) { updateButtonState(ButtonState.SEND) }
-                                return@withTimeoutOrNull  // <-- or return@launch depending on your coroutine builder
+                                Log.w("AI_CYCLE", "nextSlot is invalid, retrying.")
+                                processAboveTableRound(input, chatHistory, retryCount + 1)
+                                withContext(Dispatchers.Main) {
+                                    updateButtonState(ButtonState.SEND)
+                                }
+                                return@withTimeoutOrNull
                             }
                             if (slotProfile.profileType == "player") {
                                 Log.d("AI_CYCLE", "It's the user's turn. Do NOT generate an AI message for player slot.")
                                 activationRound = 0
                                 // Optionally, trigger user input UI here.
                                 withContext(Dispatchers.Main) {
-                                    updateButtonState(ButtonState.SEND)
+                                    updateButtonState(ButtonState.INTERRUPT)
                                 }
                                 return@withTimeoutOrNull
                             }
                             if (slotProfile.typing == true) {
                                 Log.d(TAG, "Slot is typing, retrying activation round $retryCount")
                                 processActivationRound(input, chatHistory, retryCount + 1)
+                                withContext(Dispatchers.Main) {
+                                    updateButtonState(ButtonState.INTERRUPT)
+                                }
                                 return@withTimeoutOrNull
                             }
 
@@ -1001,20 +1188,14 @@ class MainActivity : AppCompatActivity() {
                                 updateButtonState(ButtonState.WAITING)
                             }
                             val activeSlotId = sessionProfile.userMap[userId]?.activeSlotId
-                            if (activeSlotId != null) {
-                                sessionProfile = sessionProfile.copy(
-                                    slotRoster = sessionProfile.slotRoster.map { slot ->
-                                        if (slot.slotId == nextSlot) slot.copy(typing = true)
-                                        else slot
-                                    }
-                                )
-                                // Save to Firestore so others see the typing
-                                saveSessionProfile(sessionProfile, sessionId)
-
-                                if (activeSlotId != null) {
-                                    setSlotTyping(sessionId, nextSlot!!, true)
+                            sessionProfile = sessionProfile.copy(
+                                slotRoster = sessionProfile.slotRoster.map { slot ->
+                                    if (slot.slotId == nextSlot) slot.copy(typing = true)
+                                    else slot
                                 }
-                            }
+                            )
+                            // Save to Firestore so others see the typing
+                            saveSessionProfile(sessionProfile, sessionId)
 
                             val sceneSlotIds = sessionProfile.slotRoster
                                 .filter { it.lastActiveArea == playerArea && it.lastActiveLocation == playerLocation }
@@ -1169,9 +1350,7 @@ class MainActivity : AppCompatActivity() {
                                 saveMessagesSequentially(filteredMessages, sessionId, chatId)
 
                                 if (!nextSlot.isNullOrBlank()) {
-                                    if (activeSlotId != null) {
-                                        setSlotTyping(sessionId, nextSlot!!, false)
-                                    }
+                                    setSlotTyping(sessionId, nextSlot!!, false)
                                     saveSessionProfile(sessionProfile, sessionId)
                                 }
 
@@ -1225,13 +1404,7 @@ class MainActivity : AppCompatActivity() {
 
     }
 
-
-    private fun processAboveTableRound(
-        input: String,
-        chatHistory: List<ChatMessage>,
-        retryCount: Int = 0,
-        maxRetries: Int = 4
-    ) {
+    private fun processAboveTableRound(input: String, chatHistory: List<ChatMessage>, retryCount: Int = 0, maxRetries: Int = 4) {
         if (retryCount > maxRetries) {
             Log.w(TAG, "Max retries reached, aborting activation round")
             activationRound = 0
@@ -1272,7 +1445,6 @@ class MainActivity : AppCompatActivity() {
                         .filter {
                             it.lastActiveArea == playerSlot?.lastActiveArea &&
                                     it.lastActiveLocation == playerSlot?.lastActiveLocation &&
-                                    it.slotId != lastNonNarratorId &&
                                     !it.typing
                         }
                         .map { it.slotId }
@@ -1282,17 +1454,18 @@ class MainActivity : AppCompatActivity() {
                             .associate { it.slotId to it.memories.takeLast(5) }
 
                     val historyString = buildHistoryString(chatHistory.takeLast(10))
-                    val activationPrompt = PromptBuilder.buildActivationPrompt(
+                    var activationPrompt = PromptBuilder.buildActivationPrompt(
                         activeSlotId = activeSlotId,
                         sessionSummary = sessionProfile.sessionDescription + sessionProfile.secretDescription,
                         areas = if (sessionProfile.areas.isNullOrEmpty()) listOf("DM's") else sessionProfile.areas.map { it.name },
                         locations = locationMap,
-                        condensedCharacterInfo = condensedMap, // Map: slotId → summary
+                        condensedCharacterInfo = condensedMap,
                         lastNonNarratorId = lastNonNarratorId,
                         validNextSlotIds = coLocatedSlotIds,
                         memories = memoriesMap,
                         chatHistory = historyString
                     )
+                    activationPrompt += "\nNever choose narrator as next_slot."
                     Log.d("Ai_CYCLE", "Mode: ${sessionProfile.chatMode}, number of rounds: $maxActivationRounds")
                     Log.d("AI_CYCLE", "Activation Prompt:\n$activationPrompt")
                     Log.d("AI_response", "facilitator history: $chatHistory")
@@ -1405,86 +1578,11 @@ class MainActivity : AppCompatActivity() {
                         }
                     }
                     if (!nextSlot.isNullOrBlank()) {
-                        if (nextSlot == "NARRATOR") {
-                            Log.d("AI_CYCLE", "Narrator activated. Calling Narrator roleplay AI.")
-                            val activeSlotId = sessionProfile.userMap[userId]?.activeSlotId
-                            val playerSlot = sessionProfile.slotRoster.find { it.slotId == activeSlotId }
-                            val playerArea = playerSlot?.lastActiveArea
-                            val playerLocation = playerSlot?.lastActiveLocation
-                            val condensedCharacterInfo = sessionProfile.slotRoster
-                                .filter { it.lastActiveArea == playerArea && it.lastActiveLocation == playerLocation }
-                                .associate { profile ->
-                                    val outfit = profile.outfits.find { it.name == profile.currentOutfit }
-                                    val availablePoses = outfit?.poseSlots?.map { it.name } ?: emptyList()
-                                    profile.slotId to mapOf(
-                                        "summary" to profile.summary,
-                                        "pose" to profile.pose,
-                                        "available_poses" to availablePoses
-                                    )
-                                }
-                            val sceneSlotIds = sessionProfile.slotRoster
-                                .filter { it.lastActiveArea == playerArea && it.lastActiveLocation == playerLocation }
-                                .map { it.slotId }
-                                .distinct()
-                            val playerSlotId = sessionProfile.userMap[userId]?.activeSlotId
-                            val historyString = if (playerSlotId != null) {
-                                val myPersonalHistory = fetchPersonalHistory(sessionId, playerSlotId)
-                                buildHistoryString(myPersonalHistory.takeLast(10))
-                            } else {
-                                Log.e("AI", "playerSlotId is null! Cannot fetch personal history.")
-                                ""
-                            }
-                            val narratorPrompt = PromptBuilder.buildNarratorPrompt(
-                                sessionSummary = sessionProfile.sessionDescription + sessionProfile.secretDescription,
-                                area = playerArea,
-                                location = playerLocation,
-                                condensedCharacterInfo = condensedCharacterInfo,
-                                sceneSlotIds = sceneSlotIds,
-                                sessionProfile = sessionProfile,
-                                chatHistory = historyString
-                            )
-
-
-                            val narratorResponse =
-                                if (isNSFW)
-                                    Facilitator.callMixtralApi(narratorPrompt, BuildConfig.MIXTRAL_API_KEY)
-                                else
-                                    Facilitator.callOpenAiApi(narratorPrompt, BuildConfig.OPENAI_API_KEY)
-
-                            val narratorResult = try {
-                                FacilitatorResponseParser.parseRoleplayAIResponse(narratorResponse)
-                            } catch (e: Exception) {
-                                Log.e("AI_CYCLE", "Malformed narrator response: $narratorResponse", e)
-                                null
-                            }
-
-                            if (narratorResult == null || narratorResult.messages.isEmpty()) {
-                                activationRound = 0
-                                return@withTimeoutOrNull
-                            }
-
-                            val narratorMessages = narratorResult.messages.map { msg ->
-                                msg.copy(
-                                    senderId = "narrator",
-                                    area = playerSlot?.lastActiveArea,
-                                    location = playerSlot?.lastActiveLocation,
-                                    visibility = true
-                                )
-                            }
-
-
-                            withContext(Dispatchers.Main) {
-                                lifecycleScope.launch {
-                                    saveMessagesSequentially(narratorMessages, sessionId, chatId)
-                                }
-                            }
-
-                            val updatedHistory = chatAdapter.getMessages()
-                            if (activationRound < maxActivationRounds && isActive) {
-                                processAboveTableRound("", updatedHistory)
-                            }
+                        if (nextSlot == "NARRATOR"){
+                            Log.w("AI_CYCLE", "nextSlot is narrator, retrying.")
+                            processAboveTableRound(input, chatHistory, retryCount + 1)
+                            return@withTimeoutOrNull
                         }else {
-
                             val slotId = nextSlot ?: run {
                                 Log.w("AI_CYCLE", "nextSlot is null, retrying.")
                                 processAboveTableRound(input, chatHistory, retryCount + 1)
@@ -1492,9 +1590,8 @@ class MainActivity : AppCompatActivity() {
                             }
                             val slotProfile = sessionProfile.slotRoster.find { it.slotId == slotId }
                             if (slotProfile == null) {
-                                Log.w("AI_CYCLE", "Slot '$slotId' not found in slotRoster")
-                                activationRound = 0
-                                withContext(Dispatchers.Main) { updateButtonState(ButtonState.SEND) }
+                                Log.d(TAG, "Slot is invalid, retrying activation round $retryCount")
+                                processAboveTableRound(input, chatHistory, retryCount + 1)
                                 return@withTimeoutOrNull  // <-- or return@launch depending on your coroutine builder
                             }
                             if (slotProfile.profileType == "player") {
@@ -1516,20 +1613,14 @@ class MainActivity : AppCompatActivity() {
                                 updateButtonState(ButtonState.WAITING)
                             }
                             val activeSlotId = sessionProfile.userMap[userId]?.activeSlotId
-                            if (activeSlotId != null) {
-                                sessionProfile = sessionProfile.copy(
-                                    slotRoster = sessionProfile.slotRoster.map { slot ->
-                                        if (slot.slotId == nextSlot) slot.copy(typing = true)
-                                        else slot
-                                    }
-                                )
-                                // Save to Firestore so others see the typing
-                                saveSessionProfile(sessionProfile, sessionId)
-
-                                if (activeSlotId != null) {
-                                    setSlotTyping(sessionId, nextSlot!!, true)
+                            sessionProfile = sessionProfile.copy(
+                                slotRoster = sessionProfile.slotRoster.map { slot ->
+                                    if (slot.slotId == nextSlot) slot.copy(typing = true)
+                                    else slot
                                 }
-                            }
+                            )
+                            // Save to Firestore so others see the typing
+                            saveSessionProfile(sessionProfile, sessionId)
 
                             val sceneSlotIds = sessionProfile.slotRoster
                                 .filter { it.lastActiveArea == playerArea && it.lastActiveLocation == playerLocation }
@@ -1643,9 +1734,6 @@ class MainActivity : AppCompatActivity() {
                                     pose = cleanedPose
                                 )
                             }
-
-
-
                             Log.d("AI_response", "filtered messages: $filteredMessages")
 
                             val newMemory = roleplayResult.newMemory
@@ -1687,16 +1775,13 @@ class MainActivity : AppCompatActivity() {
                                 sessionProfile = sessionProfile.copy(slotRoster = updatedRoster)
                             }
 
+                            handleRPGActionList(roleplayResult.actions)
+
+                            setSlotTyping(sessionId, nextSlot!!, false)
+                            saveSessionProfile(sessionProfile, sessionId)
+
                             withContext(Dispatchers.Main) {
                                 saveMessagesSequentially(filteredMessages, sessionId, chatId)
-
-                                if (!nextSlot.isNullOrBlank()) {
-                                    if (activeSlotId != null) {
-                                        setSlotTyping(sessionId, nextSlot!!, false)
-                                    }
-                                    saveSessionProfile(sessionProfile, sessionId)
-                                }
-
                                 val updatedHistory = chatAdapter.getMessages()
                                 if (activationRound < maxActivationRounds && isActive) {
                                     processAboveTableRound("", updatedHistory)
@@ -1747,12 +1832,7 @@ class MainActivity : AppCompatActivity() {
 
     }
 
-    private fun processOnTableRPGRound(
-        input: String,
-        chatHistory: List<ChatMessage>,
-        retryCount: Int = 0,
-        maxRetries: Int = 2
-    ) {
+    private fun processOnTableRPGRound(input: String, chatHistory: List<ChatMessage>, retryCount: Int = 0, maxRetries: Int = 2) {
         if (retryCount > maxRetries) {
             Log.w(TAG, "Max retries reached, aborting activation round")
             activationRound = 0
@@ -2467,12 +2547,49 @@ class MainActivity : AppCompatActivity() {
                     updateAvatarsFromMessage(messages.last(), sessionProfile.slotRoster, visibleAvatarSlotIds)
                 }
             }
+            historyLoaded = true
         }, { error ->
             Log.e(TAG, "history load failed", error)
         })
     }
 
+    fun handleRPGActionList(actions: List<Action>) {
+        for (action in actions) {
+            when (action.type) {
+                "roll_dice" -> {
+                    handleDiceRoll(action.slot)
+                }
+                // You can handle other action types here as needed
+                // e.g. "use_item", "move_character", etc.
+            }
+        }
+    }
 
+    fun handleDiceRoll(slotId: String) {
+        val slot = sessionProfile.slotRoster.find { it.slotId == slotId }
+        if (slot == null) {
+            Toast.makeText(this, "No character found for dice roll.", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val name = slot.name
+        val area = slot.lastActiveArea
+        val location = slot.lastActiveLocation
+        val roll = (1..20).random()
+        // Post result to chat
+        val rollMessage = "$name rolled $roll"
+        val chatMessage = ChatMessage(
+            id = UUID.randomUUID().toString(),
+            senderId = slotId,
+            text = rollMessage,
+            area = area,
+            location = location,
+            delay = 0,
+            timestamp = Timestamp.now(),
+            visibility = true,
+            messageType = "roll"
+        )
+        SessionManager.sendMessage(chatId, sessionId, chatMessage)
+    }
 
     private fun sendMessageAndCallAI(text: String) {
         val activeSlotId = sessionProfile.userMap[userId]?.activeSlotId
@@ -2502,14 +2619,18 @@ class MainActivity : AppCompatActivity() {
 
     private fun sendToAI(userInput: String) {
         val messages = chatAdapter.getMessages()
-        val rpgSettingsJson = sessionProfile.modeSettings["rpg"]
         var isOnTable = false
         var isAboveTable = false
+        val rpgSettingsJson = sessionProfile.modeSettings["rpg"] as? String
         if (!rpgSettingsJson.isNullOrBlank() && rpgSettingsJson.trim().startsWith("{")) {
-            val rpgSettings = Gson().fromJson(rpgSettingsJson, RPGSettings::class.java)
-            when (rpgSettings.perspective) {
-                "onTable" -> isOnTable = true
-                "aboveTable" -> isAboveTable = true
+            try {
+                val rpgSettings = Gson().fromJson(rpgSettingsJson, RPGSettings::class.java)
+                when (rpgSettings.perspective?.lowercase()) {
+                    "ontable" -> isOnTable = true
+                    "abovetable" -> isAboveTable = true
+                }
+            } catch (e: Exception) {
+                Log.e("RPG", "Failed to parse rpgSettingsJson: $rpgSettingsJson", e)
             }
         }
         val slotIdsList = sessionProfile.slotRoster.joinToString(", ") { it.slotId }
@@ -2541,12 +2662,15 @@ class MainActivity : AppCompatActivity() {
 
             if (isOnTable) {
                 Log.d("ai_cycle", "proccessing isOnTable")
+                activationRound = 1
                 processOnTableRPGRound(userInput, messages)
             }else if (isAboveTable){
                 Log.d("ai_cycle", "proccessing isAboveTable")
+                activationRound = 1
                 processAboveTableRound(userInput, messages)
             } else {
                 Log.d("ai_cycle", "proccessing normal roleplay")
+                activationRound = 0
                 processActivationRound(userInput, messages)
             }
         }
@@ -2554,11 +2678,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     // save each message in sequence, update avatars/backgrounds if present
-    suspend fun saveMessagesSequentially(
-        messages: List<ChatMessage>,
-        sessionId: String,
-        chatId: String
-    ) {
+    suspend fun saveMessagesSequentially(messages: List<ChatMessage>, sessionId: String, chatId: String) {
         for (msg in messages) {
             delay(msg.delay.toLong())
             SessionManager.sendMessage(chatId, sessionId, msg)
@@ -2658,13 +2778,8 @@ class MainActivity : AppCompatActivity() {
             typingIndicatorBar.addView(box)
         }
     }
-    fun updateVisibleAvatarSlots(
-        senderId: String,
-        visibleAvatarSlotIds: MutableList<String>,
-        slotProfiles: List<SlotProfile>,
-        avatarSlotLocked: BooleanArray,
-        maxSlots: Int = 4
-    ) {
+
+    fun updateVisibleAvatarSlots(senderId: String, visibleAvatarSlotIds: MutableList<String>, slotProfiles: List<SlotProfile>, avatarSlotLocked: BooleanArray, maxSlots: Int = 4) {
         // Find the slot profile for the sender
         val senderProfile = slotProfiles.find { it.slotId == senderId }
         // Check if they have any poses available
@@ -2693,7 +2808,6 @@ class MainActivity : AppCompatActivity() {
         }
         Log.d("avatardebug", "No unlocked slot for $senderId; not displayed.")
     }
-
 
     fun assignSlotToUser(userId: String, slotId: String) {
         val db = FirebaseFirestore.getInstance()
@@ -2726,21 +2840,14 @@ class MainActivity : AppCompatActivity() {
             .addOnFailureListener { /* Error handling */ }
     }
 
-    fun updatePosesOnSlotProfiles(
-        poseMap: Map<String, String>,
-        slotProfiles: List<SlotProfile>
-    ): List<SlotProfile> {
+    fun updatePosesOnSlotProfiles(poseMap: Map<String, String>, slotProfiles: List<SlotProfile>): List<SlotProfile> {
         return slotProfiles.map { profile ->
             val newPose = poseMap[profile.slotId]
             if (newPose != null) profile.copy(pose = newPose) else profile
         }
     }
 
-    fun updateAvatarsFromMessage(
-        msg: ChatMessage,
-        slotProfiles: List<SlotProfile>,
-        visibleAvatarSlotIds: List<String>
-    ) {
+    fun updateAvatarsFromMessage(msg: ChatMessage, slotProfiles: List<SlotProfile>, visibleAvatarSlotIds: List<String>) {
         if (isDestroyed || isFinishing) return
         if (msg.pose.isNullOrEmpty()) return
         Log.d("avatardebug", "updateAvatarsFromMessage Activated $visibleAvatarSlotIds")
@@ -2851,7 +2958,6 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-
     fun updateBackgroundIfChanged(area: String?, location: String?, areas: List<Area>) {
         if (area == lastBackgroundArea && location == lastBackgroundLocation) return
 
@@ -2958,6 +3064,7 @@ class MainActivity : AppCompatActivity() {
 
                     SessionManager.listenMessages(sessionId) { newMessage ->
                         runOnUiThread {
+                            if (!historyLoaded) return@runOnUiThread
                             // 2. Skip if messageId is null or already processed
                             val currentMessageId = newMessage.id ?: return@runOnUiThread
                             if (currentMessageId == lastMessageId) {
@@ -2974,7 +3081,40 @@ class MainActivity : AppCompatActivity() {
                             }
 
                             recipients.forEach { slot ->
-                                addToPersonalHistoryFirestore(sessionId, slot.slotId, newMessage)
+                                if (newMessage.messageType == "roll"){
+
+                                    lifecycleScope.launch {
+                                        val rollResult = extractRollFromText(newMessage.text)
+                                        Log.d("multiplayer check", "roll result: $rollResult")
+                                        diceImageView.visibility = View.VISIBLE
+                                        // Fast cycle 15 times
+                                        repeat(15) {
+                                            val roll = (1..20).random()
+                                            val resId = resources.getIdentifier("ic_d$roll", "drawable", packageName)
+                                            if (resId != 0) diceImageView.setImageResource(resId)
+                                            delay(50)
+                                        }
+                                        // Show final roll for 1 second
+                                        val finalResId = resources.getIdentifier("ic_d$rollResult", "drawable", packageName)
+                                        if (finalResId != 0) diceImageView.setImageResource(finalResId)
+                                        delay(1000)
+                                        diceImageView.visibility = View.GONE
+                                    }
+
+                                    addToPersonalHistoryFirestore(
+                                        sessionId,
+                                        slot.slotId,
+                                        newMessage
+                                    )
+                                }
+                                else
+                                {
+                                    addToPersonalHistoryFirestore(
+                                        sessionId,
+                                        slot.slotId,
+                                        newMessage
+                                    )
+                                }
                             }
 
                             updateButtonState(ButtonState.SEND)
@@ -2986,6 +3126,12 @@ class MainActivity : AppCompatActivity() {
 
                 }
             }
+    }
+
+    fun extractRollFromText(text: String): Int? {
+        // This regex finds the last number in the string
+        val match = Regex("(\\d+)$").find(text)
+        return match?.groupValues?.get(1)?.toIntOrNull()
     }
 
     fun addToPersonalHistoryFirestore(sessionId: String, slotId: String, message: ChatMessage) {
@@ -3000,6 +3146,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private var lastPersonalHistoryMessageId: String? = null
+
     fun listenToPersonalHistory(sessionId: String, slotId: String) {
         val db = FirebaseFirestore.getInstance()
         db.collection("sessions")
@@ -3048,6 +3195,7 @@ class MainActivity : AppCompatActivity() {
             .await()
         return snapshot.documents.mapNotNull { it.toObject(ChatMessage::class.java) }
     }
+
     private fun String.normalizeLoc() = this.trim().lowercase()
 
     fun sendBugReportEmail(userMessage: String) {

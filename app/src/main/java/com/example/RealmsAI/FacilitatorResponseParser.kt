@@ -1,19 +1,16 @@
 package com.example.RealmsAI
 
-import android.app.Activity
+
 import android.util.Log
-import android.widget.Toast
-import com.example.RealmsAI.MainActivity
 import com.example.RealmsAI.models.ChatMessage
 import com.example.RealmsAI.models.Relationship
 import com.example.RealmsAI.models.SlotProfile
 import com.example.RealmsAI.models.TaggedMemory
 import com.google.gson.Gson
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import org.json.JSONException
 import org.json.JSONObject
 import java.util.UUID
+
 
 object FacilitatorResponseParser {
 
@@ -146,8 +143,6 @@ object FacilitatorResponseParser {
         return result
     }
 
-
-
     data class FacilitatorActivationResult(
         val nextSlot: String?,
         val updatedRoster: List<SlotProfile>,
@@ -157,6 +152,9 @@ object FacilitatorResponseParser {
         val isNSFW: Boolean,
         val memoryIds: List<String> = emptyList()
     )
+
+
+
 
     fun parseRoleplayAIResponse(response: String): ParsedRoleplayResult {
         val gson = Gson()
@@ -187,7 +185,8 @@ object FacilitatorResponseParser {
             return ParsedRoleplayResult(
                 messages = safeMessages,
                 newMemory = roleplayResponse.new_memory,
-                relationshipChanges = relationshipChanges
+                relationshipChanges = relationshipChanges,
+                actions = roleplayResponse.actions ?: emptyList()
             )
         } catch (e: Exception) {
             Log.e("FacilitatorResponseParser", "Malformed JSON (roleplay): $response", e)
@@ -198,7 +197,8 @@ object FacilitatorResponseParser {
     data class RoleplayResponse(
         val messages: List<ChatMessage>,
         val new_memory: NewMemory? = null,
-        val relationship: List<String>? = null
+        val relationship: List<String>? = null,
+        val actions: List<Action>?
     )
 
     data class RelationshipPointChange(
@@ -206,10 +206,16 @@ object FacilitatorResponseParser {
         val delta: Int
     )
 
+    data class Action(
+        val type: String,
+        val slot: String
+    )
+
     data class ParsedRoleplayResult(
         val messages: List<ChatMessage>,
         val newMemory: NewMemory? = null,
-        val relationshipChanges: List<RelationshipPointChange> = emptyList()
+        val relationshipChanges: List<RelationshipPointChange> = emptyList(),
+        val actions: List<Action> = emptyList()
     )
 
     fun updateRelationshipLevel(relationship: Relationship) {
