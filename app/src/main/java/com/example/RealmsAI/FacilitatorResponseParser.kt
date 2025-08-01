@@ -208,7 +208,9 @@ object FacilitatorResponseParser {
 
     data class Action(
         val type: String,
-        val slot: String
+        val slot: String,
+        val stat: String,
+        val mod: Int
     )
 
     data class ParsedRoleplayResult(

@@ -241,16 +241,7 @@ class RPGCharacterAdapter(
     fun setGenre(newGenre: RPGGenre) { genre = newGenre; notifyDataSetChanged() }
 
     companion object {
-        fun statModifier(value: Int): Int = when (value) {
-            1 -> -2
-            2, 3 -> -1
-            4, 5 -> 0
-            6, 7 -> +1
-            8 -> +2
-            9 -> +3
-            10 -> +5
-            else -> 0
-        }
+        fun statModifier(value: Int): Int = value / 2
         fun modString(mod: Int) = if (mod >= 0) "+$mod" else "$mod"
     }
 }

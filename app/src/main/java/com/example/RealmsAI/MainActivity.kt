@@ -34,6 +34,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.tasks.await
 import android.text.TextWatcher
 import android.text.Editable
+import android.view.LayoutInflater
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.constraintlayout.widget.ConstraintSet
 import com.example.RealmsAI.FacilitatorResponseParser.Action
@@ -46,6 +47,7 @@ import com.google.gson.JsonArray
 class MainActivity : AppCompatActivity() {
     companion object { private const val TAG = "MainActivity" }
 
+   
     // UI
     private lateinit var chatTitleView: TextView
     private lateinit var chatDescriptionView: TextView
@@ -82,7 +84,18 @@ class MainActivity : AppCompatActivity() {
     private val visibleAvatarSlotIds = MutableList(4) { "" }
     private val avatarSlotLocked = BooleanArray(4) { false }
     private var historyLoaded = false
+    private var lastMessageId: String? = null
+    private val processedMessageIds = mutableSetOf<String>()
+    val maxSlots = 4
+    val avatarSlotAssignments: MutableMap<Int, String?> = mutableMapOf(
+        0 to null,
+        1 to null,
+        2 to null,
+        3 to null
+    )
 
+
+    private var mySlotId: String? = null
     private var lastBackgroundArea: String? = null
     private var lastBackgroundLocation: String? = null
 
@@ -120,6 +133,7 @@ class MainActivity : AppCompatActivity() {
             return
         }
         userId = user.uid
+
 
         setContentView(R.layout.activity_main)
 
@@ -314,6 +328,7 @@ class MainActivity : AppCompatActivity() {
                     sendToAI("")
 
                 }
+                updateRPGToggleVisibility()
             }
             "GUEST" ->{
                 Log.d("entering", "entrymode: GUEST")
@@ -336,12 +351,14 @@ class MainActivity : AppCompatActivity() {
 
                 db.collection("sessions")
                     .document(sessionId)
-                    .set(updatedSessionProfile, SetOptions.merge())
-                    .addOnSuccessListener {
-                        Log.d("Firestore", "Session saved with multiplayer = true")
-                    }
-                    .addOnFailureListener { e ->
-                        Log.e("Firestore", "Failed to save session", e)
+                    .get()
+                    .addOnSuccessListener { document ->
+                        val updatedProfile = document.toObject(SessionProfile::class.java)
+                        if (updatedProfile != null) {
+                            sessionProfile = updatedProfile
+                            // ...other UI updates...
+                            updateRPGToggleVisibility() // <-- HERE
+                        }
                     }
                 loadSessionHistory()
             }
@@ -363,8 +380,6 @@ class MainActivity : AppCompatActivity() {
                 // Use your helper:
                 updateBackgroundIfChanged(playerArea, playerLocation, sessionProfile.areas)
                 loadSessionHistory()
-
-                Log.d("rpg mode", "RAW SESSION DOC: $rawMapOrDoc")
             }
         }
 
@@ -377,25 +392,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        val isRPG = sessionProfile.modeSettings.containsKey("rpg")
-        Log.d("rpg mode", "sessionProfile = $sessionProfile")
-        Log.d("rpg mode", "modeSettings keys: ${sessionProfile.modeSettings.keys}")
-        Log.d("rpg mode", "${sessionProfile.title} rpg mode is $isRPG")
-
-        val rpgSettingRaw = sessionProfile.modeSettings["rpg"]
-        val rpgSetting: String? = when (rpgSettingRaw) {
-            is String -> rpgSettingRaw
-            is Map<*, *> -> Gson().toJson(rpgSettingRaw) // Optional: if sometimes stored as Map
-            else -> null
-        }
-
-        Log.d("rpg mode", "rpgSetting: $rpgSetting")
-        if (isRPG && !rpgSetting.isNullOrBlank()) {
-            rpgToggleContainer.visibility = View.VISIBLE
-        } else {
-            rpgToggleContainer.visibility = View.GONE // (optional)
-        }
-
+        mySlotId = sessionProfile.userMap[userId]?.activeSlotId
         // Toggle input visibility
         toggleChatInputButton.setOnClickListener {
             Log.d("togglebutton debug", "toggle chatinputbutton")
@@ -695,6 +692,8 @@ class MainActivity : AppCompatActivity() {
         avatarBtn.setOnClickListener { showAvatar() }
         optionsBtn.setOnClickListener { showOptions() }
 
+        updateRPGToggleVisibility()
+
         messageEditText.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
 
@@ -712,9 +711,30 @@ class MainActivity : AppCompatActivity() {
         })
 
         rollButton.setOnClickListener {
-            if (!activeSlotId.isNullOrBlank()) {
-                handleDiceRoll(activeSlotId!!)
+            val statNames = listOf("Strength", "Agility", "Intelligence", "Charisma", "Resolve")
+            var selectedStatIndex = 0
+
+            val modifierInput = EditText(this).apply {
+                hint = "Extra modifier (default 0)"
+                inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_SIGNED
+                setText("0")
+                setSelectAllOnFocus(true)
             }
+
+            AlertDialog.Builder(this)
+                .setTitle("Roll a Stat")
+                .setSingleChoiceItems(statNames.toTypedArray(), 0) { _, which ->
+                    selectedStatIndex = which
+                }
+                .setView(modifierInput)
+                .setPositiveButton("Roll") { _, _ ->
+                    val chosenStat = statNames[selectedStatIndex]
+                    val extraMod = modifierInput.text.toString().toIntOrNull() ?: 0
+                    // Already have activeSlotId in scope
+                    handleDiceRoll(activeSlotId!!, chosenStat, extraMod)
+                }
+                .setNegativeButton("Cancel", null)
+                .show()
         }
 
         resendButton.setOnClickListener {
@@ -725,8 +745,8 @@ class MainActivity : AppCompatActivity() {
             if (lastMessage != null) {
                 // Resend same text but with visibility=false and blank text
                 val resendMsg = lastMessage.copy(
-                    id = UUID.randomUUID().toString(),
-                    text = "", // blank text
+                    id = "System",
+                    text = "",
                     visibility = false,
                     timestamp = com.google.firebase.Timestamp.now()
                 )
@@ -794,6 +814,18 @@ class MainActivity : AppCompatActivity() {
             chatInputGroup.visibility = View.GONE
             rollHistoryBox.visibility = View.GONE
             dockTogglesAbove(R.id.characterSheetBox)
+            val tabBar = findViewById<LinearLayout>(R.id.characterTabBar)
+            tabBar.removeAllViews()
+
+            sessionProfile.slotRoster.forEach { slotProfile ->
+                val button = Button(this).apply {
+                    text = slotProfile.name
+                    // Optionally set an avatar icon via setCompoundDrawablesWithIntrinsicBounds
+                    setOnClickListener { showCharacterSheet(slotProfile) }
+                }
+                tabBar.addView(button)
+            }
+
         }
 
         // -- Roll History --
@@ -826,6 +858,79 @@ class MainActivity : AppCompatActivity() {
                 updateButtonState(ButtonState.SEND)
             }
         }
+    }
+    
+    fun updateRPGToggleVisibility() {
+        val isRPG = sessionProfile.modeSettings.containsKey("rpg") ||
+                sessionProfile.enabledModes.contains("rpg")
+        if (isRPG) {
+            rpgToggleContainer.visibility = View.VISIBLE
+        } else {
+            rpgToggleContainer.visibility = View.GONE
+        }
+        Log.d("rpg", "is this session an rpg? $isRPG")
+    }
+
+    private fun showCharacterSheet(slotProfile: SlotProfile) {
+        val content = findViewById<LinearLayout>(R.id.characterSheetContent)
+        content.removeAllViews()
+        val inflater = LayoutInflater.from(this)
+        val sheetView = inflater.inflate(R.layout.item_character_sheet_fantasy, content, false)
+
+        // Avatar
+        val avatar = sheetView.findViewById<ImageView>(R.id.avatarView)
+        if (!slotProfile.avatarUri.isNullOrBlank()) {
+            Glide.with(this).load(slotProfile.avatarUri).into(avatar)
+        }
+
+        // Text fields
+        sheetView.findViewById<TextView>(R.id.nameView).text = slotProfile.name
+        sheetView.findViewById<TextView>(R.id.classView).text = "Class: ${slotProfile.rpgClass}"
+        sheetView.findViewById<TextView>(R.id.hpView).text = "HP: ${slotProfile.hp}/${slotProfile.maxHp}"
+        sheetView.findViewById<TextView>(R.id.defenseView).text = "Defense: ${slotProfile.defense}"
+
+        // Abilities
+        sheetView.findViewById<TextView>(R.id.abilitiesView).text =
+            if (slotProfile.abilities.isNotBlank()) slotProfile.abilities else "None"
+
+        // Status Effects
+        val statusList = sheetView.findViewById<LinearLayout>(R.id.statusList)
+        statusList.removeAllViews()
+        if (slotProfile.statusEffects.isNotEmpty()) {
+            slotProfile.statusEffects.forEach { status ->
+                val statusView = TextView(this)
+                statusView.text = status
+                statusList.addView(statusView)
+            }
+        } else {
+            val noneView = TextView(this)
+            noneView.text = "None"
+            statusList.addView(noneView)
+        }
+
+        // Stats
+        val statsList = sheetView.findViewById<LinearLayout>(R.id.statsList)
+        statsList.removeAllViews()
+        slotProfile.stats.forEach { (stat, value) ->
+            val statView = TextView(this)
+            statView.text = "$stat: $value"
+            statsList.addView(statView)
+        }
+
+        // Equipment
+        val eqList = sheetView.findViewById<LinearLayout>(R.id.equipmentList)
+        eqList.removeAllViews()
+        slotProfile.equipment.forEach { item ->
+            val itemView = TextView(this)
+            itemView.text = item
+            eqList.addView(itemView)
+        }
+
+        // Summary
+        sheetView.findViewById<TextView>(R.id.summaryView).text =
+            if (slotProfile.summary.isNotBlank()) slotProfile.summary else "No summary provided."
+
+        content.addView(sheetView)
     }
 
     fun dockTogglesAbove(viewBelowId: Int) {
@@ -2544,8 +2649,11 @@ class MainActivity : AppCompatActivity() {
 
                 // Update avatars once after loading entire batch
                 if (messages.isNotEmpty()) {
-                    updateAvatarsFromMessage(messages.last(), sessionProfile.slotRoster, visibleAvatarSlotIds)
+                    updateAvatarsFromSlots(sessionProfile.slotRoster, avatarSlotAssignments)
                 }
+                Log.d("rpg", "FULL PROFILE: $sessionProfile")
+                Log.d("rpg", "DEBUG modeSettings: ${sessionProfile.modeSettings} enabledModes: ${sessionProfile.enabledModes}")
+                updateRPGToggleVisibility()
             }
             historyLoaded = true
         }, { error ->
@@ -2557,7 +2665,7 @@ class MainActivity : AppCompatActivity() {
         for (action in actions) {
             when (action.type) {
                 "roll_dice" -> {
-                    handleDiceRoll(action.slot)
+                    handleDiceRoll(action.slot, action.stat, action.mod)
                 }
                 // You can handle other action types here as needed
                 // e.g. "use_item", "move_character", etc.
@@ -2565,18 +2673,21 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    fun handleDiceRoll(slotId: String) {
-        val slot = sessionProfile.slotRoster.find { it.slotId == slotId }
-        if (slot == null) {
-            Toast.makeText(this, "No character found for dice roll.", Toast.LENGTH_SHORT).show()
-            return
-        }
-        val name = slot.name
-        val area = slot.lastActiveArea
-        val location = slot.lastActiveLocation
-        val roll = (1..20).random()
+    fun handleDiceRoll(slotId: String, statName: String, extraMod: Int) {
+        val slotProfile = sessionProfile.slotRoster.find { it.slotId == slotId } ?: return
+
+        // Look up the stat value from the stats map using the lowercase key
+        val statValue = slotProfile.stats[statName.lowercase()] ?: 0
+        val statMod = statValue / 2  // Simple half-value modifier
+
+        val d20 = (1..20).random()
+        val total = d20 + statMod + extraMod
+        val area = slotProfile.lastActiveArea
+        val location = slotProfile.lastActiveLocation
         // Post result to chat
-        val rollMessage = "$name rolled $roll"
+        val rollMessage = "${slotProfile.name} rolled $d20 + $statName (mod $statMod)" +
+                (if (extraMod != 0) " + $extraMod (extra)" else "") +
+                ". Total: $total"
         val chatMessage = ChatMessage(
             id = UUID.randomUUID().toString(),
             senderId = slotId,
@@ -2589,6 +2700,7 @@ class MainActivity : AppCompatActivity() {
             messageType = "roll"
         )
         SessionManager.sendMessage(chatId, sessionId, chatMessage)
+        Log.d("airoll","this hsould post: $chatMessage")
     }
 
     private fun sendMessageAndCallAI(text: String) {
@@ -2638,7 +2750,7 @@ class MainActivity : AppCompatActivity() {
             val greetingMessage = ChatMessage(
                 id = UUID.randomUUID().toString(),
                 senderId = "system",
-                text = initialGreeting!!,
+                text = initialGreeting!! + "\n if a character has no lastActiveArea or lastActiveLocation, assign them one.",
                 delay = 0,
                 timestamp = com.google.firebase.Timestamp.now(),
                 imageUpdates = null,
@@ -2779,34 +2891,66 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    fun updateVisibleAvatarSlots(senderId: String, visibleAvatarSlotIds: MutableList<String>, slotProfiles: List<SlotProfile>, avatarSlotLocked: BooleanArray, maxSlots: Int = 4) {
-        // Find the slot profile for the sender
-        val senderProfile = slotProfiles.find { it.slotId == senderId }
-        // Check if they have any poses available
-        val hasPose = senderProfile?.outfits?.any { it.poseSlots.isNotEmpty() } == true
-        if (!hasPose) {
-            Log.d("avatardebug", "Sender $senderId has no poses; not displaying in avatar slots.")
+    fun assignAvatarSlot(senderId: String, avatarSlotAssignments: MutableMap<Int, String?>, avatarSlotLocked: BooleanArray, slotProfiles: List<SlotProfile>) {
+        val maxSlots = avatarSlotAssignments.size
+
+        // Check if sender is already in a locked slot
+        val currentIndex = avatarSlotAssignments.entries.find { it.value == senderId }?.key ?: -1
+        if (currentIndex >= 0 && avatarSlotLocked[currentIndex]) {
+            // Already in a locked slot, do nothing
             return
         }
 
-        // 1. If already present, do nothing (pose updated elsewhere)
-        if (visibleAvatarSlotIds.contains(senderId)) return
+        // Look up sender profile
+        val senderProfile = slotProfiles.find { it.slotId == senderId }
+        val hasPose = senderProfile?.outfits?.any { it.poseSlots.isNotEmpty() } == true
 
-        // 2. Find first unlocked slot for insertion
-        for (i in 0 until maxSlots) {
-            if (!avatarSlotLocked[i]) {
-                // Shift all unlocked slots above i up one, to make room
-                for (j in (maxSlots - 1) downTo (i + 1)) {
-                    if (!avatarSlotLocked[j]) {
-                        visibleAvatarSlotIds[j] = visibleAvatarSlotIds[j - 1]
+        if (!hasPose) {
+            // Sender has no poses, don't assign them to any avatar slot!
+            Log.d("avatardebug", "Sender $senderId has no poses; not assigning to avatar slots.")
+            return
+        }
+
+        avatarSlotAssignments.entries.forEach { (idx, value) ->
+            if (value == senderId) avatarSlotAssignments[idx] = null
+        }
+
+        // Check if slot 0 is locked
+        if (avatarSlotLocked[0]) {
+            // Slot 0 is locked, can't move sender here. Just make sure they're in their current slot.
+            if (currentIndex < 0) {
+                // Sender not shown, find a free slot that's not locked
+                for (i in 1 until maxSlots) {
+                    if (!avatarSlotLocked[i] && avatarSlotAssignments[i] == null) {
+                        avatarSlotAssignments[i] = senderId
+                        return
                     }
                 }
-                visibleAvatarSlotIds[i] = senderId
-                Log.d("avatardebug", "Added $senderId to avatar slot $i")
-                return
+                // No unlocked slot available, do nothing
+            }
+            // Else: already in a slot (not 0), but 0 is locked, do nothing.
+            return
+        }
+
+        // Slot 0 is not locked
+        if (currentIndex == 0) return // Sender is already in slot 0
+
+        // Shift everyone (except locked) up one (3->2, 2->1, 1->0) to make room for sender at slot 0
+        for (i in (maxSlots - 1) downTo 1) {
+            if (!avatarSlotLocked[i]) {
+                avatarSlotAssignments[i] = if (avatarSlotLocked[i - 1]) avatarSlotAssignments[i] else avatarSlotAssignments[i - 1]
             }
         }
-        Log.d("avatardebug", "No unlocked slot for $senderId; not displayed.")
+        // Place sender in slot 0
+        avatarSlotAssignments[0] = senderId
+
+        // Remove sender from old slot if needed
+        if (currentIndex > 0) avatarSlotAssignments[currentIndex] = null
+    }
+
+    fun removeAvatarFromSlots(slotId: String, avatarSlotAssignments: MutableMap<Int, String?>) {
+        val key = avatarSlotAssignments.entries.find { it.value == slotId }?.key
+        if (key != null) avatarSlotAssignments[key] = null
     }
 
     fun assignSlotToUser(userId: String, slotId: String) {
@@ -2840,34 +2984,57 @@ class MainActivity : AppCompatActivity() {
             .addOnFailureListener { /* Error handling */ }
     }
 
-    fun updatePosesOnSlotProfiles(poseMap: Map<String, String>, slotProfiles: List<SlotProfile>): List<SlotProfile> {
-        return slotProfiles.map { profile ->
-            val newPose = poseMap[profile.slotId]
-            if (newPose != null) profile.copy(pose = newPose) else profile
-        }
-    }
-
-    fun updateAvatarsFromMessage(msg: ChatMessage, slotProfiles: List<SlotProfile>, visibleAvatarSlotIds: List<String>) {
+    fun updateAvatarsFromSlots(slotProfiles: List<SlotProfile>, avatarSlotAssignments: MutableMap<Int, String?>) {
         if (isDestroyed || isFinishing) return
-        if (msg.pose.isNullOrEmpty()) return
-        Log.d("avatardebug", "updateAvatarsFromMessage Activated $visibleAvatarSlotIds")
-
-        // For each avatar slot, try to show the corresponding character
-        visibleAvatarSlotIds.take(avatarViews.size).forEachIndexed { index, slotId ->
-            val poseName = msg.pose?.get(slotId)?.lowercase() ?: ""
-            if (poseName.isBlank() || poseName == "clear" || poseName == "none") {
-                avatarViews[index].setImageResource(R.drawable.silhouette) // Or .setImageDrawable(null)
-                avatarViews[index].visibility = View.INVISIBLE
-                return@forEachIndexed
-            }
-            val slotProfile = slotProfiles.find { it.slotId == slotId }
-            val outfit = slotProfile?.outfits?.find { it.name.equals(slotProfile.currentOutfit, ignoreCase = true) }
-
-            // ---- Fix: skip if pose list is empty or null ----
-            if (outfit?.poseSlots.isNullOrEmpty()) {
+        Log.d("avatardebug", "updating: $avatarSlotAssignments")
+        avatarSlotAssignments.forEach { index, slotId ->
+            if (slotId == null) {
                 avatarViews[index].setImageResource(R.drawable.silhouette)
                 avatarViews[index].visibility = View.INVISIBLE
-                return@forEachIndexed
+                return@forEach
+            }
+
+            Log.d("avatardebug", "updating 2: $avatarSlotAssignments")
+            val slotProfile = slotProfiles.find { it.slotId == slotId }
+            val playerSlot = slotProfiles.find { it.slotId == mySlotId }
+            val playerArea = playerSlot?.lastActiveArea
+            val playerLocation = playerSlot?.lastActiveLocation
+
+            if (slotProfile == null ||
+                slotProfile.lastActiveArea != playerArea ||
+                slotProfile.lastActiveLocation != playerLocation
+            ) {
+                Log.d("avatardebug", "${slotProfile?.name} is at ${slotProfile?.lastActiveArea} ${slotProfile?.lastActiveLocation}, player ${mySlotId} is at $playerArea $playerLocation")
+                Log.d("avatardebug", "${slotProfile?.name} is being removed")
+                // Not present—remove and clear
+                removeAvatarFromSlots(slotId, avatarSlotAssignments)
+                avatarViews[index].setImageResource(R.drawable.silhouette)
+                avatarViews[index].visibility = View.INVISIBLE
+                return@forEach
+            }
+
+            if (slotProfile == null) {
+                avatarViews[index].setImageResource(R.drawable.silhouette)
+                avatarViews[index].visibility = View.INVISIBLE
+                return@forEach
+            }
+
+            val poseName = slotProfile.pose?.lowercase() ?: ""
+
+            Log.d("avatardebug", "${slotProfile?.name} is being updating it to ${slotProfile.pose} ")
+            if (poseName.isBlank() || poseName == "clear" || poseName == "none") {
+                avatarViews[index].setImageResource(R.drawable.silhouette)
+                avatarViews[index].visibility = View.INVISIBLE
+                return@forEach
+            }
+
+            val outfit = slotProfile.outfits?.find { it.name.equals(slotProfile.currentOutfit, ignoreCase = true) }
+            if (outfit?.poseSlots.isNullOrEmpty()) {
+
+                Log.d("avatardebug", "2 ${slotProfile?.name} is being updating it to ${slotProfile.pose} ")
+                avatarViews[index].setImageResource(R.drawable.silhouette)
+                avatarViews[index].visibility = View.INVISIBLE
+                return@forEach
             }
 
             val poseSlot = outfit.poseSlots.find { it.name.equals(poseName, ignoreCase = true) }
@@ -3059,29 +3226,44 @@ class MainActivity : AppCompatActivity() {
                     }
                     lastMultiplayerValue = newMultiplayer
 
-                    // 1. Track the last seen messageId globally or inside your class/scope
-                    var lastMessageId: String? = null
-
                     SessionManager.listenMessages(sessionId) { newMessage ->
                         runOnUiThread {
                             if (!historyLoaded) return@runOnUiThread
                             // 2. Skip if messageId is null or already processed
                             val currentMessageId = newMessage.id ?: return@runOnUiThread
-                            if (currentMessageId == lastMessageId) {
+                            if (processedMessageIds.contains(currentMessageId)) {
                                 Log.d("MessageFilter", "Skipping duplicate message: $currentMessageId")
                                 return@runOnUiThread
+                            }
+                            processedMessageIds.add(currentMessageId)
+                            if (processedMessageIds.size > 20) { // Prevent memory leak, keep the last 20-50
+                                processedMessageIds.remove(processedMessageIds.first())
                             }
 
                             // 4. Check location and assign message to relevant slots
                             val messageArea = newMessage.area
                             val messageLocation = newMessage.location
 
+                            // 5. Update poses from the message
+
+                            if (!newMessage.pose.isNullOrEmpty()) {
+                                val updatedRoster = sessionProfile.slotRoster.toMutableList()
+                                newMessage.pose.forEach { (slotId, poseName) ->
+                                    val idx = updatedRoster.indexOfFirst { it.slotId == slotId }
+                                    if (idx >= 0) {
+                                        val oldProfile = updatedRoster[idx]
+                                        updatedRoster[idx] = oldProfile.copy(pose = poseName)
+                                    }
+                                }
+                                sessionProfile = sessionProfile.copy(slotRoster = updatedRoster)
+                            }
+
+                            // 6. Send to local profiles
                             val recipients = sessionProfile.slotRoster.filter { slot ->
                                 slot.lastActiveArea == messageArea && slot.lastActiveLocation == messageLocation
                             }
-
                             recipients.forEach { slot ->
-                                if (newMessage.messageType == "roll"){
+                                if (newMessage.messageType == "roll" && currentMessageId != lastMessageId){
 
                                     lifecycleScope.launch {
                                         val rollResult = extractRollFromText(newMessage.text)
@@ -3096,16 +3278,14 @@ class MainActivity : AppCompatActivity() {
                                         }
                                         // Show final roll for 1 second
                                         val finalResId = resources.getIdentifier("ic_d$rollResult", "drawable", packageName)
-                                        if (finalResId != 0) diceImageView.setImageResource(finalResId)
+                                        if (finalResId != 0){
+                                            diceImageView.setImageResource(finalResId)
+                                        }
+                                        delay(1000)
+                                        addToPersonalHistoryFirestore(sessionId, slot.slotId, newMessage)
                                         delay(1000)
                                         diceImageView.visibility = View.GONE
                                     }
-
-                                    addToPersonalHistoryFirestore(
-                                        sessionId,
-                                        slot.slotId,
-                                        newMessage
-                                    )
                                 }
                                 else
                                 {
@@ -3176,9 +3356,10 @@ class MainActivity : AppCompatActivity() {
                     messages.forEach { chatAdapter.addMessage(it) }
                     chatRecycler.scrollToPosition(messages.size - 1)
                     val lastMsg = messages.last()
-                    updateVisibleAvatarSlots(lastMsg.senderId, visibleAvatarSlotIds, sessionProfile.slotRoster, avatarSlotLocked, avatarViews.size)
-                    Log.d("avatardebug", "Preparing visibleAvatarSlotIds: ${visibleAvatarSlotIds}")
-                    updateAvatarsFromMessage(lastMsg, sessionProfile.slotRoster, visibleAvatarSlotIds)
+                    assignAvatarSlot(lastMsg.senderId, avatarSlotAssignments, avatarSlotLocked, sessionProfile.slotRoster)
+
+                    Log.d("avatardebug", "Preparing visibleAvatarSlotIds: $avatarSlotAssignments")
+                    updateAvatarsFromSlots(sessionProfile.slotRoster, avatarSlotAssignments)
                 }
             }
     }

@@ -36,6 +36,7 @@ data class SessionProfile(
 
     val acts: List<RPGAct> = emptyList(),
     val currentAct: Int = 0,
+    var enabledModes: MutableList<String> = mutableListOf(),
     var modeSettings: MutableMap<String, Any> = mutableMapOf()
 
 )

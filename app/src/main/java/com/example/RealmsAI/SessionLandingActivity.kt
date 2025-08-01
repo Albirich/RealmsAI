@@ -335,7 +335,7 @@ class SessionLandingActivity : AppCompatActivity() {
                 .document(sessionId)
                 .addSnapshotListener { snapshot, _ ->
                     if (snapshot != null && snapshot.exists()) {
-                        val isBuilding = snapshot.getBoolean("isBuilding") ?: false
+                        val isBuilding = snapshot.getBoolean("isBuilding") ?: true
                         val sessionStarted = snapshot.getBoolean("started") ?: false
 
                         // How many slots/characters need prepping?
@@ -528,6 +528,8 @@ class SessionLandingActivity : AppCompatActivity() {
                             areaId = act.areaId
                         )
                     } ?: emptyList()
+
+                    var enabledModes: MutableList<String> = mutableListOf()
                     val cleanedAssignments = sessionProfile?.slotRoster!!.mapIndexed { idx, slot ->
                         "character${idx + 1}" to slot.name // or whatever placeholder syntax you use
                     }.toMap()
@@ -555,8 +557,8 @@ class SessionLandingActivity : AppCompatActivity() {
                         multiplayer = currentIsMultiplayer,
                         acts = parsedActs,
                         currentAct = currentAct,
+                        enabledModes = chatProfile?.enabledModes?.toMutableList() ?: mutableListOf(),
                         modeSettings = chatProfile?.modeSettings?.toMutableMap() ?: mutableMapOf()
-
                     )
 
                     // Save session and update Firestore
@@ -680,7 +682,7 @@ class SessionLandingActivity : AppCompatActivity() {
             // Example: defense = strength/2 + resolve/2
             val str = (stats["strength"] ?: 0)
             val res = (stats["resolve"] ?: 0)
-            return (str / 2) + (res / 2)
+            return (str / 2) + (res / 2) + 8
         }
         val rpgStats = matchingRpgCharacter?.stats?.let {
             mapOf(

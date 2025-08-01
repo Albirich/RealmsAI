@@ -609,12 +609,15 @@ object PromptBuilder {
         { 
             "advance_act": true 
         }
-        At the end of each message, if you need to Roll a dice add "actions" into the extra fields section of your output:
+         At the end of each message, if you need to Roll a dice add "actions" into the extra fields section of your output:
         {
-            "actions": [
-              { "type": "roll_dice", "slot": "SLOTID" }
-            ]
+          "actions": [
+            { "type": "roll_dice", "slot": "SLOTID", "stat": "STATNAME", "mod": MODIFIER }
+          ]
         }
+        - "stat" is the stat you want to use for the roll (e.g., "strength", "agility", etc.).
+        - "mod" is any additional modifier (positive or negative).
+        As the GM you can give modifiers if a character has advantage or disadvantage on a roll. Modifiers go from -3 to +3
         Do not include any other text on that line.
         PRIORITIZE ROLEPLAYING THE PLAYER NOT THE NPCS IN THE GAME! INTERACT WITH OTHER PLAYERS AND ENJOYING HANGING OUT, TALKING ABOUT THINGS OTHER THAN THE GAME AS WELL!
         IMPORTANT: you can only reply as ${gmSlot.name}
@@ -667,12 +670,16 @@ object PromptBuilder {
         Physical Description: ${playerSlot.physicalDescription}
 
         If you want to change equipment, heal, use an item, or do something special, just say so in your message!
-        At the end of each message, if you need to Roll a dice add "actions" into the extra fields section of your output:
+         At the end of each message, if you need to Roll a dice add "actions" into the extra fields section of your output:
         {
-            "actions": [
-              { "type": "roll_dice", "slot": "SLOTID" }
-            ]
+          "actions": [
+            { "type": "roll_dice", "slot": "SLOTID", "stat": "STATNAME", "mod": MODIFIER }
+          ]
         }
+        - "stat" is the stat you want to use for the roll (e.g., "strength", "agility", etc.).
+        - "mod" is any additional modifier (positive or negative).
+        - The GM should tell you if you have a modifier; if none was given, you can ask the GM for one.
+        - If you don't know the modifier, set "mod": 0 and ask the GM if there should be any bonus or penalty.
         Do not include any other text on that line.
         PRIORITIZE ROLEPLAYING THE PLAYER NOT THE CHARACTER IN THE GAME! INTERACT WITH OTHER PLAYERS AND ENJOYING HANGING OUT, TALKING ABOUT THINGS OTHER THAN THE GAME AS WELL!
         IMPORTANT: you can only reply as ${playerSlot.name}

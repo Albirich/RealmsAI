@@ -713,6 +713,37 @@
             android:background="#DA222222"
             app:layout_constraintTop_toBottomOf="@id/fadeTopCS"
             app:layout_constraintBottom_toBottomOf="parent"/>
+        <HorizontalScrollView
+            android:id="@+id/characterTabBarScroll"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            android:fillViewport="false"
+            android:scrollbars="none">
+            <LinearLayout
+                android:id="@+id/characterTabBar"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal" />
+        </HorizontalScrollView>
+
+        <ScrollView
+            android:id="@+id/characterSheetScroll"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            app:layout_constraintTop_toBottomOf="@id/characterTabBarScroll"
+            app:layout_constraintBottom_toBottomOf="parent"
+            android:fillViewport="true">
+
+            <LinearLayout
+                android:id="@+id/characterSheetContent"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp" />
+        </ScrollView>
+
     </androidx.constraintlayout.widget.ConstraintLayout>
 
     <androidx.constraintlayout.widget.ConstraintLayout
