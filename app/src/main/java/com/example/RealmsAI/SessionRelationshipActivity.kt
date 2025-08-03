@@ -69,12 +69,6 @@ class SessionRelationshipActivity : AppCompatActivity() {
                 onDeleteRelationship = { rel ->
                     relationships.remove(rel)
                     adapter.refresh()
-                },
-                onEditLevel = { rel, index ->
-                    val intent = Intent(this, RelationshipLevelEditorActivity::class.java)
-                    intent.putExtra("RELATIONSHIP_JSON", Gson().toJson(rel))
-                    intent.putExtra("REL_INDEX", index)
-                    startActivityForResult(intent, REQUEST_EDIT_REL_LEVEL)
                 }
             )
             recyclerView.adapter = adapter

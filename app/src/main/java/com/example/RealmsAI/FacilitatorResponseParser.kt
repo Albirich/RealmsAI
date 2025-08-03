@@ -3,6 +3,7 @@ package com.example.RealmsAI
 
 import android.util.Log
 import com.example.RealmsAI.models.ChatMessage
+import com.example.RealmsAI.models.ModeSettings.VNRelationship
 import com.example.RealmsAI.models.Relationship
 import com.example.RealmsAI.models.SlotProfile
 import com.example.RealmsAI.models.TaggedMemory
@@ -220,7 +221,7 @@ object FacilitatorResponseParser {
         val actions: List<Action> = emptyList()
     )
 
-    fun updateRelationshipLevel(relationship: Relationship) {
+    fun updateRelationshipLevel(relationship: VNRelationship) {
         // Sort levels by threshold (ascending), just in case
         val levels = relationship.levels.sortedBy { it.threshold }
         val points = relationship.points

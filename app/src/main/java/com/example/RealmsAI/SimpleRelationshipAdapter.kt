@@ -10,8 +10,7 @@ import com.example.RealmsAI.models.Relationship
 
 class SimpleRelationshipAdapter(
     private val relationships: MutableList<Relationship>,
-    private val onDelete: (Relationship) -> Unit,
-    private val onEditLevel: (Relationship, Int) -> Unit
+    private val onDelete: (Relationship) -> Unit
 ) : RecyclerView.Adapter<SimpleRelationshipAdapter.RelationshipRowHolder>() {
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RelationshipRowHolder {
@@ -31,7 +30,6 @@ class SimpleRelationshipAdapter(
         private val typeText = view.findViewById<TextView>(R.id.relationshipType)
         private val summaryText = view.findViewById<TextView>(R.id.relationshipSummaryEdit)
         private val btnDelete = view.findViewById<ImageButton>(R.id.btnDeleteRelationship)
-        private val btnLevel = view.findViewById<ImageButton>(R.id.btnRelationshipLvl)
 
         fun bind(rel: Relationship) {
             toNameText.text = rel.toName
@@ -42,13 +40,6 @@ class SimpleRelationshipAdapter(
                 val pos = adapterPosition
                 if (pos != RecyclerView.NO_POSITION) {
                     onDelete(rel)
-                }
-            }
-
-            btnLevel.setOnClickListener {
-                val pos = adapterPosition
-                if (pos != RecyclerView.NO_POSITION) {
-                    onEditLevel(rel, pos)
                 }
             }
         }

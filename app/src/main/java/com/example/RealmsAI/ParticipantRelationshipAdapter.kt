@@ -17,8 +17,7 @@ class ParticipantRelationshipAdapter(
     val participants: List<ParticipantPreview>,
     val relationships: MutableList<Relationship>,
     val onAddRelationship: (fromId: String) -> Unit,
-    val onDeleteRelationship: (Relationship) -> Unit,
-    val onEditLevel: (Relationship, Int) -> Unit
+    val onDeleteRelationship: (Relationship) -> Unit
 ) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
 
     // Flatten for adapter: [header, rel, rel, header, rel...]
@@ -86,16 +85,11 @@ class ParticipantRelationshipAdapter(
         private val type = view.findViewById<TextView>(R.id.relationshipType)
         private val summary = view.findViewById<TextView>(R.id.relationshipSummaryEdit)
         private val btnDelete = view.findViewById<ImageButton>(R.id.btnDeleteRelationship)
-        private val btnLevel = view.findViewById<ImageButton>(R.id.btnRelationshipLvl)
         fun bind(rel: Relationship) {
             toNameEdit.setText(rel.toName)
             type.text = rel.type
             summary.text = rel.description
             btnDelete.setOnClickListener { onDeleteRelationship(rel) }
-            btnLevel.setOnClickListener {
-                val pos = relationships.indexOf(rel)
-                if (pos != -1) onEditLevel(rel, pos)
-            }
         }
     }
 

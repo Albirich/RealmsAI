@@ -66,13 +66,6 @@ class ChatRelationshipActivity : AppCompatActivity() {
             onAddRelationship = { fromId -> showAddRelationshipDialog(fromId) },
             onDeleteRelationship = { rel ->
                 relationships.remove(rel); adapter.refresh()
-            },
-            onEditLevel = { rel, index ->
-                val intent = Intent(this, RelationshipLevelEditorActivity::class.java)
-                intent.putExtra("RELATIONSHIP_JSON", Gson().toJson(rel))
-                Log.d("relationship", "RELATIONSHIP_jSON")
-                intent.putExtra("REL_INDEX", index)
-                startActivityForResult(intent, REQUEST_EDIT_REL_LEVEL)
             }
         )
         recyclerView.adapter = adapter

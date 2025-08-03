@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/vnSettingsRoot"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:padding="20dp">
+
+    <!-- Monogamy toggle -->
+    <CheckBox
+        android:id="@+id/monogamyCheck"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Monogamy Cap"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"/>
+
+    <!-- Monogamy level (only visible if checked) -->
+    <EditText
+        android:id="@+id/monogamyLevel"
+        android:layout_width="100dp"
+        android:layout_height="wrap_content"
+        android:hint="Level Lock"
+        android:inputType="number"
+        android:visibility="gone"
+        app:layout_constraintTop_toBottomOf="@id/monogamyCheck"
+        app:layout_constraintStart_toStartOf="@id/monogamyCheck"/>
+
+    <!-- Jealousy toggle -->
+    <CheckBox
+        android:id="@+id/jealousyCheck"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Jealousy Mode"
+        app:layout_constraintTop_toBottomOf="@id/monogamyLevel"
+        app:layout_constraintStart_toStartOf="parent"/>
+
+    <!-- Main character toggle -->
+    <CheckBox
+        android:id="@+id/mainCharModeCheck"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Main Character Mode"
+        app:layout_constraintTop_toBottomOf="@id/jealousyCheck"
+        app:layout_constraintStart_toStartOf="parent"/>
+
+    <!-- Main character select dropdown -->
+    <Spinner
+        android:id="@+id/mainCharSpinner"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:visibility="gone"
+        app:layout_constraintTop_toBottomOf="@id/mainCharModeCheck"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"/>
+
+    <!-- Relationships RecycleView -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/relationshipList"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:visibility="gone"
+        app:layout_constraintTop_toBottomOf="@id/mainCharSpinner"
+        app:layout_constraintBottom_toTopOf="@id/saveButton"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"/>
+
+    <!-- Save button -->
+    <Button
+        android:id="@+id/saveButton"
+        android:text="Save"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"/>
+</androidx.constraintlayout.widget.ConstraintLayout>

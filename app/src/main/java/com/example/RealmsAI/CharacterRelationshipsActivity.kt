@@ -33,13 +33,6 @@ class CharacterRelationshipActivity : AppCompatActivity() {
             onDelete = { rel ->
                 relationships.remove(rel)
                 adapter.notifyDataSetChanged()
-            },
-            onEditLevel = { rel, index ->
-                val intent = Intent(this, RelationshipLevelEditorActivity::class.java)
-                intent.putExtra("RELATIONSHIP_JSON", Gson().toJson(rel))
-                intent.putExtra("REL_INDEX", index)
-                startActivityForResult(intent, REQUEST_EDIT_RELATIONSHIP_LEVEL)
-                Log.d("Relationship", "Edit level clicked at index $index for ${rel.toName}")
             }
         )
         recyclerView.layoutManager = LinearLayoutManager(this)
@@ -116,8 +109,7 @@ class CharacterRelationshipActivity : AppCompatActivity() {
                             fromId = "",
                             toName = toName,
                             type = type,
-                            description = summary,
-                            levels = mutableListOf(RelationshipLevel(level = 0, threshold = 0, personality = ""))
+                            description = summary
                         )
                     )
                     adapter.notifyDataSetChanged()

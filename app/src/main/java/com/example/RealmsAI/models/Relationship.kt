@@ -11,12 +11,7 @@ data class Relationship(
     val fromId: String = "",
     val toName: String = "",
     val type: String = "",
-    val description: String? = null,
-    var upTriggers: String? = "",
-    var downTriggers: String? = "",
-    var levels: List<RelationshipLevel> = emptyList(),
-    var currentLevel: Int = 0,
-    var points: Int = 0
+    val description: String? = null
 )
 
 data class ParticipantPreview(

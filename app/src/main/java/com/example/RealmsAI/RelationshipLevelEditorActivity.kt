@@ -39,7 +39,7 @@ class RelationshipLevelEditorActivity : AppCompatActivity() {
 
         // Load relationship from intent
         val json = intent.getStringExtra("RELATIONSHIP_JSON")
-        rel = Gson().fromJson(json, Relationship::class.java)
+        rel = if (json.isNullOrBlank()) Relationship() else Gson().fromJson(json, Relationship::class.java)
         upTriggerEdit.setText(rel.upTriggers ?: "")
         downTriggerEdit.setText(rel.downTriggers ?: "")
         levels.addAll(rel.levels)
@@ -54,7 +54,8 @@ class RelationshipLevelEditorActivity : AppCompatActivity() {
         levelsRecycler.adapter = adapter
 
         addLevelButton.setOnClickListener {
-            levels.add(RelationshipLevel(level = levels.size, threshold = 0, personality = ""))
+            val nextLevel = (levels.maxOfOrNull { it.level } ?: 0) + 1
+            levels.add(RelationshipLevel(level = nextLevel, threshold = 0, personality = ""))
             adapter.notifyDataSetChanged()
             updateCurrentLevelSpinner()
         }

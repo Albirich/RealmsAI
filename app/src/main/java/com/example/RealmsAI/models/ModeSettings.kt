@@ -81,9 +81,30 @@ sealed class ModeSettings : java.io.Serializable {
     )
 //--------------------------------------------------------VN SETTINGS-------------------------------------------------------------------
 
-    data class VisualNovelSettings(
-        val relationshipSystem: Boolean = true
-    ) : ModeSettings()
+    data class VNSettings(
+        val mainCharId: String? = null,
+        val monogamyEnabled: Boolean = false,
+        val monogamyLevel: Int? = null,
+        val jealousyEnabled: Boolean = false,
+        val characterBoards: MutableMap<String, MutableMap<String, VNRelationship>> = mutableMapOf()
+        // Map<fromCharacterId, Map<toCharacterId, RelationshipLevelDraft>>
+    )
+
+    data class VNRelationship(
+        val fromId: String,
+        val toId: String,
+        var notes: String = "",
+        var levels: MutableList<RelationshipLevel> = mutableListOf(),
+        var currentLevel: Int = 0,
+        var points: Int = 0
+    )
+
+    data class RelationshipLevel(
+        var level: Int = 0,
+        var threshold: Int = 0,         // XP or points to reach this level
+        var personality: String = ""    // Description/flavor for this level
+    )
+
 
 //------------------------------------------------------GODMODE SETTINGS-----------------------------------------------------------------
 
