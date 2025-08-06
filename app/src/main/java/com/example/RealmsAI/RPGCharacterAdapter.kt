@@ -20,7 +20,8 @@ class RPGCharacterAdapter(
     private val rpgCharacters: MutableList<RPGCharacter>,   // must match order!
     private var genre: RPGGenre,
     private val linkedToMap: Map<String, List<CharacterLink>>,
-    private val onLinkedToMapUpdate: (String, CharacterLink?) -> Unit
+    private val onLinkedToMapUpdate: (String, CharacterLink?) -> Unit,
+    private val onTheTable: Boolean
 ) : RecyclerView.Adapter<RPGCharacterAdapter.ViewHolder>() {
 
     inner class ViewHolder(val view: View) : RecyclerView.ViewHolder(view) {
@@ -70,21 +71,35 @@ class RPGCharacterAdapter(
         holder.name.text = charProfile.name
 
         // Set up spinners (roles, classes)
-        holder.roleSpinner.adapter = ArrayAdapter(holder.view.context,
+        val availableRoles = if (onTheTable) {
+            CharacterRole.values().filter { it != CharacterRole.GM }
+        } else {
+            CharacterRole.values().toList()
+        }
+
+        val roleNames = availableRoles.map { it.name.replace('_', ' ').capitalize() }
+
+        val roleAdapter = ArrayAdapter(
+            holder.view.context,
             android.R.layout.simple_spinner_dropdown_item,
-            CharacterRole.values().map { it.name.replace('_', ' ').capitalize() })
-        holder.roleSpinner.setSelection(CharacterRole.values().indexOf(rpgChar.role))
+            roleNames
+        )
+
+        holder.roleSpinner.adapter = roleAdapter
+
+        // Adjust selection based on filtered list
+        val selectedRoleIndex = availableRoles.indexOf(rpgChar.role).coerceAtLeast(0)
+        holder.roleSpinner.setSelection(selectedRoleIndex)
+
         holder.roleSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(parent: AdapterView<*>, view: View?, pos: Int, id: Long) {
-                rpgChar.role = CharacterRole.values()[pos]
-                if (rpgChar.role == CharacterRole.SIDEKICK) {
-                    holder.sidekickRow.visibility = View.VISIBLE
-                } else {
-                    holder.sidekickRow.visibility = View.GONE
-                }
+                rpgChar.role = availableRoles[pos]
+                holder.sidekickRow.visibility = if (rpgChar.role == CharacterRole.SIDEKICK) View.VISIBLE else View.GONE
             }
+
             override fun onNothingSelected(parent: AdapterView<*>) {}
         }
+
         val classList = CharacterClass.values().filter { it.genre == genre }
         holder.classSpinner.adapter = ArrayAdapter(holder.view.context,
             android.R.layout.simple_spinner_dropdown_item,

@@ -3,14 +3,17 @@ package com.example.RealmsAI
 import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
+import android.view.View
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
+import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.example.RealmsAI.models.*
 import com.example.RealmsAI.models.ModeSettings.CharacterClass
 import com.example.RealmsAI.models.ModeSettings.CharacterRole
 import com.example.RealmsAI.models.ModeSettings.CharacterStats
+import com.example.RealmsAI.models.ModeSettings.GMStyle
 import com.example.RealmsAI.models.ModeSettings.RPAct
 import com.example.RealmsAI.models.ModeSettings.RPGCharacter
 import com.example.RealmsAI.models.ModeSettings.RPGGenre
@@ -24,6 +27,8 @@ class RPGSettingsActivity : AppCompatActivity() {
     private lateinit var characterRecyclerView: RecyclerView
     private lateinit var actsRecyclerView: RecyclerView
     private lateinit var addActButton: ImageButton
+    private lateinit var gmStyleSpinner: Spinner
+    private lateinit var gmDescriptionText: TextView
 
     private lateinit var characterAdapter: RPGCharacterAdapter
     private lateinit var actAdapter: RPGActAdapter
@@ -36,7 +41,7 @@ class RPGSettingsActivity : AppCompatActivity() {
     // Data
     private var genres = RPGGenre.values().toList()
     private var allAreas: List<Area> = emptyList() // Provide from parent/intent!
-    private var allCharacters: List<CharacterProfile> = emptyList() // Provide from parent/intent!
+    private var allCharacters: List<CharacterProfile> = emptyList()
 
     private var rpgSettings: RPGSettings = RPGSettings(
         genre = RPGGenre.FANTASY,
@@ -94,6 +99,46 @@ class RPGSettingsActivity : AppCompatActivity() {
 
         perspectiveSwitch.setOnCheckedChangeListener { _, isChecked ->
             rpgSettings.perspective = if (isChecked) "onTable" else "aboveTable"
+
+            val spacer = findViewById<View>(R.id.rpgsettingspacer1)
+            val params = spacer.layoutParams as ConstraintLayout.LayoutParams
+
+            if (isChecked){
+                gmStyleSpinner.visibility = View.VISIBLE
+                gmDescriptionText.visibility = View.VISIBLE
+            }else{
+                gmStyleSpinner.visibility = View.GONE
+                gmDescriptionText.visibility = View.GONE
+            }
+
+            params.topToBottom = if (isChecked) {
+                R.id.gmStyleDescription
+            } else {
+                R.id.perspectiveSwitch
+            }
+
+            spacer.layoutParams = params
+        }
+
+        gmStyleSpinner = findViewById(R.id.gmStyleSpinner)
+        gmDescriptionText = findViewById<TextView>(R.id.gmStyleDescription)
+
+        val gmOptions = GMStyle.values().map { it.displayName }
+        val gmAdapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, gmOptions)
+        gmStyleSpinner.adapter = gmAdapter
+
+        // Set current value from settings
+        val currentGMStyle = GMStyle.values().indexOfFirst { it.name == rpgSettings.gmStyle }
+        if (currentGMStyle >= 0) gmStyleSpinner.setSelection(currentGMStyle)
+
+        gmStyleSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: AdapterView<*>, view: View?, position: Int, id: Long) {
+                val selected = GMStyle.values()[position]
+                rpgSettings.gmStyle = selected.name
+                gmDescriptionText.text = selected.description
+            }
+
+            override fun onNothingSelected(parent: AdapterView<*>) {}
         }
 
         val charMap = rpgSettings.characters.associateBy { it.characterId }
@@ -125,7 +170,6 @@ class RPGSettingsActivity : AppCompatActivity() {
         findViewById<Button>(R.id.saveRpgSettingsButton).setOnClickListener {
             rpgSettings.characters = characterAdapter.getCharacters().toMutableList()
             rpgSettings.acts = actAdapter.getActs().toMutableList()
-
             // ---- FILTER linkedToMap here ----
             val currentCharacters = rpgSettings.characters
             val allowedSidekickIds = currentCharacters
@@ -175,7 +219,8 @@ class RPGSettingsActivity : AppCompatActivity() {
                     list.add(linkOrNull)
                 }
                 rpgSettings.linkedToMap[charId] = list
-            }
+            },
+            onTheTable = rpgSettings.perspective == "onTable"
         )
         characterRecyclerView.layoutManager = LinearLayoutManager(this)
         characterRecyclerView.adapter = characterAdapter

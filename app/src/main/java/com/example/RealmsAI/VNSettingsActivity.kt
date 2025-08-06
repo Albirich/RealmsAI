@@ -12,6 +12,8 @@ import android.widget.Spinner
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.example.RealmsAI.models.CharacterProfile
+import com.example.RealmsAI.models.ModeSettings.VNRelationship
 import com.example.RealmsAI.models.ModeSettings.VNSettings
 import com.example.RealmsAI.models.Relationship
 import com.example.RealmsAI.models.SessionProfile
@@ -24,14 +26,14 @@ class VNSettingsActivity : AppCompatActivity() {
     private lateinit var jealousyCheck: CheckBox
     private lateinit var mainCharModeCheck: CheckBox
     private lateinit var mainCharSpinner: Spinner
-    private lateinit var relationshipList: RecyclerView
+    private lateinit var relationshipBoardList: RecyclerView
     private lateinit var saveButton: Button
 
-    // Assume you pass the sessionProfile via intent or singleton
-    private lateinit var sessionProfile: SessionProfile
-    private var vnSettings: VNSettings? = null
-    private var characterNames = listOf<String>()
-    private var characterIds = listOf<String>()
+    private lateinit var characterNames: List<String>
+    private lateinit var characterIds: List<String>
+    private lateinit var selectedCharacters: List<CharacterProfile>
+    private lateinit var vnSettings: VNSettings
+    private val EDIT_RELATIONSHIP_CODE = 501
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -42,80 +44,140 @@ class VNSettingsActivity : AppCompatActivity() {
         jealousyCheck = findViewById(R.id.jealousyCheck)
         mainCharModeCheck = findViewById(R.id.mainCharModeCheck)
         mainCharSpinner = findViewById(R.id.mainCharSpinner)
-        relationshipList = findViewById(R.id.relationshipList)
+        relationshipBoardList = findViewById(R.id.relationshipList) // Make sure your XML uses this id!
         saveButton = findViewById(R.id.saveButton)
 
+        // Load data from intent
+        val charactersJson = intent.getStringExtra("SELECTED_CHARACTERS_JSON")
+        selectedCharacters = Gson().fromJson(charactersJson, Array<CharacterProfile>::class.java).toList()
+        characterNames = selectedCharacters.map { it.name }
+        characterIds = selectedCharacters.map { it.id }
 
-        val profileJson = intent.getStringExtra("SESSION_PROFILE_JSON")
-        val vnSettingsJson = intent.getStringExtra("VN_SETTINGS_JSON")
+        val currentSettingsJson = intent.getStringExtra("CURRENT_SETTINGS_JSON")
+        vnSettings = if (currentSettingsJson.isNullOrBlank()) VNSettings()
+        else Gson().fromJson(currentSettingsJson, VNSettings::class.java)
 
-        sessionProfile = Gson().fromJson(profileJson, SessionProfile::class.java)
-        vnSettings = if (!vnSettingsJson.isNullOrBlank())
-            Gson().fromJson(vnSettingsJson, VNSettings::class.java)
-        else null
-            characterNames = sessionProfile.slotRoster.map { it.name }
-        characterIds = sessionProfile.slotRoster.map { it.slotId }
+        // Restore toggles/fields
+        monogamyCheck.isChecked = vnSettings.monogamyEnabled
+        monogamyLevel.setText(vnSettings.monogamyLevel?.toString() ?: "")
+        jealousyCheck.isChecked = vnSettings.jealousyEnabled
+        mainCharModeCheck.isChecked = vnSettings.mainCharMode
+        mainCharSpinner.visibility = if (vnSettings.mainCharMode) View.VISIBLE else View.GONE
 
-        // Monogamy Level only visible if checked
+        // Spinner for Main Character selection
+        mainCharSpinner.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, characterNames)
+        if (vnSettings.mainCharId != null) {
+            val idx = characterIds.indexOf(vnSettings.mainCharId)
+            if (idx >= 0) mainCharSpinner.setSelection(idx)
+        }
+
+        // Show/hide UI fields based on toggles
+        monogamyLevel.visibility = if (monogamyCheck.isChecked) View.VISIBLE else View.GONE
+        mainCharSpinner.visibility = if (mainCharModeCheck.isChecked) View.VISIBLE else View.GONE
+
         monogamyCheck.setOnCheckedChangeListener { _, isChecked ->
             monogamyLevel.visibility = if (isChecked) View.VISIBLE else View.GONE
         }
-
-        // Main Character Mode options show up if checked
         mainCharModeCheck.setOnCheckedChangeListener { _, isChecked ->
             mainCharSpinner.visibility = if (isChecked) View.VISIBLE else View.GONE
-            relationshipList.visibility = if (isChecked) View.VISIBLE else View.GONE
+            vnSettings.mainCharMode = isChecked
+            setupRelationshipBoards(isChecked)
         }
 
-        // Main Character Spinner
-        mainCharSpinner.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, characterNames)
+        // Main Char Mode Spinner: Update relationships on selection change
         mainCharSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(parent: AdapterView<*>, view: View?, position: Int, id: Long) {
-                val mainCharId = characterIds[position]
-                val otherChars = sessionProfile.slotRoster.filter { it.slotId != mainCharId }
-                relationshipList.layoutManager = LinearLayoutManager(this@VNSettingsActivity)
-                relationshipList.adapter = VNRelationshipAdapter(otherChars, mainCharId)
+                if (mainCharModeCheck.isChecked) {
+                    vnSettings.mainCharId = characterIds[position]
+                    setupRelationshipBoards(true)
+                }
             }
             override fun onNothingSelected(parent: AdapterView<*>) {}
         }
 
+        // Initial relationship board setup
+        setupRelationshipBoards(mainCharModeCheck.isChecked)
+
+        // Save logic
         saveButton.setOnClickListener {
-            val monogamyEnabled = monogamyCheck.isChecked
-            val monogamyLevelVal = monogamyLevel.text.toString().toIntOrNull()
-            val jealousyEnabled = jealousyCheck.isChecked
-            val mainCharMode = mainCharModeCheck.isChecked
-            val mainCharId = if (mainCharMode) {
+            vnSettings.monogamyEnabled = monogamyCheck.isChecked
+            vnSettings.monogamyLevel = monogamyLevel.text.toString().toIntOrNull()
+            vnSettings.jealousyEnabled = jealousyCheck.isChecked
+            vnSettings.mainCharId = if (mainCharModeCheck.isChecked) {
                 val idx = mainCharSpinner.selectedItemPosition
                 if (idx >= 0) characterIds[idx] else null
             } else null
+            vnSettings.mainCharMode = mainCharModeCheck.isChecked
 
-            // Collect relationships from adapter if in mainCharMode
-            val relationships = if (mainCharMode) {
-                (relationshipList.adapter as? VNRelationshipAdapter)?.getRelationships() ?: emptyList()
-            } else emptyList()
+            // Collect any final changes from the adapters, if needed (adapters are editing vnSettings.characterBoards in place)
 
-            // Save to profile/session
-            val settings = VNSettings(
-                monogamyEnabled = monogamyEnabled,
-                monogamyLevel = monogamyLevelVal,
-                jealousyEnabled = jealousyEnabled,
-                mainCharMode = mainCharMode,
-                mainCharId = mainCharId,
-                relationships = relationships
-            )
-            // TODO: Save settings to sessionProfile/modeSettings (e.g. sessionProfile.modeSettings["vn"] = settings)
+            val resultIntent = Intent()
+            resultIntent.putExtra("VN_SETTINGS_JSON", Gson().toJson(vnSettings))
+            setResult(RESULT_OK, resultIntent)
             finish()
         }
     }
 
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == 101 && resultCode == RESULT_OK && data != null) {
-            val updatedJson = data.getStringExtra("UPDATED_RELATIONSHIP_JSON")
-            val relIndex = data.getIntExtra("REL_INDEX", -1)
-            val updatedRelationship = Gson().fromJson(updatedJson, Relationship::class.java)
+    /**
+     * Set up the relationship board display for either Main Char Mode (single row)
+     * or Everyone-to-Everyone (all characters as MCs).
+     */
+    private fun setupRelationshipBoards(mainCharMode: Boolean) {
+        relationshipBoardList.visibility = View.VISIBLE
+        if (mainCharMode) {
+            val mcId = vnSettings.mainCharId ?: characterIds.first()
+            val mainChar = selectedCharacters.first { it.id == mcId }
+            val otherChars = selectedCharacters.filter { it.id != mcId }
+
+            relationshipBoardList.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
+            relationshipBoardList.adapter = VNRelationshipAvatarAdapter(
+                otherChars, mainChar.id, mutableMapOf() // Board not used!
+            ) { _, otherCharProfile ->
+                // Always create/fetch the relationship "otherChar -> mainChar"
+                val rel = vnSettings.characterBoards
+                    .getOrPut(otherCharProfile.id) { mutableMapOf() }
+                    .getOrPut(mainChar.id) { VNRelationship(fromId = otherCharProfile.id, toId = mainChar.id) }
+                launchRelationshipEditor(rel, otherCharProfile, mainChar)
+            }
+        } else {
+            // Show every character as MC (vertical board)
+            relationshipBoardList.layoutManager = LinearLayoutManager(this)
+            relationshipBoardList.adapter = VNRelationshipBoardAdapter(
+                selectedCharacters, vnSettings.characterBoards
+            ) { rel, fromChar, toChar ->
+                // Launch your editor here!
+                launchRelationshipEditor(rel, fromChar, toChar)
+            }
 
         }
+
     }
 
+    private fun launchRelationshipEditor(
+        rel: VNRelationship,
+        fromChar: CharacterProfile,
+        toChar: CharacterProfile
+    ) {
+        val intent = Intent(this, RelationshipLevelEditorActivity::class.java)
+        intent.putExtra("RELATIONSHIP_JSON", Gson().toJson(rel))
+        intent.putExtra("FROM_ID", rel.fromId)
+        intent.putExtra("TO_ID", rel.toId)
+        intent.putExtra("FROM_NAME", fromChar.name)
+        intent.putExtra("TO_NAME", toChar.name)
+        startActivityForResult(intent, EDIT_RELATIONSHIP_CODE)
+    }
+
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+
+        if (requestCode == EDIT_RELATIONSHIP_CODE && resultCode == RESULT_OK && data != null) {
+            val updatedJson = data.getStringExtra("UPDATED_RELATIONSHIP_JSON")
+            val updatedRel = Gson().fromJson(updatedJson, VNRelationship::class.java)
+            // Save to the correct board
+            val relBoard = vnSettings.characterBoards.getOrPut(updatedRel.fromId) { mutableMapOf() }
+            relBoard[updatedRel.toId] = updatedRel
+            setupRelationshipBoards(mainCharModeCheck.isChecked)
+        }
+    }
 }

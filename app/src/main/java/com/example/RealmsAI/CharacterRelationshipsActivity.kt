@@ -13,7 +13,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.example.RealmsAI.models.RELATIONSHIP_TYPES
 import com.example.RealmsAI.models.Relationship
 import com.example.RealmsAI.RelationshipLevelEditorActivity
-import com.example.RealmsAI.models.RelationshipLevel
+import com.example.RealmsAI.models.ModeSettings.RelationshipLevel
 import com.google.gson.Gson
 import kotlin.jvm.java
 

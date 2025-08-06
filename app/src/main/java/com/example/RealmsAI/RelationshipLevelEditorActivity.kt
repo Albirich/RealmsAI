@@ -9,8 +9,9 @@ import android.widget.Spinner
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import com.example.RealmsAI.models.Relationship
-import com.example.RealmsAI.models.RelationshipLevel
+import com.example.RealmsAI.models.ModeSettings
+import com.example.RealmsAI.models.ModeSettings.VNRelationship
+import com.example.RealmsAI.models.ModeSettings.RelationshipLevel
 import com.google.gson.Gson
 
 class RelationshipLevelEditorActivity : AppCompatActivity() {
@@ -24,7 +25,7 @@ class RelationshipLevelEditorActivity : AppCompatActivity() {
     private val levels = mutableListOf<RelationshipLevel>()
     private var currentLevel = 0
     private lateinit var adapter: RelationshipLevelAdapter
-    private lateinit var rel: Relationship
+    private lateinit var rel: VNRelationship
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -39,7 +40,10 @@ class RelationshipLevelEditorActivity : AppCompatActivity() {
 
         // Load relationship from intent
         val json = intent.getStringExtra("RELATIONSHIP_JSON")
-        rel = if (json.isNullOrBlank()) Relationship() else Gson().fromJson(json, Relationship::class.java)
+        val fromId = intent.getStringExtra("FROM_ID") ?: ""
+        val toId = intent.getStringExtra("TO_ID") ?: ""
+        rel = if (json.isNullOrBlank()) VNRelationship(fromId = fromId, toId = toId)
+        else Gson().fromJson(json, ModeSettings.VNRelationship::class.java)
         upTriggerEdit.setText(rel.upTriggers ?: "")
         downTriggerEdit.setText(rel.downTriggers ?: "")
         levels.addAll(rel.levels)

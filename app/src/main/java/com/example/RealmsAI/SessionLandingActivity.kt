@@ -36,6 +36,8 @@ import java.util.UUID
 import kotlin.collections.MutableList
 import com.example.RealmsAI.models.CharacterProfile
 import com.example.RealmsAI.models.ModeSettings.RPGSettings
+import com.example.RealmsAI.models.ModeSettings.VNRelationship
+import com.example.RealmsAI.models.ModeSettings.VNSettings
 import kotlin.jvm.java
 
 
@@ -475,8 +477,6 @@ class SessionLandingActivity : AppCompatActivity() {
 
                     // ==== Harmonize all slots ====
                     val slots = sessionProfile?.slotRoster?.toMutableList() ?: mutableListOf()
-
-                    // 1. Add slots for all character profiles
                     val harmonizedSlots = mutableListOf<SlotProfile>()
                     for ((index, slot) in slots.withIndex()) {
                         val harmonized = harmonizeAndCondenseSlot(slot.toCharacterProfile(), relationships)
@@ -529,7 +529,6 @@ class SessionLandingActivity : AppCompatActivity() {
                         )
                     } ?: emptyList()
 
-                    var enabledModes: MutableList<String> = mutableListOf()
                     val cleanedAssignments = sessionProfile?.slotRoster!!.mapIndexed { idx, slot ->
                         "character${idx + 1}" to slot.name // or whatever placeholder syntax you use
                     }.toMap()
@@ -657,6 +656,7 @@ class SessionLandingActivity : AppCompatActivity() {
                 messageIds = listOf("background")
             )
         }
+
         val outfits = profile.outfits ?: emptyList()
         val defaultOutfit = outfits.firstOrNull()?.name ?: ""
         val actualCurrentOutfit = if (profile.currentOutfit.isNullOrBlank()) defaultOutfit else profile.currentOutfit
@@ -702,6 +702,24 @@ class SessionLandingActivity : AppCompatActivity() {
         val defense = matchingRpgCharacter?.defense
             ?: calcDefense(rpgStats, matchingRpgCharacter?.characterClass?.name ?: "")
         val links: List<CharacterLink> = rpgSettings?.linkedToMap?.get(profile.id) ?: emptyList()
+
+        // 1. Grab VNSettings (once, outside this function if possible!)
+        val vnSettingsJson = sessionProfile?.modeSettings?.get("vn") as? String
+        val vnSettings = if (!vnSettingsJson.isNullOrBlank()) {
+            Gson().fromJson(vnSettingsJson, VNSettings::class.java)
+        } else null
+
+        // ... inside harmonizeAndCondenseSlot for this character (profile):
+
+        val baseId = profile.id
+        val relationshipsMap = mutableMapOf<String, VNRelationship>()
+
+        vnSettings?.characterBoards?.get(baseId)?.forEach { (toId, rel) ->
+            relationshipsMap[toId] = rel
+        }
+
+        sessionProfile?.modeSettings?.set("vn", Gson().toJson(vnSettings))
+
         // Return the full SlotProfile
         SlotProfile(
             slotId = slotId,
@@ -738,7 +756,8 @@ class SessionLandingActivity : AppCompatActivity() {
             maxHp = maxHp,
             defense = defense,
             hiddenRoles = matchingRpgCharacter?.role?.name ?: "",
-            linkedTo = links
+            linkedTo = links,
+            vnRelationships = relationshipsMap
         )
     }
 

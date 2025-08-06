@@ -8,7 +8,9 @@ import android.view.View
 import android.widget.*
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.compose.runtime.toMutableStateList
 import com.example.RealmsAI.models.*
+import com.example.RealmsAI.models.ModeSettings.VNSettings
 import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
@@ -87,7 +89,7 @@ class ChatCreationActivity : AppCompatActivity() {
         relationshipBtn = findViewById(R.id.chatrelationshipBtn)
         btnLoadCollections = findViewById(R.id.btnLoadCollections)
         btnOpenMap = findViewById(R.id.btnOpenMap)
-        val enabledModes = mutableListOf<String>()
+        var enabledModes = mutableListOf<String>()
         if (findViewById<CheckBox>(R.id.checkboxRPG).isChecked) enabledModes.add("rpg")
         if (findViewById<CheckBox>(R.id.checkboxVisualNovel).isChecked) enabledModes.add("visual_novel")
         if (findViewById<CheckBox>(R.id.checkboxGodMode).isChecked) enabledModes.add("god_mode")
@@ -125,9 +127,10 @@ class ChatCreationActivity : AppCompatActivity() {
             }
             // Set modeSettings from loaded profile!
             modeSettings = profile.modeSettings.toMutableMap()
+            enabledModes = profile.enabledModes.toMutableStateList()
 
             // If rpg settings exist, check RPG mode
-            if (!modeSettings["rpg"].isNullOrBlank()) {
+            if ("rpg" in enabledModes) {
                 checkboxRPG.isChecked = true
                 rpgButton.isEnabled = true
                 rpgButton.visibility = View.VISIBLE
@@ -135,6 +138,16 @@ class ChatCreationActivity : AppCompatActivity() {
                 checkboxRPG.isChecked = false
                 rpgButton.isEnabled = false
                 rpgButton.visibility = View.GONE
+            }
+
+            if ("visual_novel" in enabledModes) {
+                checkboxVN.isChecked = true
+                VNButton.isEnabled = true
+                VNButton.visibility = View.VISIBLE
+            } else {
+                checkboxVN.isChecked = false
+                VNButton.isEnabled = false
+                VNButton.visibility = View.GONE
             }
         }
 
@@ -192,7 +205,6 @@ class ChatCreationActivity : AppCompatActivity() {
             startActivityForResult(intent, REQUEST_CODE_RPG_SETTINGS)
         }
 
-
         checkboxVN.setOnCheckedChangeListener { _, isChecked ->
             VNButton.isEnabled = isChecked
             VNButton.visibility = View.VISIBLE
@@ -205,7 +217,12 @@ class ChatCreationActivity : AppCompatActivity() {
         }
 
         VNButton.setOnClickListener {
-            Toast.makeText(this, "Visual Novel settings is not created yet", Toast.LENGTH_SHORT).show()
+            val intent = Intent(this, VNSettingsActivity::class.java)
+            Log.d("VN_SETTINGS", "Sending: ${modeSettings["vn"]}")
+            intent.putExtra("CURRENT_SETTINGS_JSON", modeSettings["vn"] ?: "")
+            intent.putExtra("SELECTED_CHARACTERS_JSON", gson.toJson(selectedCharacters))
+            intent.putExtra("AREAS_JSON", gson.toJson(loadedAreas))
+            startActivityForResult(intent, REQUEST_CODE_VN_SETTINGS)
         }
 
         checkboxGodMode.setOnCheckedChangeListener { _, isChecked ->
@@ -232,7 +249,7 @@ class ChatCreationActivity : AppCompatActivity() {
     }
     companion object {
         private const val REQUEST_CODE_RPG_SETTINGS = 1001
-        private const val REQUEST_CODE_VISUAL_NOVEL_SETTINGS = 1002
+        private const val REQUEST_CODE_VN_SETTINGS = 1002
         private const val REQUEST_CODE_GOD_MODE_SETTINGS = 1003
         // ...add more if you have more mode settings screens
     }
@@ -252,13 +269,16 @@ class ChatCreationActivity : AppCompatActivity() {
                 if (resultCode == Activity.RESULT_OK && data != null) {
                     val rpgSettingsJson = data.getStringExtra("RPG_SETTINGS_JSON")
                     if (!rpgSettingsJson.isNullOrEmpty()) {
-                        val rpgSettings = gson.fromJson(rpgSettingsJson, ModeSettings.RPGSettings::class.java)
                         modeSettings["rpg"] = rpgSettingsJson
                     }
                 }
             }
-            REQUEST_CODE_VISUAL_NOVEL_SETTINGS -> {
-                // handle Visual Novel settings result
+            REQUEST_CODE_VN_SETTINGS -> {
+                val updatedSettingsJson = data?.getStringExtra("VN_SETTINGS_JSON")
+                if (!updatedSettingsJson.isNullOrBlank()) {
+                    modeSettings["vn"] = updatedSettingsJson
+                    Log.d("VN_SETTINGS", "Received: $updatedSettingsJson")
+                }
             }
             REQUEST_CODE_GOD_MODE_SETTINGS -> {
                 // handle Visual Novel settings result

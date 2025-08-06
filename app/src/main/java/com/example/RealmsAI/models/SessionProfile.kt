@@ -1,5 +1,6 @@
 package com.example.RealmsAI.models
 
+import com.example.RealmsAI.models.ModeSettings.VNRelationship
 import com.google.firebase.Timestamp
 import com.google.gson.annotations.SerializedName
 
@@ -85,7 +86,7 @@ data class SlotProfile(
     val textColor: String = "#000000",
     val sfwOnly: Boolean = true,
     val profileType: String = "bot",
-    val statusEffects: List<String> = emptyList(),
+    var statusEffects: MutableSet<String> = mutableSetOf(),
     val lastActiveArea: String? = null,
     val lastActiveLocation: String? = null,
     val lastSynced: Timestamp? = null,
@@ -96,10 +97,12 @@ data class SlotProfile(
     val rpgClass: String = "",
     val stats: Map<String, Int> = emptyMap(),
     val equipment: List<String> = emptyList(),
-    val hp: Int = 0,
+    var hp: Int = 0,
     val maxHp: Int = 0,
     val defense: Int = 0,
-    val linkedTo: List<CharacterLink> = emptyList()
+    val linkedTo: List<CharacterLink> = emptyList(),
+    // -- VN STUFF --
+    val vnRelationships: MutableMap<String, VNRelationship> = mutableMapOf()
 )
 data class TaggedMemory(
     var id: String = "",

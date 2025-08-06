@@ -50,6 +50,8 @@
         <activity android:name=".MessagesActivity"/>
         <activity android:name=".RPGSettingsActivity"/>
         <activity android:name=".RelationshipLevelEditorActivity"/>
+        <activity android:name=".VNSettingsActivity"/>
+
 
 
     </application>

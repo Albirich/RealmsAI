@@ -7,8 +7,10 @@ sealed class ModeSettings : java.io.Serializable {
         var acts: MutableList<RPAct> = mutableListOf(),
         var currentAct: Int = 0,
         var linkedToMap: MutableMap<String, MutableList<CharacterLink>> = mutableMapOf(),
-        var perspective: String = "aboveTable"
+        var perspective: String = "aboveTable",
+        var gmStyle: String = GMStyle.HOST.name
     ) : ModeSettings()
+
     enum class RPGGenre {
         FANTASY,
         SCIFI,
@@ -18,6 +20,34 @@ sealed class ModeSettings : java.io.Serializable {
         HORROR,
         SUPERHERO,
         MURDER_MYSTERY
+    }
+
+    enum class GMStyle(val displayName: String, val description: String, val styleTag: String) {
+        HOST(
+            displayName = "Host",
+            description = "The game’s host runs things directly behind the scenes.",
+            styleTag = "neutral_host"
+        ),
+        GRIM_LORD(
+            displayName = "The Grim Lord",
+            description = "Dark, brooding, and deadly serious. Every action has a price.",
+            styleTag = "grimdark_serious"
+        ),
+        ZANY_JIM(
+            displayName = "Zany Jim",
+            description = "Unpredictable and energetic. Loves chaos, hates logic.",
+            styleTag = "cartoon_chaotic"
+        ),
+        BARDIC_FLAIR(
+            displayName = "Bardic Flair",
+            description = "Dramatic and poetic. Narration always rhymes or sings.",
+            styleTag = "bardic_poetic"
+        ),
+        VETERAN_WARDEN(
+            displayName = "Veteran Warden",
+            description = "Disciplined and tactical. Favors fair challenges and logic.",
+            styleTag = "military_precise"
+        )
     }
     data class RPGCharacter(
         val characterId: String, // matches your character collection
@@ -82,27 +112,30 @@ sealed class ModeSettings : java.io.Serializable {
 //--------------------------------------------------------VN SETTINGS-------------------------------------------------------------------
 
     data class VNSettings(
-        val mainCharId: String? = null,
-        val monogamyEnabled: Boolean = false,
-        val monogamyLevel: Int? = null,
-        val jealousyEnabled: Boolean = false,
-        val characterBoards: MutableMap<String, MutableMap<String, VNRelationship>> = mutableMapOf()
+        var mainCharId: String? = null,
+        var monogamyEnabled: Boolean = false,
+        var monogamyLevel: Int? = null,
+        var jealousyEnabled: Boolean = false,
+        val characterBoards: MutableMap<String, MutableMap<String, VNRelationship>> = mutableMapOf(),
+        var mainCharMode: Boolean = false
         // Map<fromCharacterId, Map<toCharacterId, RelationshipLevelDraft>>
     )
 
     data class VNRelationship(
-        val fromId: String,
-        val toId: String,
+        val fromId: String = "",
+        val toId: String = "",
         var notes: String = "",
         var levels: MutableList<RelationshipLevel> = mutableListOf(),
         var currentLevel: Int = 0,
+        var upTriggers: String = "",
+        var downTriggers: String = "",
         var points: Int = 0
     )
 
     data class RelationshipLevel(
         var level: Int = 0,
-        var threshold: Int = 0,         // XP or points to reach this level
-        var personality: String = ""    // Description/flavor for this level
+        var threshold: Int = 0,
+        var personality: String = ""
     )
 
 

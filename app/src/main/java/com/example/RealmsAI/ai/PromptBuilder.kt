@@ -143,77 +143,52 @@ object PromptBuilder {
     }
 
     fun buildOnTableGMPrompt(
-        slotProfile: SlotProfile,
         act: RPGAct?,
         activeSlotId: String?,
         sessionSummary: String,
-        areas: List<String>,
         locations: Map<String, List<String>>,
         sessionProfile: SessionProfile,
         condensedCharacterInfo: Map<String, String>,
         lastNonNarratorId: String?,
         validNextSlotIds: List<String>,
         memories: Map<String, List<TaggedMemory>>,
-        chatHistory: String
+        chatHistory: String,
+        gmStyle: String
     ): String {
         return """
         You are now roleplaying as the following character. 
         - Stay fully in character. 
         - Speak and narrate **only as this character**—never as other characters or as yourself. 
         - Your character is the Gamemaster for a roleplaying game with the other characters as his players.
-        - You are not only roleplaying a character, but roleplaying a character playing a roleplaying game.
-        - You are encouraged to talk to the players, not just their characters, outside of the game you are running.
-        - You must take on the role of a character that is taking on the role of the Gamemaster, they are still in the world with the other characters and dictate what happens int heir game world.
         - You make the story up as you go, and ask your players to roll for actions.
         - use the act summary and goal to formulate how the story should unfold.
         - As the game master, Describe the scene of your story and ask players what they want to do.
-        - While staying in character you can pretend to be npc's in your game world.
-          
-           # ROLEPLAY RULES:
-               - All replies MUST be fully in-character for **${slotProfile.name}**.
-               - Advance the story, relationship, or your character's goals—never stall or repeat.
-               - Write brief, natural dialogue (1–2 sentences), showing feelings and personality.
-               - Use vivid narration for **only your own** actions, emotions, or perceptions (never for other characters).
-               - Use immersive sensory description (sight, sound, smell, etc) to make the world feel alive.
-               - Always continue naturally from the chat history.
-               - Adapt your tone and mood to match the player: be playful, flirty, serious, etc, as appropriate.
-               - If the scene is slow, inject a twist (emotional, narrative, or environmental) but always keep it relevant.
-               - Never break character or output system messages. 
-               - For every message, output a pose for every nearby character (by slotId), including the sender.
-                   - Each slotId can have only one pose at a time.
-                   - Always use poses, even during narrator messages.
-                   - Choose poses ONLY from the list of AVAILABLE POSES FOR NEARBY CHARACTERS.
-                   - You can change a character’s pose if it makes sense for the scene or message.
-                   - To clear or remove a character’s pose, set it to "clear", "none", or "" (empty string).                  
-               - If the message is important add a new memory:
-                   - Only add a memory for truly important, *novel* events, major relationship shifts, or facts not already captured in memories above.
-                   - If nothing important happened, reply: {"new_memory": null}
-                   - Tags should describe, in a word or two, what the memory is about: people, place, event, feeling
-                       - example tags: a persons name (naruto), where it happened (leaf_village), what its about (trauma), an event (hokages_death), what the character is feeling (sad)
-                   - Add up to 5 tags for each memory, it can be any combination of the types of tags (example: [Sasuke, Sakura, Training, combo])
-                   
-           CHARACTER PROFILE:
-               - Name: ${slotProfile.name}
-               - SlotId: ${slotProfile.slotId}
-               - Age: ${slotProfile.age}
-               - Height: ${slotProfile.height}
-               - Eye/Hair Color: ${slotProfile.eyeColor} ${slotProfile.hairColor}
-               - Pronouns: ${slotProfile.gender}
-               - Condensed Summary: ${slotProfile.summary}
-               - Personality: ${slotProfile.personality}
-               - Secret Description: ${slotProfile.privateDescription}
-               - Appearance: ${slotProfile.physicalDescription}
-               - Abilities: ${slotProfile.abilities}
-               - Poses: ${
-            slotProfile.outfits.joinToString("\n") { outfit ->
-                "  Outfit: ${outfit.name}\n" +
-                        outfit.poseSlots.joinToString("\n") { pose -> "    - ${pose.name}" }
-            }
+        - Only provide a detailed scene narration when a **new scene or area begins** or when **major events occur**. Do **not repeat the full environment description every turn** unless something significant changes.
+        - Narrate the current area and location ONLY if it has not already been described. Do not repeat environmental narration.
+        - Use the **"narrator" voice** (senderId "narrator") only for important descriptions – e.g. initially setting the scene or narrating the outcome of an action or dice roll. **Do not include narrator narration in every reply.**
+        - Narrator messages should be **brief (1-2 sentences)** and contain **no dialogue**, only atmospheric description (similar to how the standalone Narrator prompt works).
+        - Narrate actions based on dice rolls that are in chat.
+        - If there is nothing new to describe, do not include any narrator message at all.
+        - ALL messages must come from "NARRATOR"        
+        At the end of each message, if you need to change the health of a player, or add a status effect to a player add "actions" into the extra fields section of your output:
+        {e extra fields section of your output:
+        {
+          "actions": [
+            { "type": "health_change", "slot": "SLOTID", "stat": "hp", "mod": +/-NUMBER },
+            { "type": "status_effect", "slot": "SLOTID", "stat": "EFFECTNAME", "mod": 1/-1 }}
+          ]
         }
-               - Relationships: ${slotProfile.relationships.joinToString(", ") { "${it.type} to ${it.toName}" }}
+        - "slot" is the slotId of the character you want to affect with the change.
+        - "stat" is the stat you want to use for the roll (e.g., "strength", "agility", etc.).
+        - "mod" is any additional modifier (positive or negative).
+        - If you don't know the modifier, set "mod": 0 and ask the GM if there should be any bonus or penalty.
+        - the mod for status_effect tells it to add or remove it (1 to add, -1 to remove)
+        As the GM you can give modifiers if a character has advantage or disadvantage on a roll. Modifiers go from -3 to +3
+        Use the following GM style for narration and tone: $gmStyle
 
         ACTIVATIONAI INSTRUCTIONS:
         - Move characters ONLY if chat or actions *explicitly* says it (do NOT move characters arbitrarily).
+        - All locations must come from the LOCATIONS list
         - After ANY character moves, you MUST output area/location for EVERY character (even those who did not move) in "area_changes".
             - "area_changes" must be a map: { "<slotId>": { "area": "AreaName", "location": "LocationName" }, ... }
             - If NO ONE moves, output an empty object: "area_changes": {}
@@ -222,6 +197,7 @@ object PromptBuilder {
             - (EXAMPLE: If Alice leaves the Kitchen to go to the Garden, and Bob stays, then area_changes should list both Alice and Bob and their new locations.)
             - Always keep one or more other characters in the same location as PLAYER: (slotId=${activeSlotId})
             - IMPORTANT: Never move a character, change their area, or update their location for any reason other than explicit in-chat actions or direct instructions from the user. Their current area and location are always as shown above, unless the chat says otherwise.
+           
             Examples:
             If Alice is in the Kitchen, and Bob is in the Living Room, and the chat says, “Alice looks around the kitchen,” then neither Alice nor Bob moves. “area_changes”: {}.
             If the chat says, “Bob walks into the kitchen to join Alice,” then “area_changes”: { “Bob”: { “area”: “Kitchen”, “location”: “Kitchen Table” }, “Alice”: { “area”: “Kitchen”, “location”: “Sink” } }
@@ -268,29 +244,20 @@ object PromptBuilder {
             - privateDescription is 400 characters of their secrets, desires, kinks, goals
             - sfwOnly should be true ONLY if the character is under 18 years old.
             
-        - If nsfw = true then next_slot cannot be Narrator.
+        - If nsfw = true 
+        - then next_slot.
         # OUTPUT FORMAT (STRICT JSON ONLY)
            Respond with a single valid JSON array. **Do not use markdown, tool calls, or explanations. DO NOT mark it as json. ALWAYS use the format as is** The format is:
         [      
             {   
                  "messages": [
                     {
-                        "senderId": "${slotProfile.slotId}", // Use "${slotProfile.slotId}" for dialogue, "narrator" for actions/descriptions
+                        "senderId": "narrator"
                         "text": "TEXT HERE",
-                        "delay": 1500, // Use: 500 (snappy), 1500 (normal), 2500 (dramatic), 0 (rambling)
-                        "pose": {
-                          "slotId", "pose",
-                          "slotId", "pose",
-                          "slotId", "pose",
+                        "delay": 0
                         }
-                    }                    
-                    // 1–3 message objects max
-                 ],
-                 "new_memory": {
-                       "tags": ["relevant", "tags"],
-                       "text": "Concise memory of the event.",
-                       "nsfw": true/false
-                 }
+                    }
+                 ]
             },   
             {
                 "area_changes": { "<slotId>": { "area": "AreaName", "location": "LocationName" }, ... },
@@ -353,6 +320,9 @@ object PromptBuilder {
         VALID NEXT_SLOT CHOICES:
         ${validNextSlotIds.joinToString(", ")}
         
+        LOCATIONS:
+        ${locations.entries.joinToString("\n") { (location, slots) -> "$location: ${slots.joinToString(", ")}" }}
+        
         CHARACTER MEMORIES (for everyone present):
         ${
             memories.entries.joinToString("\n\n") { (slotId, slotMemories) ->
@@ -365,7 +335,7 @@ object PromptBuilder {
         RECENT CHAT HISTORY:
         $chatHistory
         
-        Stay in-character as ${slotProfile?.name} while narrating. Lead the players through the world and challenges.
+        Stay in-character while narrating. Lead the players through the world and challenges.
     """.trimIndent()
     }
 
@@ -486,11 +456,6 @@ object PromptBuilder {
                     "text": "Concise memory of the event.",
                     "nsfw": true/false
               }
-              "relationship": [
-              RELATIONSHIPPOINTS+1:<relationshipId>,
-              RELATIONSHIPPOINTS+1:<relationshipId>,
-              RELATIONSHIPPOINTS-1:<relationshipId>
-              ]
               {{EXTRA_FIELDS}}
             }
             
@@ -514,15 +479,7 @@ object PromptBuilder {
                         }
                 - Relationships: ${
                  slotProfile.relationships.joinToString(separator = "\n") { rel ->
-                        val base = "[ID: ${rel.id}] ${rel.toName} is your ${rel.type}: ${rel.description}"
-                        if (modeSettings["visual_novel"] == "true") {
-                            val personality = rel.levels.getOrNull(rel.currentLevel)?.personality.orEmpty()
-                            val up = rel.upTriggers?.takeIf { !it.isNullOrBlank() } ?: "(none)"
-                            val down = rel.downTriggers?.takeIf { !it.isNullOrBlank() } ?: "(none)"
-                            "$base. At this level: $personality | upTrigger: $up | downTrigger: $down"
-                        } else {
-                            "$base."
-                        }
+                        "[ID: ${rel.id}] ${rel.toName} is your ${rel.type}: ${rel.description}"
                     }
                 }
 
@@ -609,14 +566,19 @@ object PromptBuilder {
         { 
             "advance_act": true 
         }
-         At the end of each message, if you need to Roll a dice add "actions" into the extra fields section of your output:
+        At the end of each message, if you need to Roll a dice, change your health, or adda status effect add "actions" into the extra fields section of your output:
+        {e extra fields section of your output:
         {
           "actions": [
-            { "type": "roll_dice", "slot": "SLOTID", "stat": "STATNAME", "mod": MODIFIER }
+            { "type": "roll_dice", "slot": "SLOTID", "stat": "STATNAME", "mod": MODIFIER },
+            { "type": "health_change", "slot": "SLOTID", "stat": "hp", "mod": +/-NUMBER }
+            { "type": "status_effect", "slot": "SLOTID", "stat": "EFFECTNAME", "mod": 1/-1 }}
           ]
         }
         - "stat" is the stat you want to use for the roll (e.g., "strength", "agility", etc.).
         - "mod" is any additional modifier (positive or negative).
+        - If you don't know the modifier, set "mod": 0 and ask the GM if there should be any bonus or penalty.
+        - the mod for status_effect tells it to add or remove it (1 to add, -1 to remove)
         As the GM you can give modifiers if a character has advantage or disadvantage on a roll. Modifiers go from -3 to +3
         Do not include any other text on that line.
         PRIORITIZE ROLEPLAYING THE PLAYER NOT THE NPCS IN THE GAME! INTERACT WITH OTHER PLAYERS AND ENJOYING HANGING OUT, TALKING ABOUT THINGS OTHER THAN THE GAME AS WELL!
@@ -670,16 +632,19 @@ object PromptBuilder {
         Physical Description: ${playerSlot.physicalDescription}
 
         If you want to change equipment, heal, use an item, or do something special, just say so in your message!
-         At the end of each message, if you need to Roll a dice add "actions" into the extra fields section of your output:
+         At the end of each message, if you need to Roll a dice, change your health, or adda status effect add "actions" into the extra fields section of your output:
         {
           "actions": [
-            { "type": "roll_dice", "slot": "SLOTID", "stat": "STATNAME", "mod": MODIFIER }
+            { "type": "roll_dice", "slot": "SLOTID", "stat": "STATNAME", "mod": MODIFIER },
+            { "type": "health_change", "slot": "SLOTID", "stat": "hp", "mod": +/-NUMBER }
+            { "type": "status_effect", "slot": "SLOTID", "stat": "EFFECTNAME", "mod": 1/-1 }}
           ]
         }
         - "stat" is the stat you want to use for the roll (e.g., "strength", "agility", etc.).
         - "mod" is any additional modifier (positive or negative).
         - The GM should tell you if you have a modifier; if none was given, you can ask the GM for one.
         - If you don't know the modifier, set "mod": 0 and ask the GM if there should be any bonus or penalty.
+        - the mod for status_effect tells it to add or remove it (1 to add, -1 to remove)
         Do not include any other text on that line.
         PRIORITIZE ROLEPLAYING THE PLAYER NOT THE CHARACTER IN THE GAME! INTERACT WITH OTHER PLAYERS AND ENJOYING HANGING OUT, TALKING ABOUT THINGS OTHER THAN THE GAME AS WELL!
         IMPORTANT: you can only reply as ${playerSlot.name}
@@ -727,5 +692,64 @@ object PromptBuilder {
         =============================
     """.trimIndent()
     }
+
+    fun buildDiceRoll(): String {
+        return """
+        - Whenever your character attempts an action that may have a chance of success or failure (e.g. fighting, sneaking, persuading, leaping, dodging), you must roll dice to determine the outcome.
+        - Do not assume the result — the Game Master will narrate what happens after the roll.
+        - Only include the roll once per action — not per message.
+        - Never describe the result of your own roll. Wait for the Game Master (GM) to narrate what happens.
+        At the end of each message, if you need to Roll a dice add "actions" into the extra fields section of your output:
+        {
+          "actions": [
+            { "type": "roll_dice", "slot": "SLOTID", "stat": "STATNAME", "mod": MODIFIER }
+          ]
+        }
+        """.trimIndent()
+    }
+
+    fun buildVNPrompt(
+        slotProfile: SlotProfile,
+        sessionProfile: SessionProfile
+    ): String {
+        if (slotProfile.vnRelationships.isEmpty()) {
+            return """
+            INFORMATION ON YOUR CONNECTIONS TO OTHER CHARACTERS:
+            
+            You have no special relationship levels set with other characters.
+        """.trimIndent()
+        }
+
+        // Build one block per relationship
+        val relationshipsText = slotProfile.vnRelationships.values.joinToString("\n\n") { rel ->
+            val toName = sessionProfile.slotRoster.find { it.baseCharacterId == rel.toId }?.name ?: "(Unknown)"
+            val currentLevelObj = rel.levels.getOrNull(rel.currentLevel)
+            val personality = currentLevelObj?.personality ?: "(No description)"
+            """
+        With $toName:
+        - Relationship Level Description: $personality
+        - What raises the relationship: ${rel.upTriggers}
+        - What can harm the relationship: ${rel.downTriggers}
+        """.trimIndent()
+        }
+
+        return """
+        INFORMATION ON YOUR CONNECTIONS TO OTHER CHARACTERS:
+        
+        $relationshipsText
+        
+        At the end of each message, if you need to change relationship points with a character (based off of previous messages in Recent Chat History)  add "relationship" into the extra fields section of your output:
+        {
+          "relationship": [
+            { 
+                ["toId:"1234, "change:"+0]
+                ["toId:"5678, "change:"+1]
+                ["toId:"1237, "change:"-1]
+            }
+          ]
+        }
+    """.trimIndent()
+    }
+
 }
 

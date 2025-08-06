@@ -6,7 +6,7 @@ import android.view.ViewGroup
 import android.widget.EditText
 import android.widget.ImageButton
 import androidx.recyclerview.widget.RecyclerView
-import com.example.RealmsAI.models.RelationshipLevel
+import com.example.RealmsAI.models.ModeSettings.RelationshipLevel
 
 class RelationshipLevelAdapter(
     private val levels: MutableList<RelationshipLevel>,

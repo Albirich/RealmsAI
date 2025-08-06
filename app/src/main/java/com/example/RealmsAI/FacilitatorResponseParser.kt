@@ -157,7 +157,8 @@ object FacilitatorResponseParser {
 
 
 
-    fun parseRoleplayAIResponse(response: String): ParsedRoleplayResult {
+    fun parseRoleplayAIResponse(response: String, senderId: String, slotRoster: List<SlotProfile>): ParsedRoleplayResult {
+        Log.d("ai_cycle", "recieved $response")
         val gson = Gson()
         val cleaned = response
             .replace(Regex("^```json|^```|```$", RegexOption.MULTILINE), "")
@@ -175,12 +176,12 @@ object FacilitatorResponseParser {
             }
 
             val relationshipChanges = roleplayResponse.relationship?.mapNotNull { entry ->
-                val match = Regex("RELATIONSHIPPOINTS([+-]\\d+):(.*)").find(entry)
-                match?.let {
-                    val delta = it.groupValues[1].toIntOrNull() ?: 0
-                    val relationshipId = it.groupValues[2].trim()
-                    RelationshipPointChange(relationshipId, delta)
-                }
+                val toSlotId = entry.toId // or entry[0] as? String for old format
+                val slotProfile = slotRoster.find { it.slotId == toSlotId }
+                val baseCharacterId = slotProfile?.baseCharacterId
+                if (!baseCharacterId.isNullOrBlank()) {
+                    RelationshipPointChange(senderId, baseCharacterId, entry.change)
+                } else null
             } ?: emptyList()
 
             return ParsedRoleplayResult(
@@ -198,12 +199,18 @@ object FacilitatorResponseParser {
     data class RoleplayResponse(
         val messages: List<ChatMessage>,
         val new_memory: NewMemory? = null,
-        val relationship: List<String>? = null,
+        val relationship: List<RelationshipChange>? = null,
         val actions: List<Action>?
     )
 
+    data class RelationshipChange(
+        val toId: String,
+        val change: Int
+    )
+
     data class RelationshipPointChange(
-        val relationshipId: String,
+        val fromId: String,
+        val toId: String,
         val delta: Int
     )
 
@@ -220,6 +227,21 @@ object FacilitatorResponseParser {
         val relationshipChanges: List<RelationshipPointChange> = emptyList(),
         val actions: List<Action> = emptyList()
     )
+
+    fun updateRelationshipsFromChanges(
+        relationshipMap: MutableMap<String, VNRelationship>,
+        changes: List<RelationshipPointChange>
+    ) {
+        for (change in changes) {
+            // Find the relationship by toId
+            val rel = relationshipMap[change.toId]
+            if (rel != null) {
+                rel.points += change.delta
+                updateRelationshipLevel(rel)
+            }
+            Log.d("ai_cycle", "we are changing $")
+        }
+    }
 
     fun updateRelationshipLevel(relationship: VNRelationship) {
         // Sort levels by threshold (ascending), just in case
