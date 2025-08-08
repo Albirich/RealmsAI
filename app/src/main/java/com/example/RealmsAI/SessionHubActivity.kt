@@ -272,7 +272,7 @@ class SessionHubActivity : BaseActivity() {
             sfwOnly = map["sfwOnly"] as? Boolean ?: true,
             profileType = map["profileType"] as? String ?: "bot",
             hiddenRoles = map["hiddenRoles"] as? String ?: "",
-            statusEffects = ((map["statusEffects"] as? List<*>)?.mapNotNull { it as? String }?.toMutableSet()) ?: mutableSetOf(),
+            statusEffects = ((map["statusEffects"] as? List<*>)?.mapNotNull { it as? String }?.toMutableList()) ?: mutableListOf(),
             lastActiveArea = map["lastActiveArea"] as? String,
             lastActiveLocation = map["lastActiveLocation"] as? String,
             lastSynced = null, // Parse if needed

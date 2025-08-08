@@ -5,6 +5,7 @@ import com.google.firebase.Timestamp
 data class ChatMessage(
     var id: String = "",
     var senderId: String = "",
+    val displayName: String = "",
     var text: String = "",
     val pose: Map<String, String>? = null,
     var delay: Int = 0,

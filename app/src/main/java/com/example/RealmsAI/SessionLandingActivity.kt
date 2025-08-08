@@ -819,10 +819,9 @@ class SessionLandingActivity : AppCompatActivity() {
                                 )
                             }
                             2 -> { // Remove
-                                // Remove the character from the session’s slotRoster
-                                removeCharacterFromSlotRoster(character.id)
-                            }
-                            3 -> { // Save
+                                val slotsToRemove = sessionProfile?.slotRoster?.filter { it.baseCharacterId == character.id }
+                                slotsToRemove?.forEach { removeCharacterFromSlotRoster(it.slotId) }
+                            }3 -> { // Save
                                 // Copy character, set current user as creator/author, and save as new character
                                 if (character.private == true) {
                                     Toast.makeText(context, "This character is private.", Toast.LENGTH_SHORT).show()

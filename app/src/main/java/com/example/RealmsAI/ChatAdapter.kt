@@ -66,9 +66,9 @@ class ChatAdapter(
         // Determine sender type and label
         val isBot = slotProfiles.any { it.slotId == msg.senderId }
         val senderLabel = when {
+            !msg.displayName.isNullOrBlank() -> msg.displayName
             isBot -> slotProfiles.find { it.slotId == msg.senderId }?.name ?: "Bot"
-            msg.senderId == "narrator" -> "Narrator"
-            msg.senderId == "Narrator" -> "Narrator"
+            msg.senderId == "narrator" || msg.senderId == "Narrator" -> "Narrator"
             else -> sessionUsers.find { it.userId == msg.senderId }?.username ?: "Player"
         }
         holder.messageTextView.text = "$senderLabel: ${msg.text}"

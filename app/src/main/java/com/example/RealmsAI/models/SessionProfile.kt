@@ -86,7 +86,7 @@ data class SlotProfile(
     val textColor: String = "#000000",
     val sfwOnly: Boolean = true,
     val profileType: String = "bot",
-    var statusEffects: MutableSet<String> = mutableSetOf(),
+    var statusEffects: MutableList<String> = mutableListOf(),
     val lastActiveArea: String? = null,
     val lastActiveLocation: String? = null,
     val lastSynced: Timestamp? = null,
