@@ -4,14 +4,27 @@
     android:orientation="vertical"
     android:layout_width="match_parent"
     android:fitsSystemWindows="true"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_height="match_parent"
     android:padding="16dp">
 
     <TextView
+        android:id="@+id/wardrobDescription"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="Name outfits and poses in a way to let the AI know what options it has. (Uniform, Casual, Super Saiyan Transformation, etc)"
         android:textSize="18dp"/>
+
+    <include
+        android:id="@+id/infoButtonWardrobePage"
+        layout="@layout/info_button"
+        android:layout_width="25dp"
+        android:layout_height="25dp"
+        android:layout_marginStart="8dp"
+        app:layout_constraintStart_toEndOf="@id/wardrobDescription"
+        app:layout_constraintTop_toTopOf="@id/wardrobDescription"
+        app:layout_constraintBottom_toBottomOf="@id/wardrobDescription"
+        android:layout_gravity="center_vertical" />
 
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/outfitsRecycler"

@@ -7,12 +7,14 @@ import android.util.Log
 import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.EditText
+import android.widget.ImageButton
 import android.widget.Spinner
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.example.RealmsAI.ChatRelationshipActivity
 import com.example.RealmsAI.models.ChatProfile
 import com.example.RealmsAI.models.ParticipantPreview
 import com.example.RealmsAI.models.RELATIONSHIP_TYPES
@@ -33,6 +35,14 @@ class SessionRelationshipActivity : AppCompatActivity() {
         setContentView(R.layout.activity_relationships)
         val fromScreen = intent.getStringExtra("SOURCE_SCREEN") ?: "CHAT_CREATION"
 
+        val infoButtonChatRelationship: ImageButton = findViewById(R.id.infoButtonChatRelationship)
+        infoButtonChatRelationship.setOnClickListener {
+            AlertDialog.Builder(this@SessionRelationshipActivity)
+                .setTitle("Relationships")
+                .setMessage("When choosing a character for the relationship you enter a name, this will allow any character with that name to be recognized by the AI.")
+                .setPositiveButton("OK", null)
+                .show()
+        }
         recyclerView = findViewById(R.id.relationshipRecycler)
         recyclerView.layoutManager = LinearLayoutManager(this)
 

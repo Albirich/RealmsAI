@@ -2,6 +2,7 @@ package com.example.RealmsAI.models
 
 import com.example.RealmsAI.models.ModeSettings.VNRelationship
 import com.google.firebase.Timestamp
+import com.google.firebase.firestore.Exclude
 import com.google.gson.annotations.SerializedName
 
 // ----------------------
@@ -61,7 +62,8 @@ data class SessionUser(
 // ----------------------
 data class SlotProfile(
     val slotId: String = "",
-    val baseCharacterId: String = "",
+    val isPlaceholder: Boolean = false,
+    val baseCharacterId: String? = null,
     val name: String = "",
     val summary: String = "",
     val personality: String = "",
@@ -93,14 +95,14 @@ data class SlotProfile(
     val pose: String? = null,
     val typing: Boolean = false,
     // -- RPG STUFF --
-    val hiddenRoles: String? = "",
+    var hiddenRoles: String? = "",
     val rpgClass: String = "",
     val stats: Map<String, Int> = emptyMap(),
     val equipment: List<String> = emptyList(),
     var hp: Int = 0,
     val maxHp: Int = 0,
     val defense: Int = 0,
-    val linkedTo: List<CharacterLink> = emptyList(),
+    @get:Exclude var linkedTo: List<CharacterLink> = emptyList(),
     // -- VN STUFF --
     val vnRelationships: MutableMap<String, VNRelationship> = mutableMapOf()
 )

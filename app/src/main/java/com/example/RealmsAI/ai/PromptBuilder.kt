@@ -2,6 +2,7 @@ package com.example.RealmsAI.ai
 
 
 import com.example.RealmsAI.models.AvatarMapEntry
+import com.example.RealmsAI.models.ModeSettings
 import com.example.RealmsAI.models.RPGAct
 import com.example.RealmsAI.models.SessionProfile
 import com.example.RealmsAI.models.SlotProfile
@@ -143,7 +144,6 @@ object PromptBuilder {
     }
 
     fun buildOnTableGMPrompt(
-        act: RPGAct?,
         activeSlotId: String?,
         sessionSummary: String,
         locations: Map<String, List<String>>,
@@ -253,7 +253,7 @@ object PromptBuilder {
                  "messages": [
                     {
                         "senderId": "narrator"
-                        "text": "TEXT HERE",
+                        "text": "<≤120 words>",
                         "delay": 0
                         }
                     }
@@ -291,21 +291,18 @@ object PromptBuilder {
             }
         ]
 
+        CHARACTER SUMMARIES:
+        ${
+            condensedCharacterInfo.entries.joinToString("\n") { (id, summary) ->
+                val slot = sessionProfile.slotRoster.find { it.slotId == id }
+                val area = slot?.lastActiveArea ?: "?"
+                val location = slot?.lastActiveLocation ?: "?"
+                "$id: $summary (Area: $area, Location: $location)"
+            }
+        }
+
         SESSION SUMMARY:
         ${sessionSummary}
-        
-        This is your characters notes for the game.
-        ALWAYS USE THE FOLLOWING INFORMATION TO MAKE THE STORY:
-        Current Act (${(act?.actNumber ?: -1) + 1}): ${act?.summary ?: "No summary"}
-        Goal: ${act?.goal ?: "No goal set"}
-
-        CHARACTER SUMMARIES:
-        ${condensedCharacterInfo.entries.joinToString("\n") { (id, summary) ->
-            val slot = sessionProfile.slotRoster.find { it.slotId == id }
-            val area = slot?.lastActiveArea ?: "?"
-            val location = slot?.lastActiveLocation ?: "?"
-            "$id: $summary (Area: $area, Location: $location)"
-        }}
         
         CONDENSED INFO FOR NEARBY CHARACTERS:
            $condensedCharacterInfo
@@ -395,6 +392,7 @@ object PromptBuilder {
         condensedCharacterInfo: Map<String, Map<String, Any?>>,
         chatHistory: String,
         memories: Map<String, List<TaggedMemory>>,
+        poses: List<String>
     ): String {
         val relevantMemories = memories[slotProfile.slotId].orEmpty()
         val memoriesPromptSection =
@@ -407,7 +405,7 @@ object PromptBuilder {
             # ROLEPLAY RULES:
                 - All replies MUST be fully in-character for **${slotProfile.name}**.
                 - Advance the story, relationship, or your character's goals—never stall or repeat.
-                - Write brief, natural dialogue (1–2 sentences), showing feelings and personality.
+                - Write brief, natural dialogue (100 tokens), showing feelings and personality.
                 - Use vivid narration for **only your own** actions, emotions, or perceptions (never for other characters).
                 - Use immersive sensory description (sight, sound, smell, etc) to make the world feel alive.
                 - Always continue naturally from the chat history.
@@ -428,12 +426,6 @@ object PromptBuilder {
                         - example tags: a persons name (naruto), where it happened (leaf_village), what its about (trauma), an event (hokages_death), what the character is feeling (sad)
                     - Add up to 5 tags for each memory, it can be any combination of the types of tags (example: [Sasuke, Sakura, Training, combo]) 
             
-                - For each message in RECENT CHAT HISTORY:
-                    - Check the relationship for the sender
-                    - If your message meets the upTrigger or downTrigger for any relationship, append RELATIONSHIPPOINTS+1:<relationshipId> or RELATIONSHIPPOINTS-1:<relationshipId> to the JSON text as appropriate.
-
-            ---
-            
             # OUTPUT FORMAT (STRICT JSON ONLY)
             Respond with a single valid JSON object. **Do not use markdown, tool calls, or explanations. DO NOT mark it as json. ALWAYS use the format as is** The format is:
             
@@ -441,7 +433,7 @@ object PromptBuilder {
               "messages": [
                 {
                   "senderId": "${slotProfile.slotId}", // Use "${slotProfile.slotId}" for dialogue, "narrator" for actions/descriptions
-                  "text": "TEXT HERE",
+                  "text": "<Limit to 300 characters>",
                   "delay": 1500, // Use: 500 (snappy), 1500 (normal), 2500 (dramatic), 0 (rambling)
                   "pose": {
                     "slotId", "pose",
@@ -471,12 +463,7 @@ object PromptBuilder {
                 - Secret Description: ${slotProfile.privateDescription}
                 - Appearance: ${slotProfile.physicalDescription}
                 - Abilities: ${slotProfile.abilities}
-                - Poses: ${
-                            slotProfile.outfits.joinToString("\n") { outfit ->
-                                "  Outfit: ${outfit.name}\n" +
-                                        outfit.poseSlots.joinToString("\n") { pose -> "    - ${pose.name}" }
-                            }
-                        }
+                - Poses: $poses
                 - Relationships: ${
                  slotProfile.relationships.joinToString(separator = "\n") { rel ->
                         "[ID: ${rel.id}] ${rel.toName} is your ${rel.type}: ${rel.description}"
@@ -508,7 +495,7 @@ object PromptBuilder {
              - NEVER make up new poses or use "neutral" unless it is explicitly in their list.
              - NEVER add a pose for ${
             if (sceneSlotIds.isEmpty()) "None"
-            else sceneSlotIds.filter { slotProfile.profileType=="player" }.joinToString(", ")
+            else sceneSlotIds.filter { slotProfile.profileType=="player" }.joinToString(" $, ")
         }
                 
             ---
@@ -518,8 +505,6 @@ object PromptBuilder {
             Begin your response. Do not include any extra text, explanations, or system notes—**JSON only**.
         """.trimIndent()
     }
-
-
 
     fun buildGMPrompt(
         gmSlot: SlotProfile,
@@ -693,6 +678,53 @@ object PromptBuilder {
     """.trimIndent()
     }
 
+    // Optional: add Act info (only for non-murder flow).
+    fun buildActAddon(act: RPGAct?): String {
+        if (act == null) return ""
+        return """
+            ACT NOTES:
+            Summary: ${act.summary}
+            Goal: ${act.goal}
+            
+        If the party completes the Act's goal, include "advance_act" in the extra fields section of your output: 
+        { 
+            "advance_act": true 
+        }    
+        - Only move to the next Act if the party has completed the Act’s goal.
+        """.trimIndent()
+    }
+
+    // Optional: add Murder block (scene/weapon/clues + rules).
+    fun buildMurderAddon(ms: ModeSettings.MurderSettings?): String {
+        if (ms == null || !ms.enabled) return ""
+        fun String.clean(max: Int) = trim().replace("\n{3,}".toRegex(), "\n\n").take(max)
+        val weapon = ms.weapon.clean(120)
+        val scene  = ms.sceneDescription.clean(1200)
+        val clues  = ms.clues
+            .filter { it.title.isNotBlank() || it.description.isNotBlank() }
+            .mapIndexed { i, c -> "(${i+1}) ${c.title.clean(120)}: ${c.description.clean(400)}" }
+            .joinToString("\n")
+
+        // Only include non-empty sections
+        val weaponLine = if (weapon.isNotBlank()) "weapon: $weapon" else ""
+        val sceneBlock = if (scene.isNotBlank()) "scene:\n$scene" else ""
+        val cluesBlock = if (clues.isNotBlank()) "clues:\n$clues" else ""
+
+        return """
+            [MURDER_MYSTERY]
+            $weaponLine
+            $sceneBlock
+            $cluesBlock
+
+            rules:
+            - The TARGET (victim) is dead and cannot act or speak in present timeline.
+            - Any character with the ROLE of VILLAIN is one of the killers.
+            - Do not reveal the identity of VILLAIN(s) directly; surface clues instead.
+            - Characters must find out who the killer is and arrest them.
+        """.trimIndent().lines().filter { it.isNotBlank() }.joinToString("\n")
+    }
+
+
     fun buildDiceRoll(): String {
         return """
         - Whenever your character attempts an action that may have a chance of success or failure (e.g. fighting, sneaking, persuading, leaping, dodging), you must roll dice to determine the outcome.
@@ -722,7 +754,7 @@ object PromptBuilder {
 
         // Build one block per relationship
         val relationshipsText = slotProfile.vnRelationships.values.joinToString("\n\n") { rel ->
-            val toName = sessionProfile.slotRoster.find { it.baseCharacterId == rel.toId }?.name ?: "(Unknown)"
+            val toName = sessionProfile.slotRoster.find { it.baseCharacterId == rel.toSlotKey }?.name ?: "(Unknown)"
             val currentLevelObj = rel.levels.getOrNull(rel.currentLevel)
             val personality = currentLevelObj?.personality ?: "(No description)"
             """
@@ -738,7 +770,8 @@ object PromptBuilder {
         
         $relationshipsText
         
-        At the end of each message, if you need to change relationship points with a character (based off of previous messages in Recent Chat History)  add "relationship" into the extra fields section of your output:
+        At the end of each message, If a message in the RECENT CHAT HISTORY meets the upTrigger or downTrigger for any relationship (based off of previous messages in Recent Chat History)  add "relationship" into the "EXTRA FIELDS" section of your output
+        - Your relationship section MUST be formatted like this:
         {
           "relationship": [
             { 
@@ -748,8 +781,84 @@ object PromptBuilder {
             }
           ]
         }
+        with: 
+        toId being the relationships id
+        change being the number of points from -3 to +3
     """.trimIndent()
     }
 
+
+    fun buildMurderSeedingPrompt(
+        slots: List<SlotProfile>,
+        rpgSettings: ModeSettings.RPGSettings,
+        murder: ModeSettings.MurderSettings,
+        sessionProfile: SessionProfile
+    ): String {
+        // Map RPG characters (id->name, existing role if any)
+        val rpgChars = rpgSettings.characters
+        val rpgIndex = rpgChars.associateBy { it.characterId }
+
+        // Build compact character lines (only what we need)
+        val lines = slots.map { s ->
+            val rc = rpgIndex[s.baseCharacterId]
+            val role = rc?.role?.name ?: "HERO"
+            """- id:${s.baseCharacterId} name:"${s.name}" role:$role personality:${s.personality}+${s.privateDescription} relationships:${s.relationships}"""
+        }.joinToString("\n")
+        val sessionContext = "${sessionProfile.sessionDescription} + ${sessionProfile.secretDescription} + ${sessionProfile.areas}"
+        val randomize = murder.randomizeKillers
+        // Keep it deterministic but creative enough
+        val constraints = """
+        Constraints:
+        - Assign exactly ONE TARGET (the victim).
+        - ${if (randomize) "Choose at least ONE VILLAIN (killer) at random from non-GM, non-TARGET characters." else "If any characters already have role=VILLAIN, keep them as killers; otherwise choose ONE VILLAIN."}
+        - Never assign GM as TARGET or VILLAIN.
+        - Keep roles for GM unchanged.
+        - Weapon must be short (<= 6 words).
+        - Scene <= 1000 chars, concise and gameable.
+        - Return 3–10 concise clues that *logically* point to the killer(s) (alibi holes, motive hints, physical evidence), no spoilers.
+    """.trimIndent()
+
+        return """
+        You are seeding a murder-mystery for a tabletop session. 
+        Session Context:
+        $sessionContext
+        Characters (id, name, currentRole):
+        $lines
+
+        $constraints
+
+        Output STRICT JSON ONLY (no commentary), schema:
+        {
+          "roles": [ {"characterId":"...", "role":"TARGET"}, {"characterId":"...","role":"VILLAIN"} ],
+          "weapon": "...",
+          "scene": "...",
+          "clues": [ {"title":"...", "description":"..."} ]
+        }
+    """.trimIndent()
+    }
+    fun buildMurdererInfo(
+        murderSettings: ModeSettings.MurderSettings
+    ): String{
+        return """
+            You have killed ${murderSettings.victimSlotId}. 
+            - You are trying to get away with the murder
+            Here is how it happened:
+            ${murderSettings.sceneDescription}
+            - You murdered them with ${murderSettings.weapon}.
+            - You must pretend to be investigating the murder to throw others off of your trail.
+            - Blame others, Lie, Twist evidence to your favor.
+            
+            - If you are caught give a monologue about why you did it.
+        """.trimIndent()
+    }
+    fun buildMurderMysteryInfo(
+        murderSettings: ModeSettings.MurderSettings
+    ): String{
+        return """
+            You are investigating the murder of ${murderSettings.victimSlotId}
+            Collect evidence, try to find out who the murderer is.
+            The killer is among the other characters, it could be anyone.
+        """.trimIndent()
+    }
 }
 

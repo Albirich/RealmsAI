@@ -42,6 +42,8 @@ import com.example.RealmsAI.FacilitatorResponseParser.updateRelationshipLevel
 import com.example.RealmsAI.FacilitatorResponseParser.updateRelationshipsFromChanges
 import com.example.RealmsAI.adapters.CollectionAdapter.CharacterRowAdapter
 import com.example.RealmsAI.ai.PromptBuilder.buildDiceRoll
+import com.example.RealmsAI.ai.PromptBuilder.buildMurderMysteryInfo
+import com.example.RealmsAI.ai.PromptBuilder.buildMurdererInfo
 import com.example.RealmsAI.ai.PromptBuilder.buildVNPrompt
 import com.example.RealmsAI.models.ModeSettings.RPGSettings
 import com.example.RealmsAI.models.ModeSettings.VNRelationship
@@ -52,6 +54,25 @@ import com.google.gson.JsonArray
 
 class MainActivity : AppCompatActivity() {
     companion object { private const val TAG = "MainActivity" }
+//   val infoButtonWardrobe: ImageButton = findViewById(R.id.infoButtonWardrobe)
+//   infoButtonCharRelationships.setOnClickListener {
+//      AlertDialog.Builder(this@CharacterCreationActivity)
+//          .setTitle("Relationships")
+//          .setMessage("This allows you to give the character relationships that they will remember in chats")
+//          .setPositiveButton("OK", null)
+//          .show()
+//      }
+
+//    <include
+//            android:id="@+id/infoButtonWardrobe"
+//            layout="@layout/info_button"
+//            android:layout_width="25dp"
+//            android:layout_height="25dp"
+//            android:layout_marginStart="8dp"
+//            app:layout_constraintTop_toTopOf="@id/wardrobeButton"
+//            app:layout_constraintBottom_toBottomOf="@id/wardrobeButton"
+//            app:layout_constraintStart_toEndOf="@id/wardrobeButton"
+//            android:layout_gravity="center_vertical" />
 
    
     // UI
@@ -1028,7 +1049,7 @@ class MainActivity : AppCompatActivity() {
             updateButtonState(ButtonState.SEND)
         }
         activationRound++
-
+        updateButtonState(ButtonState.INTERRUPT)
         aiJob = lifecycleScope.launch(Dispatchers.IO) {
             try {
                 Log.d("ai_cycle", "actually processing normal round")
@@ -1056,14 +1077,27 @@ class MainActivity : AppCompatActivity() {
                     }
                     val lastNonNarratorId = chatHistory.lastOrNull { it.senderId != "narrator" }?.senderId
                     var playerSlot = sessionProfile.slotRoster.find { it.slotId == activeSlotId }
-                    val coLocatedSlotIds = sessionProfile.slotRoster
-                        .filter {
-                            it.lastActiveArea == playerSlot?.lastActiveArea &&
-                                    it.lastActiveLocation == playerSlot?.lastActiveLocation &&
-                                    it.slotId != lastNonNarratorId &&
-                                    !it.typing
-                        }
-                        .map { it.slotId }
+                    val coLocatedSlotIds = if (activationRound !== 1) {
+                        sessionProfile.slotRoster
+                            .filter {
+                                it.lastActiveArea == playerSlot?.lastActiveArea &&
+                                        it.lastActiveLocation == playerSlot?.lastActiveLocation &&
+                                        it.slotId != lastNonNarratorId &&
+                                        !it.typing
+
+                            }
+                            .map { it.slotId }
+                    }else{
+                        sessionProfile.slotRoster
+                            .filter {
+                                it.lastActiveArea == playerSlot?.lastActiveArea &&
+                                        it.lastActiveLocation == playerSlot?.lastActiveLocation &&
+                                        it.slotId != lastNonNarratorId && it.profileType != "player" &&
+                                        !it.typing
+
+                            }
+                            .map { it.slotId }
+                    }
                     val memoriesMap: Map<String, List<TaggedMemory>> =
                         sessionProfile.slotRoster
                             .filter { it.slotId in coLocatedSlotIds }
@@ -1292,7 +1326,10 @@ class MainActivity : AppCompatActivity() {
                                 activationRound = 0
                                 // Optionally, trigger user input UI here.
                                 withContext(Dispatchers.Main) {
-                                    updateButtonState(ButtonState.INTERRUPT)
+                                    updateButtonState(ButtonState.SEND)
+                                }
+                                runOnUiThread {
+                                    Toast.makeText(this@MainActivity, "AI Returned to you", Toast.LENGTH_SHORT).show()
                                 }
                                 return@withTimeoutOrNull
                             }
@@ -1322,16 +1359,38 @@ class MainActivity : AppCompatActivity() {
                                 .filter { it.lastActiveArea == playerArea && it.lastActiveLocation == playerLocation }
                                 .map { it.slotId }
                                 .distinct()
+                            val sentinel = "DO NOT INCLUDE THIS CHARACTER IN THE POSES SECTION"
+
                             val condensedCharacterInfo = sessionProfile.slotRoster
                                 .filter { it.lastActiveArea == playerArea && it.lastActiveLocation == playerLocation }
                                 .associate { profile ->
-                                    val outfit = profile.outfits.find { it.name == profile.currentOutfit }
-                                    val availablePoses = outfit?.poseSlots?.map { it.name } ?: "DO NOT INCLUDE THIS CHARACTER IN THE POSES SECTION"
-                                    profile.slotId to mapOf(
-                                        "summary" to profile.summary,
-                                        "pose" to profile.pose,
-                                        "available_poses" to availablePoses
-                                    )
+                                    val outfits = profile.outfits.orEmpty()
+                                    val currentName = profile.currentOutfit?.trim().orEmpty()
+                                    val chosenOutfit = outfits.firstOrNull { it.name.trim().equals(currentName, ignoreCase = true) }
+                                        ?: outfits.firstOrNull()
+
+                                    val poseSlots = (chosenOutfit?.poseSlots ?: outfits.flatMap { it.poseSlots }).orEmpty()
+                                    val (nsfwSlots, sfwSlots) = poseSlots.partition { it.nsfw }
+
+                                    val sfwNames = sfwSlots.map { it.name.trim() }.filter { it.isNotEmpty() }.distinct()
+                                    val nsfwNames = nsfwSlots.map { it.name.trim() }.filter { it.isNotEmpty() }.distinct()
+
+                                    val info = mutableMapOf<String, Any?>()
+                                    info["summary"] = profile.summary
+                                    info["pose"] = profile.pose  // String?
+
+                                    if (isNSFW) {
+                                        if (sfwNames.isEmpty() && nsfwNames.isEmpty()) {
+                                            info["available_poses"] = sentinel
+                                        } else {
+                                            info["available_poses"] = sfwNames
+                                            info["available_poses_nsfw"] = nsfwNames
+                                        }
+                                    } else {
+                                        info["available_poses"] = if (sfwNames.isEmpty()) sentinel else sfwNames
+                                    }
+
+                                    profile.slotId to info
                                 }
                             val memoryIds = result.memoryIds ?: emptyList()
                             val nextSlotProfile = sessionProfile.slotRoster.find { it.slotId == nextSlot }
@@ -1340,6 +1399,25 @@ class MainActivity : AppCompatActivity() {
                             val myPersonalHistory = fetchPersonalHistory(sessionId, slotId)
                             val historyString = buildHistoryString(myPersonalHistory.takeLast(10))
                             val modeSettings = sessionProfile.modeSettings
+                            val currentOutfitName = nextSlotProfile?.currentOutfit.orEmpty()
+
+                            val currentOutfit = nextSlotProfile?.outfits
+                                ?.firstOrNull { it.name.equals(currentOutfitName, ignoreCase = true) }
+
+                            val poses: List<String> = if (isNSFW) {
+                                currentOutfit?.poseSlots
+                                    ?.map { it.name }
+                                    ?.filter { it.isNotBlank() }
+                                    ?.distinct()
+                                    ?: emptyList()
+                            } else {
+                                currentOutfit?.poseSlots
+                                    ?.filter { !it.nsfw }
+                                    ?.map { it.name }
+                                    ?.filter { it.isNotBlank() }
+                                    ?.distinct()
+                                    ?: emptyList()
+                            }
 
                             val roleplayPrompt = PromptBuilder.buildRoleplayPrompt(
                                 slotProfile = slotProfile,
@@ -1348,7 +1426,8 @@ class MainActivity : AppCompatActivity() {
                                 sceneSlotIds = sceneSlotIds,
                                 condensedCharacterInfo = condensedCharacterInfo,
                                 chatHistory = historyString,
-                                memories = memoriesMap
+                                memories = memoriesMap,
+                                poses = poses
                             )
 
                             val vnPrompt = buildVNPrompt(
@@ -1498,16 +1577,14 @@ class MainActivity : AppCompatActivity() {
                                 sessionProfile = sessionProfile.copy(slotRoster = updatedRoster)
                             }
 
-                            withContext(Dispatchers.Main) {
+                            withContext(Dispatchers.Main) {if (!nextSlot.isNullOrBlank()) {
+                                setSlotTyping(sessionId, nextSlot!!, false)
+                                saveSessionProfile(sessionProfile, sessionId)
+                            }
                                 saveMessagesSequentially(filteredMessages!!, sessionId, chatId)
-
-                                if (!nextSlot.isNullOrBlank()) {
-                                    setSlotTyping(sessionId, nextSlot!!, false)
-                                    saveSessionProfile(sessionProfile, sessionId)
-                                }
-
                                 val updatedHistory = chatAdapter.getMessages()
                                 if (activationRound < maxActivationRounds && isActive) {
+                                    withContext(Dispatchers.Main) { updateButtonState(ButtonState.INTERRUPT) }
                                     processActivationRound("", updatedHistory)
                                 }
                             }
@@ -1568,6 +1645,7 @@ class MainActivity : AppCompatActivity() {
             updateButtonState(ButtonState.SEND)
         }
         activationRound++
+        updateButtonState(ButtonState.INTERRUPT)
 
         aiJob = lifecycleScope.launch(Dispatchers.IO) {
             try {
@@ -1777,16 +1855,38 @@ class MainActivity : AppCompatActivity() {
                                 .filter { it.lastActiveArea == playerArea && it.lastActiveLocation == playerLocation }
                                 .map { it.slotId }
                                 .distinct()
+                            val sentinel = "DO NOT INCLUDE THIS CHARACTER IN THE POSES SECTION"
+
                             val condensedCharacterInfo = sessionProfile.slotRoster
                                 .filter { it.lastActiveArea == playerArea && it.lastActiveLocation == playerLocation }
                                 .associate { profile ->
-                                    val outfit = profile.outfits.find { it.name == profile.currentOutfit }
-                                    val availablePoses = outfit?.poseSlots?.map { it.name } ?: "DO NOT INCLUDE THIS CHARACTER IN THE POSES SECTION"
-                                    profile.slotId to mapOf(
-                                        "summary" to profile.summary,
-                                        "pose" to profile.pose,
-                                        "available_poses" to availablePoses
-                                    )
+                                    val outfits = profile.outfits.orEmpty()
+                                    val currentName = profile.currentOutfit?.trim().orEmpty()
+                                    val chosenOutfit = outfits.firstOrNull { it.name.trim().equals(currentName, ignoreCase = true) }
+                                        ?: outfits.firstOrNull()
+
+                                    val poseSlots = (chosenOutfit?.poseSlots ?: outfits.flatMap { it.poseSlots }).orEmpty()
+                                    val (nsfwSlots, sfwSlots) = poseSlots.partition { it.nsfw }
+
+                                    val sfwNames = sfwSlots.map { it.name.trim() }.filter { it.isNotEmpty() }.distinct()
+                                    val nsfwNames = nsfwSlots.map { it.name.trim() }.filter { it.isNotEmpty() }.distinct()
+
+                                    val info = mutableMapOf<String, Any?>()
+                                    info["summary"] = profile.summary
+                                    info["pose"] = profile.pose  // String?
+
+                                    if (isNSFW) {
+                                        if (sfwNames.isEmpty() && nsfwNames.isEmpty()) {
+                                            info["available_poses"] = sentinel
+                                        } else {
+                                            info["available_poses"] = sfwNames
+                                            info["available_poses_nsfw"] = nsfwNames
+                                        }
+                                    } else {
+                                        info["available_poses"] = if (sfwNames.isEmpty()) sentinel else sfwNames
+                                    }
+
+                                    profile.slotId to info
                                 }
                             val modeSettings = sessionProfile.modeSettings
                             val memoryIds = result.memoryIds ?: emptyList()
@@ -1795,7 +1895,25 @@ class MainActivity : AppCompatActivity() {
                             val memoriesMap = mapOf(nextSlot!! to relevantMemories)
                             val myPersonalHistory = fetchPersonalHistory(sessionId, slotId)
                             val historyString = buildHistoryString(myPersonalHistory.takeLast(10))
+                            val currentOutfitName = nextSlotProfile?.currentOutfit.orEmpty()
 
+                            val currentOutfit = nextSlotProfile?.outfits
+                                ?.firstOrNull { it.name.equals(currentOutfitName, ignoreCase = true) }
+
+                            val poses: List<String> = if (isNSFW) {
+                                currentOutfit?.poseSlots
+                                    ?.map { it.name }
+                                    ?.filter { it.isNotBlank() }
+                                    ?.distinct()
+                                    ?: emptyList()
+                            } else {
+                                currentOutfit?.poseSlots
+                                    ?.filter { !it.nsfw }
+                                    ?.map { it.name }
+                                    ?.filter { it.isNotBlank() }
+                                    ?.distinct()
+                                    ?: emptyList()
+                            }
 
                             val roleplayPrompt = PromptBuilder.buildRoleplayPrompt(
                                 slotProfile = slotProfile,
@@ -1804,7 +1922,8 @@ class MainActivity : AppCompatActivity() {
                                 sceneSlotIds = sceneSlotIds,
                                 condensedCharacterInfo = condensedCharacterInfo,
                                 chatHistory = historyString,
-                                memories = memoriesMap
+                                memories = memoriesMap,
+                                poses = poses
                             )
 
                             val act = sessionProfile.acts.getOrNull(sessionProfile.currentAct)
@@ -2003,6 +2122,7 @@ class MainActivity : AppCompatActivity() {
                                 saveMessagesSequentially(filteredMessages, sessionId, chatId)
                                 val updatedHistory = chatAdapter.getMessages()
                                 if (activationRound < maxActivationRounds && isActive) {
+                                    withContext(Dispatchers.Main) { updateButtonState(ButtonState.INTERRUPT) }
                                     processAboveTableRound("", updatedHistory)
                                 }
                             }
@@ -2075,6 +2195,17 @@ class MainActivity : AppCompatActivity() {
                         .await()
                     val lastMsg = snapshot.documents.firstOrNull()?.toObject(ChatMessage::class.java)
                     if (lastMsg?.messageType == "roll") {
+                        val gson = Gson()
+
+                        val rpgSettingsJson = sessionProfile.modeSettings["rpg"] as? String
+                        val rpgSettings = rpgSettingsJson?.let {
+                            try { gson.fromJson(it, ModeSettings.RPGSettings::class.java) } catch (_: Exception) { null }
+                        }
+
+                        val murderSettingsJson = sessionProfile.modeSettings["murder"] as? String
+                        val murderSettings = murderSettingsJson?.let {
+                            try { gson.fromJson(it, ModeSettings.MurderSettings::class.java) } catch (_: Exception) { null }
+                        }
                         // Build activation prompt
                         val activeSlotId = sessionProfile.userMap[userId]?.activeSlotId
                         val locationMap: Map<String, List<String>> = sessionProfile.areas
@@ -2091,9 +2222,18 @@ class MainActivity : AppCompatActivity() {
                                 }
                             }.toMap()
 
-                        val condensedMap: Map<String, String> =
-                            sessionProfile.slotRoster.associate {
-                                it.slotId to it.summary // or whatever your condensed field is
+                        val roleByCharId: Map<String, ModeSettings.CharacterRole> =
+                            rpgSettings?.characters?.associate { it.characterId to it.role } ?: emptyMap()
+
+                        // If your SlotProfile has baseCharacterId, prefer that; else fall back to slotId
+                        val condensedCharacterInfo: Map<String, Map<String, String>> =
+                            sessionProfile.slotRoster.associate { slot ->
+                                val keyForRole = slot.baseCharacterId ?: slot.slotId
+                                val roleName = roleByCharId[keyForRole]?.name ?: "HERO" // default if missing
+                                slot.slotId to mapOf(
+                                    "summary" to (slot.summary ?: ""),
+                                    "role" to roleName
+                                )
                             }
                         val lastNonNarratorId =
                             chatHistory.lastOrNull { it.senderId != "narrator" }?.senderId
@@ -2128,7 +2268,6 @@ class MainActivity : AppCompatActivity() {
 
                         val act = sessionProfile.acts.getOrNull(sessionProfile.currentAct)
 
-                        val rpgSettingsJson = sessionProfile.modeSettings["rpg"] as? String
                         val gmStyle = if (!rpgSettingsJson.isNullOrBlank()) {
                             try {
                                 val gson = Gson()
@@ -2164,21 +2303,28 @@ class MainActivity : AppCompatActivity() {
                         } else {
                             "The game’s host runs things directly behind the scenes."
                         }
+                        val condensedMap: Map<String, String> = sessionProfile.slotRoster.associate { it.slotId to it.summary }
+
 
                         val gmLines = PromptBuilder.buildOnTableGMPrompt(
-                            act = act,
                             activeSlotId = activeSlotId,
                             sessionSummary = sessionProfile.sessionDescription + sessionProfile.secretDescription,
                             locations = locationMap,
                             sessionProfile = sessionProfile,
-                            condensedCharacterInfo = condensedMap, // Map: slotId → summary
+                            condensedCharacterInfo = condensedMap,
                             lastNonNarratorId = lastNonNarratorId,
                             validNextSlotIds = coLocatedSlotIds,
                             memories = memoriesMap,
                             chatHistory = historyString,
                             gmStyle = gmStyleDescription
                         )
-                        val gmPrompt = gmLines + PromptBuilder.buildRPGLiteRules()
+                        val gmPrompt = buildString {
+                            if (murderSettings?.enabled == true) {
+                                gmLines + PromptBuilder.buildRPGLiteRules() + PromptBuilder.buildMurderAddon(ms = murderSettings)
+                            }else{
+                                gmLines + PromptBuilder.buildRPGLiteRules() + PromptBuilder.buildActAddon(act = act)
+                            }
+                        }
 
                         var activationResponse =
                             Facilitator.callActivationAI(gmPrompt, BuildConfig.OPENAI_API_KEY)
@@ -2310,7 +2456,9 @@ class MainActivity : AppCompatActivity() {
 
                             withContext(Dispatchers.Main) {
                                 saveMessagesSequentially(filteredMessages, sessionId, chatId)
-
+                                withContext(Dispatchers.Main) {
+                                    updateButtonState(ButtonState.SEND)
+                                }
                                 // No GM slot typing to update — just save session normally
                                 saveSessionProfile(sessionProfile, sessionId)
                             }
@@ -2326,7 +2474,9 @@ class MainActivity : AppCompatActivity() {
             }
             return
         }
+
         activationRound++
+        updateButtonState(ButtonState.INTERRUPT)
 
 
         aiJob = lifecycleScope.launch(Dispatchers.IO) {
@@ -2374,6 +2524,17 @@ class MainActivity : AppCompatActivity() {
                             .filter { it.slotId in coLocatedSlotIds }
                             .associate { it.slotId to it.memories.takeLast(5) }
 
+                    val gson = Gson()
+
+                    val rpgSettingsJson = sessionProfile.modeSettings["rpg"] as? String
+                    val rpgSettings = rpgSettingsJson?.let {
+                        try { gson.fromJson(it, ModeSettings.RPGSettings::class.java) } catch (_: Exception) { null }
+                    }
+
+                    val murderSettingsJson = sessionProfile.modeSettings["murder"] as? String
+                    val murderSettings = murderSettingsJson?.let {
+                        try { gson.fromJson(it, ModeSettings.MurderSettings::class.java) } catch (_: Exception) { null }
+                    }
                     val historyString = buildHistoryString(chatHistory.takeLast(10))
                     withContext(Dispatchers.Main) { updateButtonState(ButtonState.INTERRUPT) }
                     sessionProfile.slotRoster.forEach {
@@ -2387,7 +2548,6 @@ class MainActivity : AppCompatActivity() {
 
                     val act = sessionProfile.acts.getOrNull(sessionProfile.currentAct)
 
-                    val rpgSettingsJson = sessionProfile.modeSettings["rpg"] as? String
                     val gmStyle = if (!rpgSettingsJson.isNullOrBlank()) {
                         try {
                             val gson = Gson()
@@ -2417,7 +2577,6 @@ class MainActivity : AppCompatActivity() {
                     }
 
                     val gmLines = PromptBuilder.buildOnTableGMPrompt(
-                        act = act,
                         activeSlotId = activeSlotId,
                         sessionSummary = sessionProfile.sessionDescription + sessionProfile.secretDescription,
                         locations = locationMap,
@@ -2429,8 +2588,13 @@ class MainActivity : AppCompatActivity() {
                         chatHistory = historyString,
                         gmStyle = gmStyleDescription
                     )
-                    val gmPrompt = gmLines + PromptBuilder.buildRPGLiteRules()
-
+                    val gmPrompt = buildString {
+                        if (murderSettings?.enabled == true) {
+                            gmLines + PromptBuilder.buildRPGLiteRules() + PromptBuilder.buildMurderAddon(ms = murderSettings)
+                        }else{
+                            gmLines + PromptBuilder.buildRPGLiteRules() + PromptBuilder.buildActAddon(act = act)
+                        }
+                    }
                     var activationResponse = Facilitator.callActivationAI(gmPrompt,BuildConfig.OPENAI_API_KEY)
                     Log.d("ai_cycle", "$gmPrompt")
                     ensureActive()
@@ -2645,16 +2809,38 @@ class MainActivity : AppCompatActivity() {
                             .filter { it.lastActiveArea == playerArea && it.lastActiveLocation == playerLocation }
                             .map { it.slotId }
                             .distinct()
+                        val sentinel = "DO NOT INCLUDE THIS CHARACTER IN THE POSES SECTION"
+
                         val condensedCharacterInfo = sessionProfile.slotRoster
                             .filter { it.lastActiveArea == playerArea && it.lastActiveLocation == playerLocation }
                             .associate { profile ->
-                                val outfit = profile.outfits.find { it.name == profile.currentOutfit }
-                                val availablePoses = outfit?.poseSlots?.map { it.name } ?: "DO NOT INCLUDE THIS CHARACTER IN THE POSES SECTION"
-                                profile.slotId to mapOf(
-                                    "summary" to profile.summary,
-                                    "pose" to profile.pose,
-                                    "available_poses" to availablePoses
-                                )
+                                val outfits = profile.outfits.orEmpty()
+                                val currentName = profile.currentOutfit?.trim().orEmpty()
+                                val chosenOutfit = outfits.firstOrNull { it.name.trim().equals(currentName, ignoreCase = true) }
+                                    ?: outfits.firstOrNull()
+
+                                val poseSlots = (chosenOutfit?.poseSlots ?: outfits.flatMap { it.poseSlots }).orEmpty()
+                                val (nsfwSlots, sfwSlots) = poseSlots.partition { it.nsfw }
+
+                                val sfwNames = sfwSlots.map { it.name.trim() }.filter { it.isNotEmpty() }.distinct()
+                                val nsfwNames = nsfwSlots.map { it.name.trim() }.filter { it.isNotEmpty() }.distinct()
+
+                                val info = mutableMapOf<String, Any?>()
+                                info["summary"] = profile.summary
+                                info["pose"] = profile.pose  // String?
+
+                                if (isNSFW) {
+                                    if (sfwNames.isEmpty() && nsfwNames.isEmpty()) {
+                                        info["available_poses"] = sentinel
+                                    } else {
+                                        info["available_poses"] = sfwNames
+                                        info["available_poses_nsfw"] = nsfwNames
+                                    }
+                                } else {
+                                    info["available_poses"] = if (sfwNames.isEmpty()) sentinel else sfwNames
+                                }
+
+                                profile.slotId to info
                             }
                         val memoryIds = activationResult?.memoryIds ?: emptyList()
                         val nextSlotProfile = sessionProfile.slotRoster.find { it.slotId == nextSlot }
@@ -2663,7 +2849,31 @@ class MainActivity : AppCompatActivity() {
                         val modeSettings = sessionProfile.modeSettings
                         val myPersonalHistory = fetchPersonalHistory(sessionId, slotId)
                         val historyString = buildHistoryString(myPersonalHistory.takeLast(10))
+                        val currentOutfitName = nextSlotProfile?.currentOutfit.orEmpty()
 
+                        val currentOutfit = nextSlotProfile?.outfits
+                            ?.firstOrNull { it.name.equals(currentOutfitName, ignoreCase = true) }
+
+                        val poses: List<String> = if (isNSFW) {
+                            currentOutfit?.poseSlots
+                                ?.map { it.name }
+                                ?.filter { it.isNotBlank() }
+                                ?.distinct()
+                                ?: emptyList()
+                        } else {
+                            currentOutfit?.poseSlots
+                                ?.filter { !it.nsfw }
+                                ?.map { it.name }
+                                ?.filter { it.isNotBlank() }
+                                ?.distinct()
+                                ?: emptyList()
+                        }
+                        val gson = Gson()
+
+                        val murderSettingsJson = sessionProfile.modeSettings["murder"] as? String
+                        val murderSettings = murderSettingsJson?.let {
+                            try { gson.fromJson(it, ModeSettings.MurderSettings::class.java) } catch (_: Exception) { null }
+                        }
 
                         val roleplayPrompt = PromptBuilder.buildRoleplayPrompt(
                             slotProfile = slotProfile,
@@ -2672,8 +2882,11 @@ class MainActivity : AppCompatActivity() {
                             sceneSlotIds = sceneSlotIds,
                             condensedCharacterInfo = condensedCharacterInfo,
                             chatHistory = historyString,
-                            memories = memoriesMap
+                            memories = memoriesMap,
+                            poses = poses
                         )
+
+
 
                         val vnPrompt = buildVNPrompt(
                             slotProfile = slotProfile,
@@ -2691,10 +2904,21 @@ class MainActivity : AppCompatActivity() {
                             roleplayPrompt + diceInstructions
                         }
 
+                        val finalRoleplayPrompt = if (murderSettings?.enabled == true) {
+                            if (slotProfile.hiddenRoles == "Villian")
+                            {
+                                vnCheckedPrompt + buildMurdererInfo(murderSettings = murderSettings)
+                            }else{
+                                vnCheckedPrompt + buildMurderMysteryInfo(murderSettings = murderSettings)
+                            }
+                        }else{
+                            vnCheckedPrompt
+                        }
+
                         Log.d("AI_response", "History: $chatHistory")
                         val nsfwinstructions = "\n - Be descriptive and explicit. The more sexual and erotic the better"
 
-                        val nsfwPrompt = vnCheckedPrompt + nsfwinstructions
+                        val nsfwPrompt = finalRoleplayPrompt + nsfwinstructions
                         // Switch models as needed
                         val roleplayResponse =
                         if (isNSFW)
@@ -2704,7 +2928,7 @@ class MainActivity : AppCompatActivity() {
                             )
                         else
                             Facilitator.callOpenAiApi(
-                                vnCheckedPrompt,
+                                finalRoleplayPrompt,
                                 BuildConfig.OPENAI_API_KEY
                             )
 
@@ -2728,7 +2952,6 @@ class MainActivity : AppCompatActivity() {
                                 Toast.makeText(this@MainActivity, "AI sent a broken message. Please try again.", Toast.LENGTH_SHORT).show()
                                 updateButtonState(ButtonState.SEND)
                                 setSlotTyping(sessionId, nextSlot!!, false)
-
                             }
                             activationRound = 0
                             return@withTimeoutOrNull
@@ -2852,6 +3075,7 @@ class MainActivity : AppCompatActivity() {
 
                             val updatedHistory = chatAdapter.getMessages()
                             if (activationRound < maxActivationRounds && isActive) {
+                                withContext(Dispatchers.Main) { updateButtonState(ButtonState.INTERRUPT) }
                                 processOnTableRPGRound("", updatedHistory)
                             }
                         }
@@ -3094,7 +3318,7 @@ class MainActivity : AppCompatActivity() {
             } else {
                 Log.d("ai_cycle", "proccessing normal roleplay")
 
-                activationRound = 1
+                activationRound = 0
                 processActivationRound(userInput, listOf(greetingMessage))
             }
         } else {
@@ -3312,71 +3536,94 @@ class MainActivity : AppCompatActivity() {
             .addOnFailureListener { /* Error handling */ }
     }
 
-    fun updateAvatarsFromSlots(slotProfiles: List<SlotProfile>, avatarSlotAssignments: MutableMap<Int, String?>) {
+    fun updateAvatarsFromSlots(
+        slotProfiles: List<SlotProfile>,
+        avatarSlotAssignments: MutableMap<Int, String?>
+    ) {
         if (isDestroyed || isFinishing) return
         Log.d("avatardebug", "updating: $avatarSlotAssignments")
+
+        // Find player's area/location once
+        val playerSlot = slotProfiles.find { it.slotId == mySlotId }
+        val playerArea = playerSlot?.lastActiveArea
+        val playerLocation = playerSlot?.lastActiveLocation
+
         avatarSlotAssignments.forEach { index, slotId ->
+            val view = avatarViews[index]
             if (slotId == null) {
-                avatarViews[index].setImageResource(R.drawable.silhouette)
-                avatarViews[index].visibility = View.INVISIBLE
+                Glide.with(this).clear(view)
+                view.setImageResource(R.drawable.silhouette)
+                view.visibility = View.INVISIBLE
                 return@forEach
             }
 
-            Log.d("avatardebug", "updating 2: $avatarSlotAssignments")
             val slotProfile = slotProfiles.find { it.slotId == slotId }
-            val playerSlot = slotProfiles.find { it.slotId == mySlotId }
-            val playerArea = playerSlot?.lastActiveArea
-            val playerLocation = playerSlot?.lastActiveLocation
+            if (slotProfile == null) {
+                Glide.with(this).clear(view)
+                view.setImageResource(R.drawable.silhouette)
+                view.visibility = View.INVISIBLE
+                return@forEach
+            }
 
-            if (slotProfile == null ||
-                slotProfile.lastActiveArea != playerArea ||
+            // Must be in the same place as the player
+            if (slotProfile.lastActiveArea != playerArea ||
                 slotProfile.lastActiveLocation != playerLocation
             ) {
-                Log.d("avatardebug", "${slotProfile?.name} is at ${slotProfile?.lastActiveArea} ${slotProfile?.lastActiveLocation}, player ${mySlotId} is at $playerArea $playerLocation")
-                Log.d("avatardebug", "${slotProfile?.name} is being removed")
-                // Not present—remove and clear
+                Log.d(
+                    "avatardebug",
+                    "${slotProfile.name} is at ${slotProfile.lastActiveArea}/${slotProfile.lastActiveLocation}, " +
+                            "player $mySlotId is at $playerArea/$playerLocation — hiding"
+                )
                 removeAvatarFromSlots(slotId, avatarSlotAssignments)
-                avatarViews[index].setImageResource(R.drawable.silhouette)
-                avatarViews[index].visibility = View.INVISIBLE
+                Glide.with(this).clear(view)
+                view.setImageResource(R.drawable.silhouette)
+                view.visibility = View.INVISIBLE
                 return@forEach
             }
 
-            if (slotProfile == null) {
-                avatarViews[index].setImageResource(R.drawable.silhouette)
-                avatarViews[index].visibility = View.INVISIBLE
+            val poseName = slotProfile.pose?.trim().orEmpty()
+            Log.d("avatardebug", "${slotProfile.name} wants pose='$poseName'")
+
+            if (poseName.isBlank() || poseName.equals("clear", true) || poseName.equals("none", true)) {
+                Glide.with(this).clear(view)
+                view.setImageResource(R.drawable.silhouette)
+                view.visibility = View.INVISIBLE
                 return@forEach
             }
 
-            val poseName = slotProfile.pose?.lowercase() ?: ""
+            // --- Robust outfit & pose resolution ---
+            val outfits = slotProfile.outfits.orEmpty()
+            val currentOutfitName = slotProfile.currentOutfit?.trim().orEmpty()
 
-            Log.d("avatardebug", "${slotProfile?.name} is being updating it to ${slotProfile.pose} ")
-            if (poseName.isBlank() || poseName == "clear" || poseName == "none") {
-                avatarViews[index].setImageResource(R.drawable.silhouette)
-                avatarViews[index].visibility = View.INVISIBLE
-                return@forEach
-            }
+            // try exact (case-insensitive) match; else first outfit
+            val chosenOutfit = outfits.firstOrNull { it.name.trim().equals(currentOutfitName, true) }
+                ?: outfits.firstOrNull()
 
-            val outfit = slotProfile.outfits?.find { it.name.equals(slotProfile.currentOutfit, ignoreCase = true) }
-            if (outfit?.poseSlots.isNullOrEmpty()) {
+            // pose candidates: chosen outfit if present, else all outfits
+            val poseSlots = (chosenOutfit?.poseSlots ?: outfits.flatMap { it.poseSlots }).orEmpty()
 
-                Log.d("avatardebug", "2 ${slotProfile?.name} is being updating it to ${slotProfile.pose} ")
-                avatarViews[index].setImageResource(R.drawable.silhouette)
-                avatarViews[index].visibility = View.INVISIBLE
-                return@forEach
-            }
+            // find the pose (case-insensitive)
+            val poseSlot = poseSlots.firstOrNull { it.name.trim().equals(poseName, true) }
 
-            val poseSlot = outfit.poseSlots.find { it.name.equals(poseName, ignoreCase = true) }
+            // Extra debug to confirm why things hide
+            Log.d(
+                "avatardebug",
+                "slot=${slotProfile.slotId} currentOutfit='${slotProfile.currentOutfit}' " +
+                        "outfits=${outfits.map { it.name }} chosen='${chosenOutfit?.name}' " +
+                        "poses=${poseSlots.map { it.name }} hit='${poseSlot?.name}' url='${poseSlot?.uri}'"
+            )
+
             val imageUrl = poseSlot?.uri
-
             if (!imageUrl.isNullOrBlank()) {
                 Glide.with(this)
                     .load(imageUrl)
                     .placeholder(R.drawable.silhouette)
-                    .into(avatarViews[index])
-                avatarViews[index].visibility = View.VISIBLE
+                    .into(view)
+                view.visibility = View.VISIBLE
             } else {
-                avatarViews[index].setImageResource(R.drawable.silhouette)
-                avatarViews[index].visibility = View.INVISIBLE
+                Glide.with(this).clear(view)
+                view.setImageResource(R.drawable.silhouette)
+                view.visibility = View.INVISIBLE
             }
         }
     }

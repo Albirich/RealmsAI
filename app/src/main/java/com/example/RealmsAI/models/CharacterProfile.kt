@@ -24,6 +24,7 @@ data class CharacterProfile(
     var height             : String              = "",
     var weight             : String              = "",
     var age                : Int                 =0,
+    val lastTimestamp      : Timestamp?          = null,
     val eyeColor           : String              = "",
     val hairColor          : String              = "",
     val physicalDescription: String              = "",
@@ -39,8 +40,8 @@ data class CharacterProfile(
 )
 
 data class CharacterLink(
-    val targetId: String,   // the linked character
-    val type: String,       // e.g. "transformation", "sidekickTo", etc.
-    val trigger: String,    // e.g. "when he plays games"
-    val notes: String = ""  // optional notes
+    var targetId: String,   // the linked character
+    var type: String,       // e.g. "transformation", "sidekickTo", etc.
+    var trigger: String,    // e.g. "when he plays games"
+    var notes: String = ""  // optional notes
 )

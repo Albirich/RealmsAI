@@ -42,7 +42,7 @@ class RelationshipLevelEditorActivity : AppCompatActivity() {
         val json = intent.getStringExtra("RELATIONSHIP_JSON")
         val fromId = intent.getStringExtra("FROM_ID") ?: ""
         val toId = intent.getStringExtra("TO_ID") ?: ""
-        rel = if (json.isNullOrBlank()) VNRelationship(fromId = fromId, toId = toId)
+        rel = if (json.isNullOrBlank()) VNRelationship(fromSlotKey = fromId, toSlotKey = toId)
         else Gson().fromJson(json, ModeSettings.VNRelationship::class.java)
         upTriggerEdit.setText(rel.upTriggers ?: "")
         downTriggerEdit.setText(rel.downTriggers ?: "")
@@ -57,24 +57,43 @@ class RelationshipLevelEditorActivity : AppCompatActivity() {
         levelsRecycler.layoutManager = LinearLayoutManager(this)
         levelsRecycler.adapter = adapter
 
+        // --- Add Level ---
         addLevelButton.setOnClickListener {
             val nextLevel = (levels.maxOfOrNull { it.level } ?: 0) + 1
-            levels.add(RelationshipLevel(level = nextLevel, threshold = 0, personality = ""))
+            val targetKey = rel.toSlotKey   // 👈 ensure new level knows its target
+
+            levels.add(
+                RelationshipLevel(
+                    level = nextLevel,
+                    threshold = 0,
+                    personality = "",
+                    targetSlotKey = targetKey
+                )
+            )
+
             adapter.notifyDataSetChanged()
             updateCurrentLevelSpinner()
         }
 
+
         updateCurrentLevelSpinner()
 
         saveButton.setOnClickListener {
+            // Force all edits to commit before we read values
+            currentFocus?.clearFocus()
+            levelsRecycler.clearFocus()
+            upTriggerEdit.clearFocus()
+            downTriggerEdit.clearFocus()
+
             rel.upTriggers = upTriggerEdit.text.toString()
             rel.downTriggers = downTriggerEdit.text.toString()
             rel.levels = levels
             rel.currentLevel = currentLevelSpinner.selectedItemPosition
 
-            val data = Intent()
-            data.putExtra("UPDATED_RELATIONSHIP_JSON", Gson().toJson(rel))
-            data.putExtra("REL_INDEX", intent.getIntExtra("REL_INDEX", -1))
+            val data = Intent().apply {
+                putExtra("UPDATED_RELATIONSHIP_JSON", Gson().toJson(rel))
+                putExtra("REL_INDEX", intent.getIntExtra("REL_INDEX", -1))
+            }
             setResult(RESULT_OK, data)
             finish()
         }

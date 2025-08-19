@@ -7,10 +7,10 @@ import android.util.Log
 import android.view.View
 import android.widget.*
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.runtime.toMutableStateList
 import com.example.RealmsAI.models.*
-import com.example.RealmsAI.models.ModeSettings.VNSettings
 import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
@@ -39,6 +39,8 @@ class ChatCreationActivity : AppCompatActivity() {
     private var chatRelationships: MutableList<Relationship> = mutableListOf()
     private var editingChatId: String? = null
     private var modeSettings: MutableMap<String, String> = mutableMapOf()
+
+
 
     private val gson = Gson()
 
@@ -125,6 +127,27 @@ class ChatCreationActivity : AppCompatActivity() {
                     selectedCharacters = chars.toMutableList()
                 }
             }
+
+            val infoButtonChatGameMode: ImageButton = findViewById(R.id.infoButtonChatGameMode)
+            infoButtonChatGameMode.setOnClickListener {
+                AlertDialog.Builder(this@ChatCreationActivity)
+                    .setTitle("Game Modes")
+                    .setMessage("Choose what special rules you want to add. Modes are additive so you can mix and match them\n" +
+                            "RPG Mode - gives dice rolls, character sheets, light rpg rules\n" +
+                            "VN Mode - gives relationship levels that evolve the way characters interact\n" +
+                            "God Mode - removes the need for the user to have a character, all their messages will be system messages (Not implemented yet)")
+                    .setPositiveButton("OK", null)
+                    .show()
+            }
+
+            val infoButtonChatCreation: ImageButton = findViewById(R.id.infoButtonChatCreation)
+            infoButtonChatCreation.setOnClickListener {
+                AlertDialog.Builder(this@ChatCreationActivity)
+                    .setTitle("Relationships")
+                    .setMessage( "Use character#, # being the position in the character list you want to refer to. if the character in that position is replaced the name will be replaced.")
+                    .setPositiveButton("OK", null)
+                    .show()
+            }
             // Set modeSettings from loaded profile!
             modeSettings = profile.modeSettings.toMutableMap()
             enabledModes = profile.enabledModes.toMutableStateList()
@@ -198,8 +221,8 @@ class ChatCreationActivity : AppCompatActivity() {
         }
         rpgButton.setOnClickListener {
             val intent = Intent(this, RPGSettingsActivity::class.java)
-            Log.d("RPG_SETTINGS", "Sending: ${modeSettings["rpg"]}")
             intent.putExtra("CURRENT_SETTINGS_JSON", modeSettings["rpg"] ?: "")
+            intent.putExtra("MURDER_SETTINGS_JSON", modeSettings["murder"] ?: "")
             intent.putExtra("SELECTED_CHARACTERS_JSON", gson.toJson(selectedCharacters))
             intent.putExtra("AREAS_JSON", gson.toJson(loadedAreas))
             startActivityForResult(intent, REQUEST_CODE_RPG_SETTINGS)
@@ -267,10 +290,8 @@ class ChatCreationActivity : AppCompatActivity() {
         when (requestCode) {
             REQUEST_CODE_RPG_SETTINGS -> {
                 if (resultCode == Activity.RESULT_OK && data != null) {
-                    val rpgSettingsJson = data.getStringExtra("RPG_SETTINGS_JSON")
-                    if (!rpgSettingsJson.isNullOrEmpty()) {
-                        modeSettings["rpg"] = rpgSettingsJson
-                    }
+                    data.getStringExtra("RPG_SETTINGS_JSON")?.let { modeSettings["rpg"] = it }
+                    data.getStringExtra("MURDER_SETTINGS_JSON")?.let { modeSettings["murder"] = it } // <-- store it
                 }
             }
             REQUEST_CODE_VN_SETTINGS -> {

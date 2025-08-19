@@ -29,7 +29,7 @@
         android:layout_width="50dp"
         android:layout_height="25dp"
         android:src="@drawable/sfw_badge"
-        app:layout_constraintTop_toTopOf="@id/characterProfileSessionButton"
+        app:layout_constraintTop_toTopOf="@id/characterProfileName"
         app:layout_constraintEnd_toEndOf="parent"
         android:layout_marginTop="5dp"
         android:layout_marginEnd="24dp"
@@ -50,6 +50,23 @@
         app:layout_constraintTop_toBottomOf="@id/characterProfileAuthor"
         app:layout_constraintStart_toStartOf="@id/characterProfileAuthor"
         android:layout_marginEnd="24dp"
+        android:minWidth="100dp"
+        android:backgroundTint="#3974D3"
+        android:textColor="#FFF"/>
+
+    <Button
+        android:id="@+id/characterProfileSaveButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:padding="0dp"
+        android:adjustViewBounds="true"
+        android:scaleType="fitXY"
+        android:text="save Character"
+        android:textSize="10dp"
+        android:maxLines="1"
+        app:layout_constraintTop_toBottomOf="@id/characterProfileAuthor"
+        app:layout_constraintStart_toEndOf="@id/characterProfileSessionButton"
+        android:layout_marginStart="10dp"
         android:minWidth="100dp"
         android:backgroundTint="#3974D3"
         android:textColor="#FFF"/>

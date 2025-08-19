@@ -10,6 +10,7 @@ import android.widget.TextView
 import androidx.annotation.LayoutRes
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
+import com.example.RealmsAI.models.CharacterPreview
 
 class CharacterPreviewAdapter(
     private val context: Context,
@@ -66,6 +67,7 @@ class CharacterPreviewAdapter(
 
     override fun onBindViewHolder(holder: VH, position: Int) {
         holder.bind(items[position])
+
     }
 
     override fun getItemCount(): Int = items.size

@@ -1,5 +1,7 @@
 package com.example.RealmsAI.models
 
+import java.util.UUID
+
 sealed class ModeSettings : java.io.Serializable {
     data class RPGSettings(
         var genre: RPGGenre = RPGGenre.FANTASY,
@@ -18,8 +20,7 @@ sealed class ModeSettings : java.io.Serializable {
         WILDWEST,
         POST_APOCALYPTIC,
         HORROR,
-        SUPERHERO,
-        MURDER_MYSTERY
+        SUPERHERO
     }
 
     enum class GMStyle(val displayName: String, val description: String, val styleTag: String) {
@@ -80,35 +81,29 @@ sealed class ModeSettings : java.io.Serializable {
         var intelligence: Int = 6,
         var charisma: Int = 6,
         var resolve: Int = 6
-    ) {
-        val strengthMod get() = statMod(strength)
-        val agilityMod get() = statMod(agility)
-        val intelligenceMod get() = statMod(intelligence)
-        val charismaMod get() = statMod(charisma)
-        val resolveMod get() = statMod(resolve)
-
-        val defense get() = agility + 10
-        fun hp(level: Int) = resolve + (2 * level)
-
-        fun total(): Int = strength + agility + intelligence + charisma + resolve
-        fun pointsLeft(): Int = 30 - total()
-
-        private fun statMod(score: Int): Int = when (score) {
-            1 -> -2
-            2, 3 -> -1
-            4, 5 -> 0
-            6, 7 -> +1
-            8 -> +2
-            9 -> +3
-            10 -> +5
-            else -> 0 // default/fallback
-        }
-    }
+    )
     data class RPAct(
         var summary: String,
         var goal: String,
         var areaId: String // area id from your area model
     )
+
+    data class MurderSettings(
+        var enabled: Boolean = false,
+        var victimSlotId: String? = null,          // target
+        var killerSlotIds: MutableSet<String> = mutableSetOf(), // villains
+        var weapon: String = "",
+        var sceneDescription: String = "",         // “what happened”
+        var clues: MutableList<MurderClue> = mutableListOf(),
+        var randomizeKillers: Boolean = false
+    ) : ModeSettings()
+    data class MurderClue(
+        val id: String = UUID.randomUUID().toString(),
+        var title: String = "",
+        var description: String = ""
+    )
+
+
 //--------------------------------------------------------VN SETTINGS-------------------------------------------------------------------
 
     data class VNSettings(
@@ -118,12 +113,11 @@ sealed class ModeSettings : java.io.Serializable {
         var jealousyEnabled: Boolean = false,
         val characterBoards: MutableMap<String, MutableMap<String, VNRelationship>> = mutableMapOf(),
         var mainCharMode: Boolean = false
-        // Map<fromCharacterId, Map<toCharacterId, RelationshipLevelDraft>>
     )
 
     data class VNRelationship(
-        val fromId: String = "",
-        val toId: String = "",
+        val fromSlotKey: String ="",
+        val toSlotKey: String ="",
         var notes: String = "",
         var levels: MutableList<RelationshipLevel> = mutableListOf(),
         var currentLevel: Int = 0,
@@ -135,9 +129,21 @@ sealed class ModeSettings : java.io.Serializable {
     data class RelationshipLevel(
         var level: Int = 0,
         var threshold: Int = 0,
-        var personality: String = ""
+        var personality: String = "",
+        val targetSlotKey: String =""
     )
 
+    object SlotKeys {
+        val ALL = listOf("character1","character2","character3","character4")
+        fun fromPosition(pos: Int) = ALL.getOrNull(pos) ?: "character${pos+1}"
+    }
+
+    data class ResolvedRel(
+        val fromId: String,
+        val toId: String,
+        val type: String,
+        val strength: Int
+    )
 
 //------------------------------------------------------GODMODE SETTINGS-----------------------------------------------------------------
 

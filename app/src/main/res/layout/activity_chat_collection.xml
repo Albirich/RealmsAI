@@ -24,15 +24,24 @@
             android:id="@+id/btnAddCollection"
             android:layout_width="0dp"
             android:layout_weight="1"
+            android:textSize="10dp"
             android:layout_height="wrap_content"
-            android:text="Add Collections" />
+            android:text="Add Collection" />
 
         <Button
             android:id="@+id/btnAddIndividual"
             android:layout_width="0dp"
             android:layout_weight="1"
+            android:textSize="10dp"
             android:layout_height="wrap_content"
             android:text="Add Individual" />
+        <Button
+            android:id="@+id/btnAddPlaceholder"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:textSize="10dp"
+            android:layout_height="wrap_content"
+            android:text="Add placeholder" />
     </LinearLayout>
 
     <Button

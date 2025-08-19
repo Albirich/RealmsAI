@@ -8,6 +8,7 @@ data class Outfit(
 // models/PoseSlot.kt
 data class PoseSlot(
     var name: String = "",
-    var uri: String? = null
+    var uri: String? = null,
+    var nsfw: Boolean = false
 )
 

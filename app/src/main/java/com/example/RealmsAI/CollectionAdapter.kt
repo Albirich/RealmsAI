@@ -1,16 +1,14 @@
 package com.example.RealmsAI.adapters
 
-import android.content.Intent
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageButton
+import android.widget.ImageView
 import android.widget.TextView
-import androidx.core.content.ContextCompat.startActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
-import com.example.RealmsAI.CharacterSelectionActivity
 import com.example.RealmsAI.R
 import com.example.RealmsAI.models.CharacterCollection
 import com.example.RealmsAI.models.CharacterProfile
@@ -118,6 +116,18 @@ class CollectionAdapter(
                 .inflate(R.layout.collection_list_item, parent, false)
             return HaloViewHolder(view)
         }
+        private var highlightIds: Set<String> = emptySet()
+        fun setHighlightIds(newIds: Set<String>) {
+            highlightIds = newIds
+            notifyDataSetChanged()
+        }
+
+        private val items = mutableListOf<CharacterProfile>()
+        fun setItems(newItems: List<CharacterProfile>) {
+            items.clear()
+            items.addAll(newItems)
+            notifyDataSetChanged()
+        }
 
         override fun getItemCount(): Int = characters.size
 
@@ -142,6 +152,7 @@ class CollectionAdapter(
 
         class HaloViewHolder(view: View) : RecyclerView.ViewHolder(view) {
             val iconView = view.findViewById<android.widget.ImageView>(R.id.character_image)
+            val haloView: ImageView = view.findViewById(R.id.update_halo)
             val nameText = view.findViewById<TextView>(R.id.character_name)
             val slotNumberText = view.findViewById<TextView>(R.id.character_slot_number)
         }

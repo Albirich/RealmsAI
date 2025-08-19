@@ -5,6 +5,7 @@ import android.content.Intent
 import android.os.Bundle
 import android.view.View
 import android.widget.*
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -20,6 +21,7 @@ import com.example.RealmsAI.models.ModeSettings.RPGGenre
 import com.example.RealmsAI.models.ModeSettings.RPGSettings
 import com.google.common.reflect.TypeToken
 import com.google.gson.Gson
+import androidx.core.widget.doAfterTextChanged
 
 class RPGSettingsActivity : AppCompatActivity() {
 
@@ -35,6 +37,21 @@ class RPGSettingsActivity : AppCompatActivity() {
     private var selectedCharacters: MutableList<CharacterProfile> = mutableListOf()
     private lateinit var rpgCharacters: MutableList<RPGCharacter>
     private lateinit var perspectiveSwitch:Switch
+
+    // Murder UI
+    private lateinit var murderToggle: CheckBox
+    private lateinit var actsGroup: View
+    private lateinit var murderGroup: View
+    private lateinit var perspectiveGroup: View
+    private lateinit var weaponEdit: EditText
+    private lateinit var sceneEdit: EditText
+    private lateinit var cluesRecycler: RecyclerView
+    private lateinit var addClueButton: ImageButton
+    private lateinit var randomizeKillersSwitch: Switch
+    private lateinit var clueAdapter: ClueAdapter
+    // Hold murder mode settings separately from RPGSettings
+    private var murderSettings = ModeSettings.MurderSettings()
+
 
     private val gson = Gson()
 
@@ -60,22 +77,44 @@ class RPGSettingsActivity : AppCompatActivity() {
         actsRecyclerView = findViewById(R.id.actsRecyclerView)
         addActButton = findViewById(R.id.addActButton)
         perspectiveSwitch = findViewById(R.id.perspectiveSwitch)
+        actsGroup = findViewById(R.id.actGroup)
+        // --- Murder UI binds ---
+        murderToggle = findViewById(R.id.murderToggle)
+        murderGroup = findViewById(R.id.murderGroup)
+        weaponEdit = findViewById(R.id.weaponEdit)
+        sceneEdit = findViewById(R.id.sceneEdit)
+        cluesRecycler = findViewById(R.id.cluesRecycler)
+        addClueButton = findViewById(R.id.addClueButton)
+        randomizeKillersSwitch = findViewById(R.id.randomizeKillersSwitch)
+        perspectiveGroup = findViewById(R.id.perspectiveGroup)
 
         // Parse incoming settings if editing an existing chat
         val currentSettingsJson = intent.getStringExtra("CURRENT_SETTINGS_JSON")
-        if (!currentSettingsJson.isNullOrBlank() && currentSettingsJson.trim().startsWith("{")) {
-            rpgSettings = gson.fromJson(currentSettingsJson, RPGSettings::class.java)
+        rpgSettings = if (!currentSettingsJson.isNullOrBlank() && currentSettingsJson.trim().startsWith("{")) {
+            gson.fromJson(currentSettingsJson, RPGSettings::class.java)
         } else {
-            rpgSettings = RPGSettings()
+            RPGSettings()
         }
+
+        intent.getStringExtra("MURDER_SETTINGS_JSON")?.let { json ->
+            if (json.trim().startsWith("{")) {
+                murderSettings = gson.fromJson(json, ModeSettings.MurderSettings::class.java)
+            }
+        }
+
         val selectedCharactersJson = intent.getStringExtra("SELECTED_CHARACTERS_JSON")
         val areasJson = intent.getStringExtra("AREAS_JSON")
+
         if (!areasJson.isNullOrEmpty()) {
             allAreas = gson.fromJson(areasJson, object : TypeToken<List<Area>>() {}.type)
         }
-        selectedCharacters = gson.fromJson(
-            selectedCharactersJson, object : TypeToken<List<CharacterProfile>>() {}.type
-        )
+
+        selectedCharacters = if (!selectedCharactersJson.isNullOrBlank()) {
+            gson.fromJson(selectedCharactersJson, object : TypeToken<List<CharacterProfile>>() {}.type)
+        } else {
+            mutableListOf()
+        }
+
         perspectiveSwitch.isChecked = (rpgSettings.perspective == "onTable")
         perspectiveSwitch.setOnCheckedChangeListener { _, isChecked ->
             rpgSettings.perspective = if (isChecked) "onTable" else "aboveTable"
@@ -95,6 +134,24 @@ class RPGSettingsActivity : AppCompatActivity() {
                 acts = mutableListOf(),
                 currentAct = 0
             )
+        }
+
+        setupMurderSection()
+
+
+        randomizeKillersSwitch.isChecked = murderSettings.randomizeKillers
+        randomizeKillersSwitch.setOnCheckedChangeListener { _, on ->
+            murderSettings.randomizeKillers = on
+        }
+
+        weaponEdit.setText(murderSettings.weapon)
+        sceneEdit.setText(murderSettings.sceneDescription)
+
+        weaponEdit.doAfterTextChanged {
+            murderSettings.weapon = it?.toString().orEmpty()
+        }
+        sceneEdit.doAfterTextChanged {
+            murderSettings.sceneDescription = it?.toString().orEmpty()
         }
 
         perspectiveSwitch.setOnCheckedChangeListener { _, isChecked ->
@@ -122,6 +179,49 @@ class RPGSettingsActivity : AppCompatActivity() {
 
         gmStyleSpinner = findViewById(R.id.gmStyleSpinner)
         gmDescriptionText = findViewById<TextView>(R.id.gmStyleDescription)
+
+        val infoButtonGenre: ImageButton = findViewById(R.id.infoButtonGenre)
+        infoButtonGenre.setOnClickListener {
+            AlertDialog.Builder(this@RPGSettingsActivity)
+                .setTitle("Genres")
+                .setMessage("The selected Genre will dictate what classes and rules there are for the session")
+                .setPositiveButton("OK", null)
+                .show()
+        }
+
+        val infoButtonActs: ImageButton = findViewById(R.id.infoButtonActs)
+        infoButtonActs.setOnClickListener {
+            AlertDialog.Builder(this@RPGSettingsActivity)
+                .setTitle("Acts")
+                .setMessage("This is whats given to the GM as notes for the current Act/Arch of the story. Only the current Act is shown so if you reference things from other Acts AI-GMs won't be able to understand.")
+                .setPositiveButton("OK", null)
+                .show()
+        }
+        val infoButtonMurderToggle: ImageButton = findViewById(R.id.infoButtonMurderToggle)
+        infoButtonMurderToggle.setOnClickListener {
+            AlertDialog.Builder(this@RPGSettingsActivity)
+                .setTitle("Murder Mystery")
+                .setMessage("Replaces acts with Murder Mystery options. One character is the murderer it's up to the others to find out who.")
+                .setPositiveButton("OK", null)
+                .show()
+        }
+        val infoButtonPerspective: ImageButton = findViewById(R.id.infoButtonPerspective)
+        infoButtonPerspective.setOnClickListener {
+            AlertDialog.Builder(this@RPGSettingsActivity)
+                .setTitle("Perspective")
+                .setMessage("Above the table: the characters in the game will play a ttrpg. One will have to be the GM\n" +
+                        "On the table: the characters don't realize they are in a game. The activationAi handles GMing, narrating locations and dice results")
+                .setPositiveButton("OK", null)
+                .show()
+        }
+        val infoButtonRandomKiller: ImageButton = findViewById(R.id.infoButtonRandomKiller)
+        infoButtonRandomKiller.setOnClickListener {
+            AlertDialog.Builder(this@RPGSettingsActivity)
+                .setTitle("Random Murder mode")
+                .setMessage("This checkbox will make it so at the start of each Session the murder options are randomly filled by an ai")
+                .setPositiveButton("OK", null)
+                .show()
+        }
 
         val gmOptions = GMStyle.values().map { it.displayName }
         val gmAdapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, gmOptions)
@@ -170,18 +270,17 @@ class RPGSettingsActivity : AppCompatActivity() {
         findViewById<Button>(R.id.saveRpgSettingsButton).setOnClickListener {
             rpgSettings.characters = characterAdapter.getCharacters().toMutableList()
             rpgSettings.acts = actAdapter.getActs().toMutableList()
-            // ---- FILTER linkedToMap here ----
-            val currentCharacters = rpgSettings.characters
-            val allowedSidekickIds = currentCharacters
-                .filter { it.role == CharacterRole.SIDEKICK }
-                .map { it.characterId }
-                .toSet()
-            rpgSettings.linkedToMap = rpgSettings.linkedToMap
-                .filterKeys { allowedSidekickIds.contains(it) }
-                .toMutableMap()
-            val resultIntent = Intent()
-            resultIntent.putExtra("RPG_SETTINGS_JSON", gson.toJson(rpgSettings))
-            setResult(Activity.RESULT_OK, resultIntent)
+
+            // validate via roles if murder is on
+            if (murderSettings.enabled && !validateMurderByRoles(rpgSettings, murderSettings)) {
+                Toast.makeText(this, "Assign exactly one TARGET and at least one VILLAIN, or enable Random Killer.", Toast.LENGTH_LONG).show()
+                return@setOnClickListener
+            }
+
+            val result = Intent()
+                .putExtra("RPG_SETTINGS_JSON", gson.toJson(rpgSettings))
+                .putExtra("MURDER_SETTINGS_JSON", gson.toJson(murderSettings))
+            setResult(Activity.RESULT_OK, result)
             finish()
         }
 
@@ -202,6 +301,122 @@ class RPGSettingsActivity : AppCompatActivity() {
             }
             override fun onNothingSelected(parent: AdapterView<*>) {}
         }
+    }
+
+    private fun setupMurderSection() {
+        val applyVisibility: (Boolean) -> Unit = { enabled ->
+            actsGroup.visibility   = if (enabled) View.GONE else View.VISIBLE
+            murderGroup.visibility = if (enabled) View.VISIBLE else View.GONE
+
+            if (enabled) {
+                rpgSettings.perspective = "onTable"
+                perspectiveSwitch.isChecked = true
+                perspectiveSwitch.isEnabled = false
+                perspectiveGroup.visibility = View.GONE
+
+            } else {
+                perspectiveGroup.visibility = View.VISIBLE
+                perspectiveSwitch.isEnabled = true
+            }
+            android.util.Log.d("MurderToggle", "enabled=$enabled acts=${actsGroup.visibility} murder=${murderGroup.visibility}")
+        }
+
+        // initial state
+        murderToggle.isChecked = murderSettings.enabled
+        applyVisibility(murderSettings.enabled)
+
+        // listen
+        murderToggle.setOnCheckedChangeListener { _, isOn ->
+            murderSettings.enabled = isOn
+            applyVisibility(isOn)
+        }
+
+        // randomize killers toggle
+        randomizeKillersSwitch.isChecked = murderSettings.randomizeKillers
+        randomizeKillersSwitch.setOnCheckedChangeListener { _, on ->
+            murderSettings.randomizeKillers = on
+        }
+
+        // fields
+        weaponEdit.setText(murderSettings.weapon)
+        sceneEdit.setText(murderSettings.sceneDescription)
+
+        // if KTX isn’t available, use TextWatcher
+        weaponEdit.addTextChangedListener(object : android.text.TextWatcher {
+            override fun afterTextChanged(s: android.text.Editable?) { murderSettings.weapon = s?.toString().orEmpty() }
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+        })
+        sceneEdit.addTextChangedListener(object : android.text.TextWatcher {
+            override fun afterTextChanged(s: android.text.Editable?) { murderSettings.sceneDescription = s?.toString().orEmpty() }
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+        })
+
+        // clues
+        clueAdapter = ClueAdapter(
+            items = murderSettings.clues,
+            onEdit = { clue -> showClueDialog(clue) },
+            onDelete = { clue ->
+                murderSettings.clues.removeAll { it.id == clue.id }
+                clueAdapter.notifyDataSetChanged()
+            }
+        )
+        cluesRecycler.layoutManager = LinearLayoutManager(this)
+        cluesRecycler.adapter = clueAdapter
+
+        addClueButton.setOnClickListener { showClueDialog(null) }
+    }
+
+
+    private fun showClueDialog(existing: ModeSettings.MurderClue?) {
+        val dialogView = layoutInflater.inflate(R.layout.dialog_edit_clue, null)
+        val titleEdit = dialogView.findViewById<EditText>(R.id.clueTitleEdit)
+        val descEdit = dialogView.findViewById<EditText>(R.id.clueDescEdit)
+
+        if (existing != null) {
+            titleEdit.setText(existing.title)
+            descEdit.setText(existing.description)
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle(if (existing == null) "Add Clue" else "Edit Clue")
+            .setView(dialogView)
+            .setPositiveButton("Save") { d, _ ->
+                val t = titleEdit.text.toString().trim()
+                val desc = descEdit.text.toString().trim()
+                if (existing == null) {
+                    murderSettings.clues.add(ModeSettings.MurderClue(title = t, description = desc))
+                } else {
+                    existing.title = t
+                    existing.description = desc
+                }
+                clueAdapter.notifyDataSetChanged()
+                d.dismiss()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun validateMurderByRoles(rpg: ModeSettings.RPGSettings, murder: ModeSettings.MurderSettings): Boolean {
+        if (!murder.enabled) return true
+        if (randomizeKillersSwitch.isChecked ) return true
+        val roles = rpg.characters.map { it.role }
+        val targetCount = roles.count { it == ModeSettings.CharacterRole.TARGET }
+        val villainCount = roles.count { it == ModeSettings.CharacterRole.VILLAIN }
+        val okTarget = (targetCount == 1)
+        val okVillains = if (murder.randomizeKillers) true else villainCount >= 1
+        return okTarget && okVillains
+    }
+
+    private class SimpleTextWatcher(
+        val onChange: (String) -> Unit
+    ) : android.text.TextWatcher {
+        override fun afterTextChanged(s: android.text.Editable?) {
+            onChange(s?.toString().orEmpty())
+        }
+        override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+        override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
     }
 
     private fun setupCharacterRecycler() {

@@ -20,14 +20,16 @@
             app:layout_constraintTop_toTopOf="parent"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintEnd_toEndOf="@id/genreSpinner"/>
-        <TextView
-            android:id="@+id/perspectiveTitle"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Perspective:"
-            app:layout_constraintStart_toStartOf="@id/aboveLabel"
-            app:layout_constraintEnd_toEndOf="@id/onLabel"
-            app:layout_constraintTop_toBottomOf="@id/genreSpinner"/>
+        <include
+            android:id="@+id/infoButtonGenre"
+            layout="@layout/info_button"
+            android:layout_width="25dp"
+            android:layout_height="25dp"
+            android:layout_marginStart="8dp"
+            app:layout_constraintTop_toTopOf="@id/genreSpinnerLabel"
+            app:layout_constraintBottom_toBottomOf="@id/genreSpinnerLabel"
+            app:layout_constraintStart_toEndOf="@id/genreSpinnerLabel"
+            android:layout_gravity="center_vertical" />
         <Spinner
             android:id="@+id/genreSpinner"
             android:layout_width="match_parent"
@@ -36,6 +38,48 @@
             app:layout_constraintStart_toStartOf="parent"
             android:contentDescription="a list of genre to dictate what the options are given"/>
 
+        <CheckBox
+            android:id="@+id/murderToggle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            app:layout_constraintTop_toBottomOf="@id/genreSpinner"
+            app:layout_constraintStart_toStartOf="parent"
+            android:text="Murder Mysetery"/>
+        <include
+            android:id="@+id/infoButtonMurderToggle"
+            layout="@layout/info_button"
+            android:layout_width="25dp"
+            android:layout_height="25dp"
+            android:layout_marginStart="8dp"
+            app:layout_constraintTop_toTopOf="@id/murderToggle"
+            app:layout_constraintBottom_toBottomOf="@id/murderToggle"
+            app:layout_constraintStart_toEndOf="@id/murderToggle"
+            android:layout_gravity="center_vertical" />
+
+        <androidx.constraintlayout.widget.ConstraintLayout
+            android:id="@+id/perspectiveGroup"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:layout_constraintTop_toBottomOf="@id/murderToggle">
+        <TextView
+            android:id="@+id/perspectiveTitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Perspective:"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="@id/perspectiveSwitch"
+            app:layout_constraintTop_toTopOf="@id/perspectiveSwitch"
+            app:layout_constraintBottom_toTopOf="@id/perspectiveSwitch"/>
+        <include
+            android:id="@+id/infoButtonPerspective"
+            layout="@layout/info_button"
+            android:layout_width="25dp"
+            android:layout_height="25dp"
+            android:layout_marginStart="8dp"
+            app:layout_constraintTop_toTopOf="@id/perspectiveTitle"
+            app:layout_constraintBottom_toBottomOf="@id/perspectiveTitle"
+            app:layout_constraintStart_toEndOf="@id/perspectiveTitle"
+            android:layout_gravity="center_vertical" />
         <TextView
             android:id="@+id/aboveLabel"
             android:layout_width="wrap_content"
@@ -51,8 +95,8 @@
             android:layout_height="wrap_content"
             app:layout_constraintTop_toBottomOf="@id/perspectiveTitle"
             app:layout_constraintStart_toEndOf="@id/aboveLabel"
-            app:layout_constraintEnd_toStartOf="@id/onLabel"/>
-
+            app:layout_constraintEnd_toStartOf="@id/onLabel"
+            android:layout_marginTop="10dp"/>
         <TextView
             android:id="@+id/onLabel"
             android:layout_width="wrap_content"
@@ -61,13 +105,14 @@
             android:text="On the table"
             android:maxLines="2"
             app:layout_constraintStart_toEndOf="@id/perspectiveSwitch"
-            app:layout_constraintTop_toTopOf="@id/perspectiveSwitch" />
+            app:layout_constraintTop_toTopOf="@id/perspectiveSwitch"/>
+        </androidx.constraintlayout.widget.ConstraintLayout>
 
         <Spinner
             android:id="@+id/gmStyleSpinner"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            app:layout_constraintTop_toBottomOf="@id/perspectiveSwitch"
+            app:layout_constraintTop_toBottomOf="@id/perspectiveGroup"
             app:layout_constraintBottom_toTopOf="@id/gmStyleDescription"
             android:layout_marginTop="8dp"
             android:visibility="gone"/>
@@ -81,16 +126,14 @@
             android:textSize="14sp"
             android:layout_marginBottom="8dp"
             android:visibility="gone"/>
-
         <View
             android:id="@+id/rpgsettingspacer1"
             android:layout_width="match_parent"
             android:layout_height="2dp"
-            app:layout_constraintTop_toBottomOf="@id/perspectiveSwitch"
+            app:layout_constraintTop_toBottomOf="@id/perspectiveGroup"
             android:background="#000000"
             android:layout_marginTop="8dp"
             android:layout_marginBottom="8dp" />
-
             <!-- Characters header -->
         <TextView
             android:id="@+id/characterListLabel"
@@ -102,7 +145,6 @@
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintBottom_toTopOf="@id/characterRecyclerView"
             android:layout_marginTop="16dp"/>
-
             <!-- RecyclerView for characters -->
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/characterRecyclerView"
@@ -119,10 +161,16 @@
             android:layout_height="2dp"
             app:layout_constraintTop_toBottomOf="@id/characterRecyclerView"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintBottom_toTopOf="@id/actsLabel"
             android:background="#000000"
             android:layout_marginTop="8dp"
             android:layout_marginBottom="8dp" />
+
+        <androidx.constraintlayout.widget.ConstraintLayout
+            android:id="@+id/actGroup"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:layout_constraintTop_toBottomOf="@id/rpgsettingspacer2"
+            app:layout_constraintBottom_toTopOf="@id/saveRpgSettingsButton">
         <!-- Acts header and add button would go below -->
         <TextView
             android:id="@+id/actsLabel"
@@ -130,7 +178,7 @@
             android:layout_height="wrap_content"
             android:text="Acts"
             android:textSize="18sp"
-            app:layout_constraintTop_toBottomOf="@id/rpgsettingspacer2"
+            app:layout_constraintTop_toBottomOf="parent"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintBottom_toTopOf="@id/actsRecyclerView"
             android:layout_marginTop="16dp"/>
@@ -144,18 +192,87 @@
             android:background="?attr/selectableItemBackgroundBorderless"
             app:layout_constraintStart_toEndOf="@id/actsLabel"
             app:layout_constraintBottom_toBottomOf="@id/actsLabel"/>
+            <include
+                android:id="@+id/infoButtonActs"
+                layout="@layout/info_button"
+                android:layout_width="25dp"
+                android:layout_height="25dp"
+                android:layout_marginStart="8dp"
+                app:layout_constraintTop_toTopOf="@id/addActButton"
+                app:layout_constraintBottom_toBottomOf="@id/addActButton"
+                app:layout_constraintStart_toEndOf="@id/addActButton"
+                android:layout_gravity="center_vertical" />
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/actsRecyclerView"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="10dp"
             app:layout_constraintTop_toBottomOf="@id/actsLabel"
-            app:layout_constraintBottom_toTopOf="@id/saveRpgSettingsButton"/>
+            app:layout_constraintBottom_toTopOf="parent"/>
+        </androidx.constraintlayout.widget.ConstraintLayout>
+
+        <androidx.constraintlayout.widget.ConstraintLayout
+            android:id="@+id/murderGroup"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:layout_constraintTop_toBottomOf="@id/rpgsettingspacer2"
+            app:layout_constraintBottom_toTopOf="@id/saveRpgSettingsButton"
+            android:layout_marginTop="10dp"
+            android:visibility="gone">
+            <EditText
+                android:id="@+id/weaponEdit"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:layout_constraintTop_toTopOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                android:hint="Enter the Murder Weapon"
+                app:counterMaxLength="40"/>
+            <EditText
+                android:id="@+id/sceneEdit"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:layout_constraintTop_toBottomOf="@id/weaponEdit"
+                app:layout_constraintStart_toStartOf="parent"
+                android:hint="Describe the murder scene. (up to 1000 characters)"
+                app:counterMaxLength="1000"/>
+            <ImageButton
+                android:id="@+id/addClueButton"
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:src="@drawable/ic_clue"
+                app:layout_constraintTop_toBottomOf="@id/sceneEdit"
+                android:background="?android:selectableItemBackgroundBorderless"
+                android:scaleType="fitCenter"
+                app:layout_constraintStart_toStartOf="parent"/>
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/cluesRecycler"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:layout_constraintTop_toBottomOf="@id/addClueButton"/>
+            <Switch
+                android:id="@+id/randomizeKillersSwitch"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Random Killer"
+                app:layout_constraintTop_toBottomOf="@id/cluesRecycler"
+                app:layout_constraintStart_toStartOf="parent"/>
+            <include
+                android:id="@+id/infoButtonRandomKiller"
+                layout="@layout/info_button"
+                android:layout_width="25dp"
+                android:layout_height="25dp"
+                android:layout_marginStart="8dp"
+                app:layout_constraintTop_toTopOf="@id/randomizeKillersSwitch"
+                app:layout_constraintBottom_toBottomOf="@id/randomizeKillersSwitch"
+                app:layout_constraintStart_toEndOf="@id/randomizeKillersSwitch"
+                android:layout_gravity="center_vertical" />
+        </androidx.constraintlayout.widget.ConstraintLayout>
+
         <Button
             android:id="@+id/saveRpgSettingsButton"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            app:layout_constraintTop_toBottomOf="@id/actsRecyclerView"
             app:layout_constraintBottom_toBottomOf="parent"
             android:text="done"/>
     </androidx.constraintlayout.widget.ConstraintLayout>

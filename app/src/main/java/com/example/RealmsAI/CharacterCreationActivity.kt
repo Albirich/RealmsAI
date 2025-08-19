@@ -16,9 +16,12 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.constraintlayout.widget.ConstraintLayout
+import androidx.constraintlayout.widget.ConstraintSet
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
+import com.example.RealmsAI.MainActivity
 import com.example.RealmsAI.models.Area
 import com.example.RealmsAI.models.CharacterProfile
 import com.example.RealmsAI.models.Outfit
@@ -167,6 +170,8 @@ class CharacterCreationActivity : AppCompatActivity() {
             val intent = Intent(this, WardrobeActivity::class.java)
             val outfitsJson = Gson().toJson(outfitsList)
             intent.putExtra(EXTRA_OUTFITS_JSON, outfitsJson)
+            val heightFeet = parseHeightToFeet(heightEt.text?.toString()) ?: 6f
+            intent.putExtra("CHARACTER_HEIGHT_FEET", heightFeet)
             wardrobeLauncher.launch(intent)
         }
 
@@ -187,7 +192,7 @@ class CharacterCreationActivity : AppCompatActivity() {
             }
         }
 
-        findViewById<Button>(R.id.addAreaButton).setOnClickListener {
+        findViewById<Button>(R.id.charBackgroundButton).setOnClickListener {
             // If currentCharacter is not set, build it now!
             if (!::currentCharacter.isInitialized) {
                 currentCharacter = CharacterProfile(
@@ -203,9 +208,6 @@ class CharacterCreationActivity : AppCompatActivity() {
             intent.putExtra("AREA_LIST_JSON", areaJson)
             areaMapLauncher.launch(intent)
         }
-
-
-
 
         // Relationships button
         relationshipBtn.setOnClickListener {
@@ -225,6 +227,20 @@ class CharacterCreationActivity : AppCompatActivity() {
             physicalToggle.setImageResource(
                 if (isVisible) R.drawable.ic_expand_more else R.drawable.ic_expand_less
             )
+            val root = findViewById<ConstraintLayout>(R.id.charCreate)
+            val cs = ConstraintSet()
+            cs.clone(root)
+
+            if (isVisible) {
+                // Section going to GONE, so connect header directly to bubbleTitle
+                cs.connect(R.id.physicalInfoHeader, ConstraintSet.BOTTOM, R.id.bubbleTitle, ConstraintSet.TOP)
+                cs.connect(R.id.bubbleTitle, ConstraintSet.TOP, R.id.physicalInfoHeader, ConstraintSet.BOTTOM)
+            } else {
+                // Section going to VISIBLE, so place it between header and bubbleTitle
+                cs.connect(R.id.physicalInfoHeader, ConstraintSet.BOTTOM, R.id.physicalInfoSection, ConstraintSet.TOP)
+                cs.connect(R.id.bubbleTitle, ConstraintSet.TOP, R.id.physicalInfoSection, ConstraintSet.BOTTOM)
+            }
+            cs.applyTo(root)
         }
 
         // --- Edit support: Fill from profile if present ---
@@ -234,6 +250,32 @@ class CharacterCreationActivity : AppCompatActivity() {
             val profile = Gson().fromJson(charJson, CharacterProfile::class.java)
             fillFormFromProfile(profile)
         }
+        val infoButtonWardrobe: ImageButton = findViewById(R.id.infoButtonWardrobe)
+        infoButtonWardrobe.setOnClickListener {
+            AlertDialog.Builder(this@CharacterCreationActivity)
+                .setTitle("Wardrobe")
+                .setMessage("This is used to add poses for the character.")
+                .setPositiveButton("OK", null)
+                .show()
+        }
+        val infoButtonCharRelationships: ImageButton = findViewById(R.id.infoButtonCharRelationships)
+        infoButtonCharRelationships.setOnClickListener {
+            AlertDialog.Builder(this@CharacterCreationActivity)
+                .setTitle("Relationships")
+                .setMessage("This allows you to give the character relationships that they will remember in chats")
+                .setPositiveButton("OK", null)
+                .show()
+        }
+        val infoButtonBackgroundGallery: ImageButton = findViewById(R.id.infoButtonBackgroundGallery)
+        infoButtonBackgroundGallery.setOnClickListener {
+            AlertDialog.Builder(this@CharacterCreationActivity)
+                .setTitle("Backgrounds")
+                .setMessage("This allows you to choose backgrounds for character 1 on 1 chats")
+                .setPositiveButton("OK", null)
+                .show()
+
+        }
+
 
         // Submit
         submitBtn.setOnClickListener {
@@ -270,6 +312,40 @@ class CharacterCreationActivity : AppCompatActivity() {
                 bubbleColor, textColor
             )
         }
+    }
+
+    // Add this helper anywhere in CharacterCreationActivity
+    private fun parseHeightToFeet(raw: String?): Float? {
+        if (raw.isNullOrBlank()) return null
+        val s = raw.trim().lowercase()
+
+        // 5'7" or 5' 7"
+        Regex("""^\s*(\d+)\s*'\s*(\d+)\s*"?\s*$""").matchEntire(s)?.let {
+            val ft = it.groupValues[1].toFloat()
+            val inch = it.groupValues[2].toFloat()
+            return ft + inch/12f
+        }
+        // 5 ft 7 in / 5ft7in
+        Regex("""^\s*(\d+)\s*ft\s*(\d+)\s*in\s*$""").matchEntire(s)?.let {
+            val ft = it.groupValues[1].toFloat()
+            val inch = it.groupValues[2].toFloat()
+            return ft + inch/12f
+        }
+        // 170 cm
+        Regex("""^\s*(\d+(\.\d+)?)\s*cm\s*$""").matchEntire(s)?.let {
+            val cm = it.groupValues[1].toFloat()
+            return (cm / 30.48f)
+        }
+        // 5.5 ft
+        Regex("""^\s*(\d+(\.\d+)?)\s*ft\s*$""").matchEntire(s)?.let {
+            return it.groupValues[1].toFloat()
+        }
+        // 67 in
+        Regex("""^\s*(\d+(\.\d+)?)\s*in\s*$""").matchEntire(s)?.let {
+            val inches = it.groupValues[1].toFloat()
+            return inches / 12f
+        }
+        return null
     }
 
     private fun saveCharacterAndReturnToHub(
@@ -325,7 +401,8 @@ class CharacterCreationActivity : AppCompatActivity() {
                         outfit.copy(poseSlots = updatedPoseSlots)
                     }
                     val isSfwOnly = if (age < 18) true else sfwSwitch.isChecked
-                    val charData: Map<String, Any?> = mapOf(
+                    val isEdit = editCharId != null
+                    val commonFields: Map<String, Any?> = mapOf(
                         "id" to charId,
                         "name" to name,
                         "summary" to summary,
@@ -355,26 +432,43 @@ class CharacterCreationActivity : AppCompatActivity() {
                                 }
                             )
                         },
-                        "createdAt" to com.google.firebase.firestore.FieldValue.serverTimestamp(),
+                        "lastTimestamp" to FieldValue.serverTimestamp(),
+                        "createdAt" to FieldValue.serverTimestamp(),
                         "relationships" to relationships.map { it.copy(fromId = charId) },
                         "sfwOnly" to isSfwOnly,
                         "private" to privateSwitch.isChecked,
                         "outfits" to updatedOutfits // will save as a list of outfits, each with poseSlots (name+uri)
                     )
-                    firestore.collection("characters").document(charId)
-                        .set(charData)
-                        .addOnSuccessListener {
-                            dismissProgressDialog()
-                            Toast.makeText(this, "Character saved!", Toast.LENGTH_SHORT).show()
-                            val intent = Intent(this, CreationHubActivity::class.java)
-                            intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
-                            startActivity(intent)
-                            finish()
-                        }
-                        .addOnFailureListener { e ->
-                            dismissProgressDialog()
-                            toast("Failed to save character: ${e.message}")
-                        }
+                    val createFields = commonFields + mapOf(
+                        // only set createdAt when creating
+                        "createdAt" to FieldValue.serverTimestamp()
+                    )
+                    val docRef = firestore.collection("characters").document(charId)
+
+                    if (isEdit) {
+                        // Don’t include createdAt here!
+                        docRef.update(commonFields.filterValues { it != null })
+                            .addOnSuccessListener { dismissProgressDialog()
+                                Toast.makeText(this, "Character saved!", Toast.LENGTH_SHORT).show()
+                                val intent = Intent(this, CreationHubActivity::class.java)
+                                intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                                startActivity(intent)
+                                finish() }
+                            .addOnFailureListener { e ->
+                                dismissProgressDialog()
+                                toast("Failed to save character: ${e.message}")}
+                    } else {
+                        docRef.set(createFields)
+                            .addOnSuccessListener { dismissProgressDialog()
+                                Toast.makeText(this, "Character saved!", Toast.LENGTH_SHORT).show()
+                                val intent = Intent(this, CreationHubActivity::class.java)
+                                intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                                startActivity(intent)
+                                finish() }
+                            .addOnFailureListener { e ->
+                                dismissProgressDialog()
+                                toast("Failed to save character: ${e.message}") }
+                    }
                 }
                 .addOnFailureListener { e ->
                     dismissProgressDialog()

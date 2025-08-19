@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.Typeface
 import android.util.AttributeSet
 import android.view.View
 
@@ -33,6 +34,19 @@ class GuidelinesView @JvmOverloads constructor(
             field = value
             invalidate()
         }
+    private val highlightPaint = Paint().apply {
+        color = Color.RED
+        strokeWidth = 3f * resources.displayMetrics.density // thicker than guidelines
+        style = Paint.Style.STROKE
+        isAntiAlias = true
+    }
+
+    val textPaint = Paint().apply {
+        color = Color.RED
+        textSize = 40f
+        isAntiAlias = true
+        typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+    }
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
@@ -53,7 +67,20 @@ class GuidelinesView @JvmOverloads constructor(
             )
             // Draw the label at the left edge
             val label = "$feet ft"
-            canvas.drawText(label, 12f * resources.displayMetrics.density, y - 8f, labelPaint)
+            canvas.drawText(label, width.toFloat() * .16f , y - 8f, labelPaint)
+        }
+        // Draw the highlight, if present
+        highlightedHeightFeet?.let { heightFt ->
+            // Clamp so it doesn’t go off‑screen
+            val clamped = heightFt.coerceIn(
+                heightMarkers.first().toFloat(),
+                heightMarkers.last().toFloat()
+            )
+            val y = totalHeight - marginBottom - (clamped * pixelsPerFoot)
+            canvas.drawLine(0f, y, width.toFloat(), y, highlightPaint)
+            // Label (e.g., "5′7″")
+            val label = "Character Height"
+            canvas.drawText(label, width.toFloat() * .16f , y - 10f, textPaint)
         }
     }
 

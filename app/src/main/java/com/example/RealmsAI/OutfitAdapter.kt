@@ -16,7 +16,8 @@ class OutfitAdapter(
     val onPickPoseImage: (outfitIdx: Int, poseIdx: Int) -> Unit,
     val onAddPose: (outfitIdx: Int) -> Unit,
     val onDeletePose: (outfitIdx: Int, poseIdx: Int) -> Unit,
-    val onOutfitNameChanged: (outfitIdx: Int, newName: String) -> Unit
+    val onOutfitNameChanged: (outfitIdx: Int, newName: String) -> Unit,
+    val onDeleteOutfit: (outfitIdx: Int) -> Unit
 ) : RecyclerView.Adapter<OutfitAdapter.Holder>() {
 
     inner class Holder(v: View) : RecyclerView.ViewHolder(v) {
@@ -48,21 +49,26 @@ class OutfitAdapter(
             LinearLayoutManager(holder.poseRecycler.context, LinearLayoutManager.HORIZONTAL, false)
         val poseAdapter = PoseAdapter(
             poses = outfit.poseSlots,
-            onImageClick = { poseIdx -> onPickPoseImage(outfitPos, poseIdx) }
+            onImageClick = { poseIdx -> onPickPoseImage(outfitPos, poseIdx) },
+            onDeletePose = { poseIdx ->
+                onDeletePose(outfitPos, poseIdx)
+                (holder.poseRecycler.adapter as? PoseAdapter)?.notifyItemRemoved(poseIdx)
+            },
+            onToggleNsfw = { poseIdx, newVal ->
+                outfit.poseSlots.getOrNull(poseIdx)?.nsfw = newVal
+                (holder.poseRecycler.adapter as? PoseAdapter)?.notifyItemChanged(poseIdx)
+            }
         )
         holder.poseRecycler.adapter = poseAdapter
 
         // Add pose button
         holder.addPoseBtn.setOnClickListener {
             onAddPose(outfitPos)
-            poseAdapter.notifyItemInserted(outfit.poseSlots.size - 1)
+            (holder.poseRecycler.adapter as? PoseAdapter)?.notifyItemInserted(outfit.poseSlots.size - 1)
         }
         // Delete pose button (removes last pose)
         holder.deletePoseBtn.setOnClickListener {
-            if (outfit.poseSlots.isNotEmpty()) {
-                onDeletePose(outfitPos, outfit.poseSlots.size - 1)
-                poseAdapter.notifyItemRemoved(outfit.poseSlots.size)
-            }
+            onDeleteOutfit(outfitPos)
         }
     }
 }

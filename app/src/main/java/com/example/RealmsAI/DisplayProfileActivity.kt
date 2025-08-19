@@ -14,6 +14,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.example.RealmsAI.SessionManager.findSessionForUser
+import com.example.RealmsAI.models.CharacterPreview
 import com.example.RealmsAI.models.CharacterProfile
 import com.example.RealmsAI.models.ChatProfile
 import com.example.RealmsAI.models.DirectMessage
@@ -198,13 +199,13 @@ class DisplayProfileActivity : BaseActivity() {
                 val list = snap.documents.mapNotNull { doc ->
                     val cp = doc.toObject(CharacterProfile::class.java)?.copy(id = doc.id) ?: return@mapNotNull null
                     CharacterPreview(
-                        id        = cp.id,
-                        name      = cp.name,
-                        summary   = cp.summary.orEmpty(),
+                        id = cp.id,
+                        name = cp.name,
+                        summary = cp.summary.orEmpty(),
                         avatarUri = cp.avatarUri,
                         avatarResId = cp.avatarResId ?: R.drawable.placeholder_avatar,
-                        author    = cp.author,
-                        rawJson   = Gson().toJson(cp)
+                        author = cp.author,
+                        rawJson = Gson().toJson(cp)
                     )
                 }
                 val adapter = CharacterPreviewAdapter(

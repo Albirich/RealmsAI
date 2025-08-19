@@ -8,15 +8,16 @@ import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.CheckBox
 import android.widget.EditText
+import android.widget.ImageButton
 import android.widget.Spinner
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.example.RealmsAI.models.CharacterProfile
+import com.example.RealmsAI.models.ModeSettings
 import com.example.RealmsAI.models.ModeSettings.VNRelationship
 import com.example.RealmsAI.models.ModeSettings.VNSettings
-import com.example.RealmsAI.models.Relationship
-import com.example.RealmsAI.models.SessionProfile
 import com.google.gson.Gson
 import kotlin.jvm.java
 
@@ -97,6 +98,30 @@ class VNSettingsActivity : AppCompatActivity() {
 
         // Initial relationship board setup
         setupRelationshipBoards(mainCharModeCheck.isChecked)
+        val infoButtonMonogamy: ImageButton = findViewById(R.id.infoButtonMonogamy)
+        infoButtonMonogamy.setOnClickListener {
+            AlertDialog.Builder(this@VNSettingsActivity)
+                .setTitle("Monogamy Mode")
+                .setMessage("This let's you set a level threshold. Only 1 relationship for each character can go above that level at a time. All other relationship levels will stop increasing at the threshold")
+                .setPositiveButton("OK", null)
+                .show()
+        }
+        val infoButtonJealousy: ImageButton = findViewById(R.id.infoButtonJealousy)
+        infoButtonJealousy.setOnClickListener {
+            AlertDialog.Builder(this@VNSettingsActivity)
+                .setTitle("Jealousy")
+                .setMessage("When a character gains relationship points with another character, all other characters in that location lose 1 relationship point.")
+                .setPositiveButton("OK", null)
+                .show()
+        }
+        val infoButtonMainCharacter: ImageButton = findViewById(R.id.infoButtonMainCharacter)
+        infoButtonMainCharacter.setOnClickListener {
+            AlertDialog.Builder(this@VNSettingsActivity)
+                .setTitle("Main Character Mode")
+                .setMessage("Choose a character and all other characters only have relationship levels with them. ")
+                .setPositiveButton("OK", null)
+                .show()
+        }
 
         // Save logic
         saveButton.setOnClickListener {
@@ -118,39 +143,55 @@ class VNSettingsActivity : AppCompatActivity() {
         }
     }
 
-    /**
-     * Set up the relationship board display for either Main Char Mode (single row)
-     * or Everyone-to-Everyone (all characters as MCs).
-     */
+    private fun slotKeyFor(profile: CharacterProfile, list: List<CharacterProfile>): String {
+        val idx = list.indexOfFirst { it.id == profile.id }
+        return ModeSettings.SlotKeys.fromPosition(idx)
+    }
+
     private fun setupRelationshipBoards(mainCharMode: Boolean) {
         relationshipBoardList.visibility = View.VISIBLE
+
         if (mainCharMode) {
             val mcId = vnSettings.mainCharId ?: characterIds.first()
             val mainChar = selectedCharacters.first { it.id == mcId }
             val otherChars = selectedCharacters.filter { it.id != mcId }
 
-            relationshipBoardList.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
-            relationshipBoardList.adapter = VNRelationshipAvatarAdapter(
-                otherChars, mainChar.id, mutableMapOf() // Board not used!
-            ) { _, otherCharProfile ->
-                // Always create/fetch the relationship "otherChar -> mainChar"
-                val rel = vnSettings.characterBoards
-                    .getOrPut(otherCharProfile.id) { mutableMapOf() }
-                    .getOrPut(mainChar.id) { VNRelationship(fromId = otherCharProfile.id, toId = mainChar.id) }
-                launchRelationshipEditor(rel, otherCharProfile, mainChar)
+            val mainKey  = slotKeyFor(mainChar, selectedCharacters)
+
+            relationshipBoardList.layoutManager =
+                LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
+
+            // Adapter specifically for "others -> main"
+            relationshipBoardList.adapter = VNRelAvatarAdapter_OthersToMain(
+                otherCharacters = otherChars,
+                selectedCharacters = selectedCharacters,
+                mainSlotKey = mainKey,
+                characterBoards = vnSettings.characterBoards
+            ) { rel, otherChar ->
+                // rel.fromSlotKey == otherKey, rel.toSlotKey == mainKey
+                launchRelationshipEditor(rel, otherChar, mainChar)
             }
+
         } else {
-            // Show every character as MC (vertical board)
             relationshipBoardList.layoutManager = LinearLayoutManager(this)
+
+            // FIX: pass selectedCharacters as the 2nd constructor arg
             relationshipBoardList.adapter = VNRelationshipBoardAdapter(
-                selectedCharacters, vnSettings.characterBoards
+                characters = selectedCharacters,
+                selectedCharacters = selectedCharacters,
+                characterBoardsBySlot = vnSettings.characterBoards
             ) { rel, fromChar, toChar ->
-                // Launch your editor here!
+                // Ensure the relationship is slot-keyed (safety net; usually already set)
+                val fromKey = slotKeyFor(fromChar, selectedCharacters)
+                val toKey   = slotKeyFor(toChar, selectedCharacters)
+                if (rel.fromSlotKey.isBlank() || rel.toSlotKey.isBlank()) {
+                    val fixed = rel.copy(fromSlotKey = fromKey, toSlotKey = toKey)
+                    vnSettings.characterBoards
+                        .getOrPut(fromKey) { mutableMapOf() }[toKey] = fixed
+                }
                 launchRelationshipEditor(rel, fromChar, toChar)
             }
-
         }
-
     }
 
     private fun launchRelationshipEditor(
@@ -160,8 +201,8 @@ class VNSettingsActivity : AppCompatActivity() {
     ) {
         val intent = Intent(this, RelationshipLevelEditorActivity::class.java)
         intent.putExtra("RELATIONSHIP_JSON", Gson().toJson(rel))
-        intent.putExtra("FROM_ID", rel.fromId)
-        intent.putExtra("TO_ID", rel.toId)
+        intent.putExtra("FROM_ID", rel.fromSlotKey)
+        intent.putExtra("TO_ID", rel.toSlotKey)
         intent.putExtra("FROM_NAME", fromChar.name)
         intent.putExtra("TO_NAME", toChar.name)
         startActivityForResult(intent, EDIT_RELATIONSHIP_CODE)
@@ -175,8 +216,8 @@ class VNSettingsActivity : AppCompatActivity() {
             val updatedJson = data.getStringExtra("UPDATED_RELATIONSHIP_JSON")
             val updatedRel = Gson().fromJson(updatedJson, VNRelationship::class.java)
             // Save to the correct board
-            val relBoard = vnSettings.characterBoards.getOrPut(updatedRel.fromId) { mutableMapOf() }
-            relBoard[updatedRel.toId] = updatedRel
+            val relBoard = vnSettings.characterBoards.getOrPut(updatedRel.fromSlotKey) { mutableMapOf() }
+            relBoard[updatedRel.toSlotKey] = updatedRel
             setupRelationshipBoards(mainCharModeCheck.isChecked)
         }
     }

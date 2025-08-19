@@ -35,6 +35,7 @@ class CropperActivity : AppCompatActivity() {
     private var oldDist = 1f
     private var mid = PointF()
 
+
     companion object {
         private const val NONE = 0
         private const val DRAG = 1

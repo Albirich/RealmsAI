@@ -17,6 +17,13 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:hint="Enter chat title" />
+        <include
+            android:id="@+id/infoButtonChatCreation"
+            layout="@layout/info_button"
+            android:layout_width="25dp"
+            android:layout_height="25dp"
+            android:layout_marginStart="8dp"
+            android:layout_gravity="center_vertical" />
 
        <!-- Description -->
         <com.google.android.material.textfield.TextInputLayout
@@ -125,13 +132,7 @@
             android:layout_height="wrap_content"
             android:text="Relationships" />
 
-        <!-- Game Mode Spinner -->
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:text="Game Modes"
-            android:textStyle="bold" />
+
 
         <androidx.constraintlayout.widget.ConstraintLayout
             android:id="@+id/gameModeCheckboxContainer"
@@ -139,11 +140,31 @@
             android:layout_height="wrap_content"
             android:orientation="vertical"
             android:layout_marginTop="16dp">
+            <!-- Game Mode Spinner -->
+            <TextView
+                android:id="@+id/gameModeTextView"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                app:layout_constraintTop_toTopOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                android:text="Game Modes"
+                android:textStyle="bold" />
+            <include
+                android:id="@+id/infoButtonChatGameMode"
+                layout="@layout/info_button"
+                android:layout_width="25dp"
+                android:layout_height="25dp"
+                android:layout_marginStart="8dp"
+                app:layout_constraintTop_toTopOf="@id/gameModeTextView"
+                app:layout_constraintBottom_toBottomOf="@id/gameModeTextView"
+                app:layout_constraintStart_toEndOf="@id/gameModeTextView"
+                android:layout_gravity="center_vertical" />
             <CheckBox
                 android:id="@+id/checkboxRPG"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                app:layout_constraintTop_toTopOf="parent"
+                app:layout_constraintTop_toBottomOf="@id/gameModeTextView"
                 app:layout_constraintStart_toStartOf="parent"
                 android:text="RPG Mode" />
             <Button

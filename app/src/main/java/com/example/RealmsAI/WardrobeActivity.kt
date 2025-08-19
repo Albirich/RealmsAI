@@ -5,8 +5,10 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.util.Log
+import android.widget.ImageButton
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -33,6 +35,19 @@ class WardrobeActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_wardrobe)
+
+        val infoButtonWardrobePage: ImageButton = findViewById(R.id.infoButtonWardrobePage)
+        infoButtonWardrobePage.setOnClickListener {
+            AlertDialog.Builder(this@WardrobeActivity)
+                .setTitle("Outfits")
+                .setMessage("The + adds a new pose\n" +
+                        "The - deletes the entire outfit\n" +
+                        "Click and hold the pose image to get options:\n" +
+                        "Delete will delete that pose\n" +
+                        "NSFW toggle will set the pose to NSFW and not be sent to SFW AI Messages or shown on the profile.")
+                .setPositiveButton("OK", null)
+                .show()
+        }
 
         // Find Views
         val outfitRecycler = findViewById<RecyclerView>(R.id.outfitsRecycler)
@@ -63,7 +78,10 @@ class WardrobeActivity : AppCompatActivity() {
                 val intent = Intent(this, CropperActivity::class.java).apply {
                     putExtra("EXTRA_IMAGE_URI", it)
                     // Optionally pass in character height or other info
-                    putExtra("CHARACTER_HEIGHT_FEET", 6.0f)
+                    putExtra(
+                        "CHARACTER_HEIGHT_FEET",
+                        intent.getFloatExtra("CHARACTER_HEIGHT_FEET", 6f) // forward it
+                    )
                 }
                 cropperLauncher.launch(intent)
             }
@@ -131,8 +149,35 @@ class WardrobeActivity : AppCompatActivity() {
                         Log.d("WardrobeDebug", "    [$poseIdx] Pose: '${pose.name}' -> '${pose.uri}'")
                     }
                 }
-            }
+            },
+            onDeleteOutfit = { outfitIdx ->                      // NEW
+                val name = outfits.getOrNull(outfitIdx)?.name.orEmpty().ifBlank { "Outfit ${outfitIdx + 1}" }
+                AlertDialog.Builder(this)
+                    .setTitle("Delete outfit?")
+                    .setMessage("This will remove \"$name\" and all its poses.")
+                    .setPositiveButton("Delete") { _, _ ->
+                        if (outfitIdx in outfits.indices) {
+                            outfits.removeAt(outfitIdx)
+                            outfitAdapter.notifyItemRemoved(outfitIdx)
+                            // Shift positions for items after the removed one
+                            outfitAdapter.notifyItemRangeChanged(outfitIdx, outfits.size - outfitIdx)
 
+                            // Keep indices in a safe range
+                            if (outfits.isEmpty()) {
+                                outfits.add(Outfit(name = "Outfit 1", poseSlots = mutableListOf()))
+                                outfitAdapter.notifyItemInserted(0)
+                                currentOutfitIdx = 0
+                                currentPoseIdx = 0
+                            } else {
+                                if (currentOutfitIdx >= outfits.size) currentOutfitIdx = outfits.size - 1
+                                currentPoseIdx = 0
+                                outfitAdapter.notifyItemChanged(currentOutfitIdx)
+                            }
+                        }
+                    }
+                    .setNegativeButton("Cancel", null)
+                    .show()
+            }
         )
 
 

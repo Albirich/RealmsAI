@@ -27,6 +27,7 @@ import com.google.firebase.storage.StorageReference
 import com.google.gson.Gson
 import org.json.JSONObject
 import com.example.RealmsAI.SessionManager.findSessionForUser
+import com.example.RealmsAI.models.CharacterPreview
 
 
 class CreatedListActivity : BaseActivity() {
@@ -278,13 +279,13 @@ class CreatedListActivity : BaseActivity() {
                 val previews = snap.documents.mapNotNull { doc ->
                     val cp = doc.toObject<CharacterProfile>() ?: return@mapNotNull null
                     CharacterPreview(
-                        id          = cp.id,
-                        name        = cp.name,
-                        summary     = cp.summary.orEmpty(),
-                        avatarUri   = cp.avatarUri,
+                        id = cp.id,
+                        name = cp.name,
+                        summary = cp.summary.orEmpty(),
+                        avatarUri = cp.avatarUri,
                         avatarResId = cp.avatarResId ?: R.drawable.icon_01,
-                        author      = cp.author,
-                        rawJson   = Gson().toJson(cp)
+                        author = cp.author,
+                        rawJson = Gson().toJson(cp)
                     )
                 }
 

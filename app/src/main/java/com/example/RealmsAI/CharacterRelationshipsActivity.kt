@@ -5,6 +5,7 @@ import android.content.Intent
 import android.os.Bundle
 import android.util.Log
 import android.widget.Button
+import android.widget.ImageButton
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
@@ -25,6 +26,15 @@ class CharacterRelationshipActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_character_relationships)
+
+        val infoButtonCharRelationshipsPage: ImageButton = findViewById(R.id.infoButtonCharRelationshipsPage)
+        infoButtonCharRelationshipsPage.setOnClickListener {
+            AlertDialog.Builder(this@CharacterRelationshipActivity)
+                .setTitle("Relationships")
+                .setMessage("When choosing a character for the relationship you enter a name, this will allow any character with that name to be recognized by the AI.")
+                .setPositiveButton("OK", null)
+                .show()
+        }
 
         // Set up RecyclerView
         val recyclerView = findViewById<RecyclerView>(R.id.relationshipRecycler)

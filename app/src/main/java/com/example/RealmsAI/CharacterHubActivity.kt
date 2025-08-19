@@ -11,12 +11,13 @@ import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.example.RealmsAI.models.CharacterCollection
+import com.example.RealmsAI.models.CharacterPreview
 import com.example.RealmsAI.models.CharacterProfile
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
 import com.google.gson.Gson
-import kotlin.math.log
 
 class CharacterHubActivity : BaseActivity() {
     private lateinit var sortSpinner: Spinner
@@ -53,7 +54,7 @@ class CharacterHubActivity : BaseActivity() {
             onLongClick = { preview ->
                 AlertDialog.Builder(this)
                     .setTitle(preview.name)
-                    .setItems(arrayOf("Profile", "Creator")) { _, which ->
+                    .setItems(arrayOf("Profile", "Creator", "Add to Collection")) { _, which ->
                         when (which) {
                             0 -> { // Profile
                                 startActivity(
@@ -66,6 +67,28 @@ class CharacterHubActivity : BaseActivity() {
                                     Intent(this, DisplayProfileActivity::class.java)
                                         .putExtra("userId", preview.author)
                                 )
+                            }
+                            2 -> { // Add to Collection
+                                val userId = currentUserId
+                                if (userId == null) {
+                                    Toast.makeText(this, "Sign in first.", Toast.LENGTH_SHORT)
+                                        .show()
+                                    return@setItems
+                                }
+                                loadUserCollections { colls ->
+                                    if (colls.isEmpty()) {
+                                        // No collections yet → prompt to create
+                                        promptNewCollectionName { name ->
+                                            createCollection(name, userId) { newColl ->
+                                                addCharacterToCollection(newColl.id, preview.id)
+                                            }
+                                        }
+                                    } else {
+                                        showCollectionPickerDialog(colls) { picked ->
+                                            addCharacterToCollection(picked.id, preview.id)
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
@@ -98,6 +121,107 @@ class CharacterHubActivity : BaseActivity() {
         showCharacters(charsRv, orderBy = "createdAt")
     }
 
+    private fun loadUserCollections(onLoaded: (List<CharacterCollection>) -> Unit) {
+        val userId = FirebaseAuth.getInstance().currentUser?.uid
+        if (userId == null) return onLoaded(emptyList())
+
+        FirebaseFirestore.getInstance()
+            .collection("users")
+            .document(userId)
+            .collection("collections")
+            .orderBy("name") // optional
+            .get()
+            .addOnSuccessListener { snap ->
+                val list = snap.documents.mapNotNull { doc ->
+                    doc.toObject(CharacterCollection::class.java)?.copy(id = doc.id)
+                }
+                onLoaded(list)
+            }
+            .addOnFailureListener {
+                Toast.makeText(this, "Failed to load collections.", Toast.LENGTH_SHORT).show()
+                onLoaded(emptyList())
+            }
+    }
+
+    private fun showCollectionPickerDialog(
+        collections: List<CharacterCollection>,
+        onPicked: (CharacterCollection) -> Unit
+    ) {
+        val names = collections.map { it.name } + "New collection…"
+        AlertDialog.Builder(this)
+            .setTitle("Add to collection")
+            .setItems(names.toTypedArray()) { _, idx ->
+                if (idx == collections.size) {
+                    // "New collection…"
+                    promptNewCollectionName { name ->
+                        val userId = currentUserId ?: return@promptNewCollectionName
+                        createCollection(name, userId) { newColl ->
+                            onPicked(newColl)
+                        }
+                    }
+                } else {
+                    onPicked(collections[idx])
+                }
+            }
+            .show()
+    }
+
+    private fun promptNewCollectionName(onNamed: (String) -> Unit) {
+        val input = android.widget.EditText(this).apply { hint = "Collection name" }
+        AlertDialog.Builder(this)
+            .setTitle("New collection")
+            .setView(input)
+            .setPositiveButton("Create") { _, _ ->
+                val name = input.text?.toString()?.trim().orEmpty()
+                if (name.isBlank()) {
+                    Toast.makeText(this, "Name cannot be empty.", Toast.LENGTH_SHORT).show()
+                } else onNamed(name)
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun createCollection(
+        name: String,
+        userId: String,
+        onCreated: (CharacterCollection) -> Unit
+    ) {
+        val data = hashMapOf(
+            "name" to name,
+            "characterIds" to emptyList<String>()
+        )
+
+        FirebaseFirestore.getInstance()
+            .collection("users")
+            .document(userId)
+            .collection("collections")
+            .add(data)
+            .addOnSuccessListener { ref ->
+                onCreated(CharacterCollection(id = ref.id, name = name, characterIds = emptyList()))
+                Toast.makeText(this, "Collection created.", Toast.LENGTH_SHORT).show()
+            }
+            .addOnFailureListener {
+                Toast.makeText(this, "Failed to create collection.", Toast.LENGTH_SHORT).show()
+            }
+    }
+
+    private fun addCharacterToCollection(collectionId: String, characterId: String) {
+        val userId = FirebaseAuth.getInstance().currentUser?.uid ?: return
+        val ref = FirebaseFirestore.getInstance()
+            .collection("users")
+            .document(userId)
+            .collection("collections")
+            .document(collectionId)
+
+        ref.update("characterIds", com.google.firebase.firestore.FieldValue.arrayUnion(characterId))
+            .addOnSuccessListener {
+                Toast.makeText(this, "Added to collection.", Toast.LENGTH_SHORT).show()
+            }
+            .addOnFailureListener {
+                Toast.makeText(this, "Failed to add to collection.", Toast.LENGTH_SHORT).show()
+            }
+    }
+
     private fun showCharacters(
         rv: RecyclerView,
         orderBy: String = "createdAt"
@@ -122,13 +246,13 @@ class CharacterHubActivity : BaseActivity() {
 
                     // 2) Build preview
                     CharacterPreview(
-                        id        = cp.id,
-                        name      = cp.name,
-                        summary   = cp.summary.orEmpty(),
+                        id = cp.id,
+                        name = cp.name,
+                        summary = cp.summary.orEmpty(),
                         avatarUri = cp.avatarUri,
                         avatarResId = cp.avatarResId ?: R.drawable.placeholder_avatar,
-                        author    = cp.author,
-                        rawJson   = Gson().toJson(cp) // FULL profile as JSON!
+                        author = cp.author,
+                        rawJson = Gson().toJson(cp)
                     )
 
                 }
