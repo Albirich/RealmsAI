@@ -46,7 +46,7 @@
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintStart_toEndOf="@id/thresholdEdit"
         app:layout_constraintEnd_toStartOf="@id/btnDeleteLevel"
-        android:maxLength="100"
+        android:maxLength="200"
         android:inputType="text"/>
 
     <ImageButton

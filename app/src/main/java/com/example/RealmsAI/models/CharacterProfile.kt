@@ -28,14 +28,14 @@ data class CharacterProfile(
     val eyeColor           : String              = "",
     val hairColor          : String              = "",
     val physicalDescription: String              = "",
-    val abilities           : String              = "",
+    val abilities          : String              = "",
     val gender             : String              = "",
-    val relationships: List<Relationship> = emptyList(),
-    val bubbleColor: String = "#FFFFFF",
-    val textColor: String = "#000000",
-    val sfwOnly: Boolean = true,
-    val private: Boolean = false,
-    val linkedToMap: Map<String, List<CharacterLink>> = emptyMap(),
+    val relationships      : List<Relationship> = emptyList(),
+    val bubbleColor        : String = "#FFFFFF",
+    val textColor          : String = "#000000",
+    val sfwOnly            : Boolean = true,
+    val private            : Boolean = false,
+    val linkedToMap        : Map<String, List<CharacterLink>> = emptyMap(),
     val profileType        : String = "bot"
 )
 

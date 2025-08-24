@@ -243,18 +243,12 @@ class SessionLandingActivity : AppCompatActivity() {
                 loadCharactersByIds(charIds) { profiles ->
                     characterProfiles = profiles
 
-                    // 2. Build slot roster with valid area/location for each
-                    val defaultArea = loadedAreas.firstOrNull()?.name ?: "Default"
-                    val defaultLocation = loadedAreas.firstOrNull()?.locations?.firstOrNull()?.name ?: "Entrance"
-                    val slots = profiles.map { profile ->
-                        profile.toSlotProfile(
-                            relationships = relationships.filter { it.fromId == profile.id },
-                            slotId = UUID.randomUUID().toString()
-                        ).copy(
-                            lastActiveArea = defaultArea,
-                            lastActiveLocation = defaultLocation
-                        )
-                    }
+                    // 2. Build slot roster PRESERVING ORDER and inserting placeholders
+                    val slots = buildSlotRosterFromIds(
+                        orderedIds = charIds,
+                        loadedProfiles = profiles,
+                        areas = loadedAreas
+                    )
 
                     // 3. Auto-assign player to first character (for solo), or use persona selection UI
                     val playerSlot = slots.firstOrNull()  // solo: just use the first
@@ -289,7 +283,7 @@ class SessionLandingActivity : AppCompatActivity() {
                         slotRoster = slots,
                         areas = loadedAreas,
                         history = emptyList(),
-                        currentAreaId = defaultArea,
+                        currentAreaId = loadedAreas.firstOrNull()?.name ?: "Default",
                         relationships = relationships,
                         multiplayer = false,
                         enabledModes = chatProfile?.enabledModes?.toMutableList()?:mutableListOf(),
@@ -598,11 +592,13 @@ class SessionLandingActivity : AppCompatActivity() {
 
                     val harmonizedSlots = mutableListOf<SlotProfile>()
                     for ((i, slot) in slots.withIndex()) {
+                        val slotKey = ModeSettings.SlotKeys.fromPosition(i)
                         val h = harmonizeAndCondenseSlot(
                             slot.toCharacterProfile(),
                             relationships,
                             rpgSettings,
-                            murderSettings
+                            murderSettings,
+                            currentSlotKey = slotKey
                         )
                         harmonizedSlots.add(h)
 
@@ -790,11 +786,46 @@ class SessionLandingActivity : AppCompatActivity() {
         }
     }
 
+    private fun buildSlotRosterFromIds(
+        orderedIds: List<String>,
+        loadedProfiles: List<CharacterProfile>,
+        areas: List<Area>
+    ): List<SlotProfile> {
+        val byId = loadedProfiles.associateBy { it.id }
+        val defaultArea = areas.firstOrNull()?.name ?: "Default"
+        val defaultLoc  = areas.firstOrNull()?.locations?.firstOrNull()?.name ?: "Entrance"
+
+        return orderedIds.mapIndexed { index, id ->
+            val slotId = "slot-${index + 1}-${System.currentTimeMillis()}"
+            val prof = byId[id]
+            if (prof != null) {
+                prof.toSlotProfile(
+                    relationships = emptyList(), // you merge session rels elsewhere
+                    slotId = slotId
+                ).copy(
+                    lastActiveArea     = defaultArea,
+                    lastActiveLocation = defaultLoc
+                )
+            } else {
+                // No doc for this id → placeholder slot at the same position
+                makePlaceholderSlot(index + 1).copy(
+                    slotId = slotId,
+                    lastActiveArea     = defaultArea,
+                    lastActiveLocation = defaultLoc,
+                    // optional: name that shows its slot number
+                    name = "character${index + 1}"
+                )
+            }
+        }
+    }
+
+
     private suspend fun harmonizeAndCondenseSlot(
         profile: CharacterProfile,
         relationships: List<Relationship>,
         rpgSettings: ModeSettings.RPGSettings?,
-        murder: ModeSettings.MurderSettings?
+        murder: ModeSettings.MurderSettings?,
+        currentSlotKey: String
     ): SlotProfile = withContext(Dispatchers.IO) {
         val roleForThisChar = rpgSettings
             ?.characters
@@ -911,25 +942,30 @@ class SessionLandingActivity : AppCompatActivity() {
             ?: calcDefense(rpgStats, matchingRpgCharacter?.characterClass?.name ?: "")
         val links: List<CharacterLink> = rpgSettings?.linkedToMap?.get(profile.id) ?: emptyList()
 
-        // 1. Grab VNSettings (once, outside this function if possible!)
+        // 1) Pull VN settings JSON
         val vnSettingsJson = sessionProfile?.modeSettings?.get("vn") as? String
-        val vnSettings = if (!vnSettingsJson.isNullOrBlank()) {
+        val vnSettings = if (!vnSettingsJson.isNullOrBlank())
             Gson().fromJson(vnSettingsJson, VNSettings::class.java)
-        } else null
+        else null
 
-        // ... inside harmonizeAndCondenseSlot for this character (profile):
+        // 2) Build the vnRelationships map for THIS slot (slot-keyed!)
+        val vnRelMap = mutableMapOf<String, ModeSettings.VNRelationship>()
+        vnSettings?.characterBoards
+            ?.get(currentSlotKey)           // <-- use "characterN", not baseId
+            ?.forEach { (toSlotKey, rel) ->
+                // make sure the rel itself uses slot keys (defensive copy)
+                if (rel.fromSlotKey != currentSlotKey || rel.toSlotKey != toSlotKey) {
+                    vnRelMap[toSlotKey] = rel.copy(fromSlotKey = currentSlotKey, toSlotKey = toSlotKey)
+                } else {
+                    vnRelMap[toSlotKey] = rel
+                }
+            }
 
-        val baseId = profile.id
-        val relationshipsMap = mutableMapOf<String, VNRelationship>()
+        // (optional) write back normalized settings (not required)
+        sessionProfile?.modeSettings?.set("vn", Gson().toJson(vnSettings))
 
         // When building the SlotProfile, set role + hiddenRoles from updated rpgSettings:
         val roleName = matchingRpgCharacter?.role?.name ?: ""
-
-        vnSettings?.characterBoards?.get(baseId)?.forEach { (toId, rel) ->
-            relationshipsMap[toId] = rel
-        }
-
-        sessionProfile?.modeSettings?.set("vn", Gson().toJson(vnSettings))
 
         // Return the full SlotProfile
         SlotProfile(
@@ -967,7 +1003,7 @@ class SessionLandingActivity : AppCompatActivity() {
             maxHp = maxHp,
             defense = defense,
             linkedTo = links,
-            vnRelationships = relationshipsMap,
+            vnRelationships = vnRelMap,
             hiddenRoles = roleName
         )
     }
@@ -1021,12 +1057,21 @@ class SessionLandingActivity : AppCompatActivity() {
                                 }
                             }
                             1 -> { // Replace
-                                // Launch CharacterAdditionActivity for replacement
+                                val slot = sessionProfile?.slotRoster?.firstOrNull { it.baseCharacterId == character.id }
+                                // if character.id could be "placeholder-<slotId>", fall back to finding by that:
+                                    ?: sessionProfile?.slotRoster?.firstOrNull { "placeholder-${it.slotId}" == character.id }
+
+                                if (slot == null) {
+                                    Toast.makeText(context, "Couldn’t resolve slot to replace.", Toast.LENGTH_SHORT).show()
+                                    return@setItems
+                                }
+
                                 context.startActivityForResult(
                                     Intent(context, CharacterAdditionActivity::class.java)
-                                        .putExtra("replaceCharacterId", character.id)
+                                        .putExtra("replaceSlotId", slot.slotId)
+                                        .putExtra("oldBaseCharacterId", slot.baseCharacterId ?: "")
                                         .putExtra("entry", "Replace"),
-                                    103 // or any unique requestCode
+                                    103
                                 )
                             }
                             2 -> { // Remove
@@ -1204,60 +1249,89 @@ class SessionLandingActivity : AppCompatActivity() {
                         .update("relationships", relationships)
                 }
             }
-            103 -> { // Replacement logic
+            103 -> {
                 val type = data.getStringExtra("SELECTED_TYPE") // "character" or "persona"
-                val id = data.getStringExtra("SELECTED_ID") ?: return
-                val replaceCharacterId = data.getStringExtra("replaceCharacterId") ?: return
+                val id   = data.getStringExtra("SELECTED_ID") ?: return
+                val replaceSlotId      = data.getStringExtra("replaceSlotId") ?: return
+                val oldBaseCharacterId = data.getStringExtra("oldBaseCharacterId")
 
                 val sessionId = lobbySessionId ?: return
-
                 val collection = if (type == "character") "characters" else "personas"
+
                 FirebaseFirestore.getInstance().collection(collection).document(id).get()
                     .addOnSuccessListener { doc ->
-                        val (newProfile, newRelationships) = when (type) {
+
+                        // ⬇️ Make the types explicit + null-safe
+                        val newProfile: CharacterProfile
+                        val newRelationships: List<Relationship>
+
+                        when (type) {
                             "character" -> {
-                                val profile = doc.toObject(CharacterProfile::class.java) ?: return@addOnSuccessListener
-                                profile to profile.relationships
+                                val prof = doc.toObject(CharacterProfile::class.java) ?: return@addOnSuccessListener
+                                newProfile = prof
+                                newRelationships = prof.relationships ?: emptyList()
                             }
                             "persona" -> {
-                                val profile = doc.toObject(PersonaProfile::class.java) ?: return@addOnSuccessListener
-                                profile.toCharacterProfile() to profile.relationships
+                                val persona = doc.toObject(PersonaProfile::class.java) ?: return@addOnSuccessListener
+                                val prof = persona.toCharacterProfile()
+                                newProfile = prof
+                                newRelationships = persona.relationships ?: emptyList()
                             }
                             else -> return@addOnSuccessListener
                         }
-                        val newSlot = newProfile.toSlotProfile(
-                            relationships = emptyList(), // you will assign actual relationships via sessionProfile after updating
-                            slotId = UUID.randomUUID().toString()
-                        )
 
-                        // --- Relationships update ---
-                        val oldRelationships = sessionProfile?.relationships?.toMutableList() ?: mutableListOf()
-                        // Remove all relationships with fromId == replaceCharacterId
-                        oldRelationships.removeAll { it.fromId == replaceCharacterId }
-                        // Add new character's relationships (update their fromId if needed)
-                        val relsToAdd = newRelationships.map { it.copy(fromId = newProfile.id) }
-                        oldRelationships.addAll(relsToAdd)
-
-                        // --- Replace the slot in the roster ---
                         val oldRoster = sessionProfile?.slotRoster ?: return@addOnSuccessListener
-                        val newRoster = oldRoster.map {
-                            if (it.baseCharacterId == replaceCharacterId) newSlot else it
+                        val oldSlot   = oldRoster.firstOrNull { it.slotId == replaceSlotId } ?: run {
+                            Toast.makeText(this, "Slot not found.", Toast.LENGTH_SHORT).show()
+                            return@addOnSuccessListener
                         }
 
-                        // --- Update Firestore ---
+                        // Optional: prevent duplicates except for the slot we’re replacing
+                        if (oldRoster.any { it.baseCharacterId == newProfile.id && it.slotId != replaceSlotId }) {
+                            Toast.makeText(this, "That character is already in the session.", Toast.LENGTH_SHORT).show()
+                            return@addOnSuccessListener
+                        }
+
+                        val newSlot = oldSlot.copy(
+                            baseCharacterId     = newProfile.id,
+                            name                = newProfile.name,
+                            summary             = newProfile.summary ?: "",
+                            personality         = newProfile.personality ?: "",
+                            privateDescription  = newProfile.privateDescription ?: "",
+                            greeting            = newProfile.greeting ?: "",
+                            avatarUri           = newProfile.avatarUri ?: "",
+                            outfits             = newProfile.outfits ?: emptyList(),
+                            currentOutfit       = newProfile.currentOutfit ?: "",
+                            sfwOnly             = newProfile.sfwOnly,
+                            relationships       = emptyList(),
+                            isPlaceholder       = false
+                        )
+
+                        val updatedRelationships = (sessionProfile?.relationships ?: emptyList()).toMutableList()
+                        if (!oldBaseCharacterId.isNullOrBlank()) {
+                            updatedRelationships.removeAll { it.fromId == oldBaseCharacterId }
+                        }
+                        // ✅ newRelationships is a List<Relationship> now, so map() is available
+                        updatedRelationships += newRelationships.map { it.copy(fromId = newProfile.id) }
+
+                        val newRoster = oldRoster.map { if (it.slotId == replaceSlotId) newSlot else it }
+
                         FirebaseFirestore.getInstance().collection("sessions")
                             .document(sessionId)
                             .update(
                                 mapOf(
                                     "slotRoster" to newRoster,
-                                    "relationships" to oldRelationships
+                                    "relationships" to updatedRelationships
                                 )
                             )
                             .addOnSuccessListener {
                                 sessionProfile?.slotRoster = newRoster
-                                sessionProfile?.relationships = oldRelationships
+                                sessionProfile?.relationships = updatedRelationships
                                 displaySession(sessionProfile!!)
                                 Toast.makeText(this, "Character replaced!", Toast.LENGTH_SHORT).show()
+                            }
+                            .addOnFailureListener {
+                                Toast.makeText(this, "Failed to replace: ${it.message}", Toast.LENGTH_SHORT).show()
                             }
                     }
             }

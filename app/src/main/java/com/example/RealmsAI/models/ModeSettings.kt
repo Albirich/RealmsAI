@@ -127,6 +127,7 @@ sealed class ModeSettings : java.io.Serializable {
     )
 
     data class RelationshipLevel(
+        val id: String = UUID.randomUUID().toString(),
         var level: Int = 0,
         var threshold: Int = 0,
         var personality: String = "",

@@ -752,17 +752,17 @@ object PromptBuilder {
         """.trimIndent()
         }
 
-        // Build one block per relationship
+        // Build one block per relationship (slot-key aware)
         val relationshipsText = slotProfile.vnRelationships.values.joinToString("\n\n") { rel ->
-            val toName = sessionProfile.slotRoster.find { it.baseCharacterId == rel.toSlotKey }?.name ?: "(Unknown)"
+            val toName = nameForSlotKey(rel.toSlotKey, sessionProfile.slotRoster)
             val currentLevelObj = rel.levels.getOrNull(rel.currentLevel)
-            val personality = currentLevelObj?.personality ?: "(No description)"
+            val personality = currentLevelObj?.personality?.takeIf { it.isNotBlank() } ?: "(No description)"
             """
-        With $toName:
-        - Relationship Level Description: $personality
-        - What raises the relationship: ${rel.upTriggers}
-        - What can harm the relationship: ${rel.downTriggers}
-        """.trimIndent()
+                With $toName:
+                - Relationship Level Description: $personality
+                - What raises the relationship: ${rel.upTriggers}
+                - What can harm the relationship: ${rel.downTriggers}
+            """.trimIndent()
         }
 
         return """
@@ -860,5 +860,11 @@ object PromptBuilder {
             The killer is among the other characters, it could be anyone.
         """.trimIndent()
     }
+
+    private fun nameForSlotKey(slotKey: String, roster: List<SlotProfile>): String {
+        val idx = slotKey.removePrefix("character").toIntOrNull()?.minus(1) ?: return "(Unknown)"
+        return roster.getOrNull(idx)?.name ?: "(Unknown)"
+    }
+
 }
 

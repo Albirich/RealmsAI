@@ -39,6 +39,10 @@ class CharacterAdditionActivity : AppCompatActivity() {
         doneButton = findViewById(R.id.doneButton)
 
         replaceCharacterId = intent.getStringExtra("replaceCharacterId")
+        // at top (e.g., onCreate)
+        val incomingReplaceSlotId      = intent.getStringExtra("replaceSlotId")
+        val incomingOldBaseCharacterId = intent.getStringExtra("oldBaseCharacterId")
+
 
         adapter = AddableProfileAdapter { profile ->
             selectedProfile = profile
@@ -56,27 +60,29 @@ class CharacterAdditionActivity : AppCompatActivity() {
 
         doneButton.isEnabled = false
         doneButton.setOnClickListener {
-            selectedProfile?.let { profile ->
-                val resultIntent = Intent().apply {
-                    when (profile) {
-                        is AddableProfile.Character -> {
-                            putExtra("SELECTED_TYPE", "character")
-                            putExtra("SELECTED_ID", profile.profile.id)
-                        }
-                        is AddableProfile.Persona -> {
-                            putExtra("SELECTED_TYPE", "persona")
-                            putExtra("SELECTED_ID", profile.profile.id)
-                        }
+            val sel = selectedProfile ?: return@setOnClickListener
+            val resultIntent = Intent().apply {
+                when (sel) {
+                    is AddableProfile.Character -> {
+                        putExtra("SELECTED_TYPE", "character")
+                        putExtra("SELECTED_ID", sel.profile.id)
                     }
-                    // Pass back the replacement ID if we are in replace mode!
-                    replaceCharacterId?.let {
-                        putExtra("replaceCharacterId", it)
+                    is AddableProfile.Persona -> {
+                        putExtra("SELECTED_TYPE", "persona")
+                        putExtra("SELECTED_ID", sel.profile.id)
                     }
                 }
-                setResult(Activity.RESULT_OK, resultIntent)
-                finish()
+                // echo the passthroughs the caller needs
+                incomingReplaceSlotId?.let      { putExtra("replaceSlotId", it) }
+                incomingOldBaseCharacterId?.let { putExtra("oldBaseCharacterId", it) }
+
+                // (optional) keep backward-compat if something else still reads this older key:
+                // replaceCharacterId?.let { putExtra("replaceCharacterId", it) }
             }
+            setResult(Activity.RESULT_OK, resultIntent)
+            finish()
         }
+
     }
 
     private fun loadGlobalCharacters() {

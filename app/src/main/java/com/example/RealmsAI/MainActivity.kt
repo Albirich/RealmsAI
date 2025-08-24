@@ -1444,18 +1444,21 @@ class MainActivity : AppCompatActivity() {
                                 roleplayPrompt
                             }
                             Log.d("AI_response", "History: $chatHistory")
-                            val nsfwinstructions =  "/n - Be descriptive and explicit. The more sexual and erotic the better"
-
+                            val nsfwinstructions =  "\n - Be descriptive and explicit. The more sexual and erotic the better"
+                            val nsfwRejection = "\n - If responding to not safe for work messages, reject them while remaining in character."
+                            val nsfwRejectionPrompt = vnCheckedPrompt + nsfwRejection
                             val nsfwPrompt = vnCheckedPrompt + nsfwinstructions
 
                             // Switch models as needed
                             val roleplayResponse =
                                 if (isNSFW)
-                                    Facilitator.callMixtralApi(nsfwPrompt, BuildConfig.MIXTRAL_API_KEY)
+                                    if (slotProfile.sfwOnly){
+                                        Facilitator.callOpenAiApi(nsfwRejectionPrompt, BuildConfig.OPENAI_API_KEY)
+                                    }else {
+                                        Facilitator.callMixtralApi(nsfwPrompt, BuildConfig.MIXTRAL_API_KEY)
+                                    }
                                 else
                                     Facilitator.callOpenAiApi(vnCheckedPrompt, BuildConfig.OPENAI_API_KEY)
-
-
                             ensureActive()
                             Log.d("ai_cycle", "Roleplay Prompt is: $vnCheckedPrompt")
 
@@ -1954,25 +1957,33 @@ class MainActivity : AppCompatActivity() {
                             }
 
                             val nsfwinstructions =  "/n - Be descriptive and explicit. The more sexual and erotic the better"
-
+                            val nsfwRejection = "\n - If responding to not safe for work messages, reject them while remaining in character."
+                            val nsfwRejectionPrompt = vnCheckedPrompt + nsfwRejection
                             val nsfwPrompt = vnCheckedPrompt + nsfwinstructions
 
                             Log.d("AI_response", "History: $chatHistory")
                             val rpgPrompt = if (slotProfile.hiddenRoles == "GM"){
                                 if (isNSFW){
-                                    nsfwPrompt + gmPrompt + PromptBuilder.buildRPGLiteRules()
+                                    if (slotProfile.sfwOnly){
+                                        vnCheckedPrompt + nsfwRejection + gmPrompt + PromptBuilder.buildRPGLiteRules()
+                                    }else {
+                                        nsfwPrompt + gmPrompt + PromptBuilder.buildRPGLiteRules()
+                                    }
                                 }else {
                                     vnCheckedPrompt + gmPrompt + PromptBuilder.buildRPGLiteRules()
                                 }
                             }else{
                                 if (isNSFW){
-                                    nsfwPrompt + playerPrompt + PromptBuilder.buildRPGLiteRules()
+                                    if (slotProfile.sfwOnly){
+                                        vnCheckedPrompt + nsfwRejection + playerPrompt + PromptBuilder.buildRPGLiteRules()
+                                    }else {
+                                        nsfwPrompt + playerPrompt + PromptBuilder.buildRPGLiteRules()
+                                    }
                                 }else {
                                     vnCheckedPrompt + playerPrompt + PromptBuilder.buildRPGLiteRules()
                                 }
                             }
 
-                            // Switch models as needed
                             val roleplayResponse =
                                 if (isNSFW)
                                     Facilitator.callMixtralApi(rpgPrompt, BuildConfig.MIXTRAL_API_KEY)
@@ -2916,22 +2927,21 @@ class MainActivity : AppCompatActivity() {
                         }
 
                         Log.d("AI_response", "History: $chatHistory")
-                        val nsfwinstructions = "\n - Be descriptive and explicit. The more sexual and erotic the better"
+                        val nsfwinstructions =  "\n - Be descriptive and explicit. The more sexual and erotic the better"
+                        val nsfwRejection = "\n - If responding to not safe for work messages, reject them while remaining in character."
+                        val nsfwRejectionPrompt = vnCheckedPrompt + nsfwRejection
+                        val nsfwPrompt = vnCheckedPrompt + nsfwinstructions
 
-                        val nsfwPrompt = finalRoleplayPrompt + nsfwinstructions
                         // Switch models as needed
                         val roleplayResponse =
-                        if (isNSFW)
-                            Facilitator.callMixtralApi(
-                                nsfwPrompt,
-                                BuildConfig.MIXTRAL_API_KEY
-                            )
-                        else
-                            Facilitator.callOpenAiApi(
-                                finalRoleplayPrompt,
-                                BuildConfig.OPENAI_API_KEY
-                            )
-
+                            if (isNSFW)
+                                if (slotProfile.sfwOnly){
+                                    Facilitator.callOpenAiApi(nsfwRejectionPrompt, BuildConfig.OPENAI_API_KEY)
+                                }else {
+                                    Facilitator.callMixtralApi(nsfwPrompt, BuildConfig.MIXTRAL_API_KEY)
+                                }
+                            else
+                                Facilitator.callOpenAiApi(vnCheckedPrompt, BuildConfig.OPENAI_API_KEY)
                         ensureActive()
                         Log.d("ai_cycle", "Roleplay Prompt is: $roleplayPrompt")
                         Log.d("AI_response", "Roleplay Response:\n$roleplayResponse")

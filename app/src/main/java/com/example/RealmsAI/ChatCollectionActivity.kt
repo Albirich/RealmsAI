@@ -14,6 +14,7 @@ import com.example.RealmsAI.adapters.CollectionAdapter.CharacterRowAdapter
 import com.example.RealmsAI.models.CharacterCollection
 import com.example.RealmsAI.models.CharacterPreview
 import com.example.RealmsAI.models.CharacterProfile
+import com.example.RealmsAI.models.ModeSettings
 import com.example.RealmsAI.models.SlotProfile
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
@@ -27,6 +28,7 @@ class ChatCollectionActivity : AppCompatActivity() {
     private val slotRoster = mutableListOf<SlotProfile>()
     private lateinit var rowAdapter: CharacterRowAdapter
     private var pendingReplaceIndex: Int = -1
+
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -59,17 +61,18 @@ class ChatCollectionActivity : AppCompatActivity() {
 
         // Add Placeholder
         findViewById<Button>(R.id.btnAddPlaceholder).setOnClickListener {
-            val next = slotRoster.size + 1
-            slotRoster.add(
-                // use your shared SlotProfile factory if you have it public; otherwise inline:
-                com.example.RealmsAI.models.SlotProfile(
-                    slotId = "slot-$next-${System.currentTimeMillis()}",
-                    name = "Empty Slot",
-                    isPlaceholder = true
-                )
+            val slotIndex = selectedCharacters.size
+
+            val placeholder = CharacterProfile(
+                id = "placeholder:$slotIndex:${System.currentTimeMillis()}",
+                name = "Empty Slot",
+                avatarUri = null,
+                profileType = "placeholder"
             )
+            selectedCharacters.add(placeholder)
             rebind()
         }
+
 
         findViewById<Button>(R.id.btnAddCollection).setOnClickListener {
             loadUserCollections { userCollections ->
@@ -107,6 +110,13 @@ class ChatCollectionActivity : AppCompatActivity() {
             finish()
         }
     }
+
+    fun makePlaceholderSlot(slotIndex: Int): SlotProfile = SlotProfile(
+        slotId = "slot-$slotIndex-${System.currentTimeMillis()}",
+        baseCharacterId = null,
+        name = "Empty Slot",
+        isPlaceholder = true
+    )
 
     private fun loadUserCollections(onLoaded: (List<CharacterCollection>) -> Unit) {
         val db = FirebaseFirestore.getInstance()
@@ -156,13 +166,6 @@ class ChatCollectionActivity : AppCompatActivity() {
         // no need to pass TARGET_INDEX unless your picker echoes it back
         startActivityForResult(intent, 2001)
     }
-
-    fun makePlaceholderSlot(slotIndex: Int): SlotProfile = SlotProfile(
-        slotId = "slot-$slotIndex-${System.currentTimeMillis()}",
-        baseCharacterId = null,
-        name = "Empty Slot",
-        isPlaceholder = true
-    )
 
     fun CharacterProfile.toSlot(slotIndex: Int, keepSlotId: String? = null): SlotProfile =
         SlotProfile(
