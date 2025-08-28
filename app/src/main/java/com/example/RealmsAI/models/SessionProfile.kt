@@ -91,9 +91,10 @@ data class SlotProfile(
     var statusEffects: MutableList<String> = mutableListOf(),
     val lastActiveArea: String? = null,
     val lastActiveLocation: String? = null,
-    val lastSynced: Timestamp? = null,
+    var lastSynced: com.google.firebase.Timestamp? = null,
     val pose: String? = null,
     val typing: Boolean = false,
+    var moreInfo: String? = null,
     // -- RPG STUFF --
     var hiddenRoles: String? = "",
     val rpgClass: String = "",
@@ -104,7 +105,7 @@ data class SlotProfile(
     val defense: Int = 0,
     @get:Exclude var linkedTo: List<CharacterLink> = emptyList(),
     // -- VN STUFF --
-    val vnRelationships: MutableMap<String, VNRelationship> = mutableMapOf()
+    var vnRelationships: MutableMap<String, VNRelationship> = mutableMapOf()
 )
 data class TaggedMemory(
     var id: String = "",

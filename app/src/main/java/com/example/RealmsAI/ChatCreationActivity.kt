@@ -17,6 +17,7 @@ import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
+import com.google.firebase.firestore.FieldPath
 
 class ChatCreationActivity : AppCompatActivity() {
 
@@ -246,6 +247,7 @@ class ChatCreationActivity : AppCompatActivity() {
             intent.putExtra("SELECTED_CHARACTERS_JSON", gson.toJson(selectedCharacters))
             intent.putExtra("AREAS_JSON", gson.toJson(loadedAreas))
             startActivityForResult(intent, REQUEST_CODE_VN_SETTINGS)
+            Log.d("VN_settings", "sending $selectedCharacters")
         }
 
         checkboxGodMode.setOnCheckedChangeListener { _, isChecked ->
@@ -394,16 +396,56 @@ class ChatCreationActivity : AppCompatActivity() {
             }
     }
 
-    private fun loadCharactersFromFirestoreByIds(ids: List<String>, onLoaded: (List<CharacterProfile>) -> Unit) {
+    private fun loadCharactersFromFirestoreByIds(
+        ids: List<String>,
+        onLoaded: (List<CharacterProfile>) -> Unit
+    ) {
         if (ids.isEmpty()) { onLoaded(emptyList()); return }
-        FirebaseFirestore.getInstance()
-            .collection("characters")
-            .whereIn("id", ids)
-            .get()
-            .addOnSuccessListener { snap ->
-                val chars = snap.documents.mapNotNull { it.toObject(CharacterProfile::class.java) }
-                onLoaded(chars)
-            }
-            .addOnFailureListener { onLoaded(emptyList()) }
+
+        val db = FirebaseFirestore.getInstance()
+        val chunks = ids.chunked(10) // Firestore whereIn limit
+        val found = mutableMapOf<String, CharacterProfile>()
+        var remaining = chunks.size
+
+        chunks.forEach { group ->
+            db.collection("characters")
+                .whereIn(FieldPath.documentId(), group)   // ← use documentId, not the "id" field
+                .get()
+                .addOnSuccessListener { snap ->
+                    snap.documents.forEach { doc ->
+                        doc.toObject(CharacterProfile::class.java)?.let { cp ->
+                            // always trust the doc id
+                            found[doc.id] = cp.copy(id = doc.id)
+                        }
+                    }
+                }
+                .addOnCompleteListener {
+                    remaining--
+                    if (remaining == 0) {
+                        // preserve original order and fill missing with placeholders
+                        val ordered = ids.mapIndexed { idx, wantId ->
+                            found[wantId] ?: makePlaceholderProfile(wantId, idx)
+                        }
+                        onLoaded(ordered)
+                    }
+                }
+        }
+    }
+
+    private fun makePlaceholderProfile(placeholderId: String, position: Int): CharacterProfile {
+        // Try to show a friendlier display name like "Empty Slot #4"
+        val slotNum = Regex("""placeholder-slot-(\d+)-""")
+            .find(placeholderId)?.groupValues?.getOrNull(1)?.toIntOrNull()
+            ?: Regex("""placeholder:(\d+):""")
+                .find(placeholderId)?.groupValues?.getOrNull(1)?.toIntOrNull()
+        val displayName = if (slotNum != null) "Empty Slot #$slotNum" else "Empty Slot"
+
+        return CharacterProfile(
+            id = placeholderId,
+            name = displayName,
+            avatarUri = null,
+            profileType = "placeholder",
+            relationships = emptyList() // safe defaults; keep others at their data-class defaults
+        )
     }
 }

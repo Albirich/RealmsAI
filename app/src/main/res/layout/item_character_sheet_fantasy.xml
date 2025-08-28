@@ -168,4 +168,26 @@
         app:layout_constraintEnd_toEndOf="@id/nameView"
         android:paddingBottom="5dp"/>
 
+    <!-- Status Effects -->
+    <TextView
+        android:id="@+id/moreInfoHeader"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="More Info:"
+        android:textStyle="bold"
+        android:textSize="18sp"
+        app:layout_constraintTop_toBottomOf="@id/statusList"
+        app:layout_constraintStart_toStartOf="@id/avatarView"
+        android:layout_marginTop="12dp"/>
+
+    <TextView
+        android:id="@+id/moreInfo"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        app:layout_constraintTop_toBottomOf="@id/moreInfoHeader"
+        app:layout_constraintStart_toStartOf="@id/avatarView"
+        app:layout_constraintEnd_toEndOf="@id/nameView"
+        android:paddingBottom="5dp"/>
+
 </androidx.constraintlayout.widget.ConstraintLayout>

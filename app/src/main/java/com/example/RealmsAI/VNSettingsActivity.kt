@@ -40,14 +40,6 @@ class VNSettingsActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_vn_settings)
 
-        monogamyCheck = findViewById(R.id.monogamyCheck)
-        monogamyLevel = findViewById(R.id.monogamyLevel)
-        jealousyCheck = findViewById(R.id.jealousyCheck)
-        mainCharModeCheck = findViewById(R.id.mainCharModeCheck)
-        mainCharSpinner = findViewById(R.id.mainCharSpinner)
-        relationshipBoardList = findViewById(R.id.relationshipList) // Make sure your XML uses this id!
-        saveButton = findViewById(R.id.saveButton)
-
         // Load data from intent
         val charactersJson = intent.getStringExtra("SELECTED_CHARACTERS_JSON")
         selectedCharacters = Gson().fromJson(charactersJson, Array<CharacterProfile>::class.java).toList()
@@ -58,19 +50,43 @@ class VNSettingsActivity : AppCompatActivity() {
         vnSettings = if (currentSettingsJson.isNullOrBlank()) VNSettings()
         else Gson().fromJson(currentSettingsJson, VNSettings::class.java)
 
+        normalizeMainCharIdFromPlaceholder()
+        healVnSettingsForRoster()
+
+        monogamyCheck = findViewById(R.id.monogamyCheck)
+        monogamyLevel = findViewById(R.id.monogamyLevel)
+        jealousyCheck = findViewById(R.id.jealousyCheck)
+        mainCharModeCheck = findViewById(R.id.mainCharModeCheck)
+        mainCharSpinner = findViewById(R.id.mainCharSpinner)
+        relationshipBoardList = findViewById(R.id.relationshipList) // Make sure your XML uses this id!
+        saveButton = findViewById(R.id.saveButton)
+
+        android.util.Log.d("VNSettings",
+            "mainCharId=${vnSettings.mainCharId} roster=${characterIds.joinToString()}")
+
+        mainCharSpinner.adapter = ArrayAdapter(
+            this,
+            android.R.layout.simple_spinner_dropdown_item,
+            characterNames
+        )
+
+        val selIdx = vnSettings.mainCharId?.let { characterIds.indexOf(it) } ?: -1
+        if (selIdx >= 0) mainCharSpinner.setSelection(selIdx)
+
+
+        // now render
+        setupRelationshipBoards(mainCharModeCheck.isChecked)
+
+        // set selection safely
+        val idx = vnSettings.mainCharId?.let { characterIds.indexOf(it) } ?: -1
+        if (idx >= 0) mainCharSpinner.setSelection(idx)
+
         // Restore toggles/fields
         monogamyCheck.isChecked = vnSettings.monogamyEnabled
         monogamyLevel.setText(vnSettings.monogamyLevel?.toString() ?: "")
         jealousyCheck.isChecked = vnSettings.jealousyEnabled
         mainCharModeCheck.isChecked = vnSettings.mainCharMode
         mainCharSpinner.visibility = if (vnSettings.mainCharMode) View.VISIBLE else View.GONE
-
-        // Spinner for Main Character selection
-        mainCharSpinner.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, characterNames)
-        if (vnSettings.mainCharId != null) {
-            val idx = characterIds.indexOf(vnSettings.mainCharId)
-            if (idx >= 0) mainCharSpinner.setSelection(idx)
-        }
 
         // Show/hide UI fields based on toggles
         monogamyLevel.visibility = if (monogamyCheck.isChecked) View.VISIBLE else View.GONE
@@ -144,54 +160,122 @@ class VNSettingsActivity : AppCompatActivity() {
     }
 
     private fun slotKeyFor(profile: CharacterProfile, list: List<CharacterProfile>): String {
-        val idx = list.indexOfFirst { it.id == profile.id }
+        val idx = list.indexOfFirst { it.id == profile.id }.let { if (it < 0) 0 else it }
         return ModeSettings.SlotKeys.fromPosition(idx)
     }
 
     private fun setupRelationshipBoards(mainCharMode: Boolean) {
+        if (selectedCharacters.isEmpty()) {
+            relationshipBoardList.visibility = View.GONE
+            return
+        }
         relationshipBoardList.visibility = View.VISIBLE
 
         if (mainCharMode) {
-            val mcId = vnSettings.mainCharId ?: characterIds.first()
-            val mainChar = selectedCharacters.first { it.id == mcId }
-            val otherChars = selectedCharacters.filter { it.id != mcId }
+            val mcId = vnSettings.mainCharId
+                ?.takeIf { id -> selectedCharacters.any { it.id == id } }
+                ?: selectedCharacters.first().id
+            if (vnSettings.mainCharId != mcId) vnSettings.mainCharId = mcId
 
-            val mainKey  = slotKeyFor(mainChar, selectedCharacters)
+            val mainChar  = selectedCharacters.first { it.id == mcId }
+            val otherChars = selectedCharacters.filter { it.id != mcId }
+            val mainKey   = slotKeyFor(mainChar, selectedCharacters)
 
             relationshipBoardList.layoutManager =
                 LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
 
-            // Adapter specifically for "others -> main"
             relationshipBoardList.adapter = VNRelAvatarAdapter_OthersToMain(
                 otherCharacters = otherChars,
                 selectedCharacters = selectedCharacters,
                 mainSlotKey = mainKey,
                 characterBoards = vnSettings.characterBoards
             ) { rel, otherChar ->
-                // rel.fromSlotKey == otherKey, rel.toSlotKey == mainKey
-                launchRelationshipEditor(rel, otherChar, mainChar)
+                val otherKey = slotKeyFor(otherChar, selectedCharacters)
+                val fixed = if (rel.fromSlotKey != otherKey || rel.toSlotKey != mainKey)
+                    rel.copy(fromSlotKey = otherKey, toSlotKey = mainKey) else rel
+                vnSettings.characterBoards.getOrPut(otherKey) { mutableMapOf() }[mainKey] = fixed
+                launchRelationshipEditor(fixed, otherChar, mainChar)
             }
-
         } else {
             relationshipBoardList.layoutManager = LinearLayoutManager(this)
-
-            // FIX: pass selectedCharacters as the 2nd constructor arg
             relationshipBoardList.adapter = VNRelationshipBoardAdapter(
                 characters = selectedCharacters,
                 selectedCharacters = selectedCharacters,
                 characterBoardsBySlot = vnSettings.characterBoards
             ) { rel, fromChar, toChar ->
-                // Ensure the relationship is slot-keyed (safety net; usually already set)
                 val fromKey = slotKeyFor(fromChar, selectedCharacters)
                 val toKey   = slotKeyFor(toChar, selectedCharacters)
                 if (rel.fromSlotKey.isBlank() || rel.toSlotKey.isBlank()) {
                     val fixed = rel.copy(fromSlotKey = fromKey, toSlotKey = toKey)
-                    vnSettings.characterBoards
-                        .getOrPut(fromKey) { mutableMapOf() }[toKey] = fixed
+                    vnSettings.characterBoards.getOrPut(fromKey) { mutableMapOf() }[toKey] = fixed
                 }
                 launchRelationshipEditor(rel, fromChar, toChar)
             }
         }
+    }
+
+    private fun healVnSettingsForRoster() {
+        if (selectedCharacters.isEmpty()) return
+
+        // Valid slot keys for current roster size: character1..characterN
+        val validKeys = ModeSettings.SlotKeys.ALL.take(selectedCharacters.size).toSet()
+
+        // Compute (and persist) a valid main char id/key if in main-char mode
+        val mainKey: String? = if (vnSettings.mainCharMode) {
+            val mcId = vnSettings.mainCharId
+                ?.takeIf { id -> selectedCharacters.any { it.id == id } }
+                ?: selectedCharacters.first().id
+            if (vnSettings.mainCharId != mcId) vnSettings.mainCharId = mcId
+            val mainChar = selectedCharacters.first { it.id == mcId }
+            slotKeyFor(mainChar, selectedCharacters)
+        } else null
+
+        val newBoards = mutableMapOf<String, MutableMap<String, ModeSettings.VNRelationship>>()
+
+        vnSettings.characterBoards.forEach { (fromKey, inner) ->
+            // Drop rows from non-existent slots (e.g., character4 when only 3 exist)
+            if (fromKey !in validKeys) return@forEach
+
+            val toMap = newBoards.getOrPut(fromKey) { mutableMapOf() }
+
+            inner.forEach { (toKey, rel) ->
+                // If 'to' slot is invalid, in main-char mode route to main; else skip
+                val mappedTo: String = when {
+                    toKey in validKeys -> toKey
+                    mainKey != null    -> mainKey
+                    else               -> return@forEach
+                }
+
+                // Fix relationship keys and level.targetSlotKey
+                val fixedLevels = rel.levels.map {
+                    if (it.targetSlotKey != mappedTo) it.copy(targetSlotKey = mappedTo) else it
+                }
+
+                val fixed = rel.copy(
+                    fromSlotKey = fromKey,
+                    toSlotKey = mappedTo,
+                    levels = fixedLevels.toMutableList()
+                )
+
+                toMap[mappedTo] = fixed
+            }
+
+            // Ensure a (from -> main) entry exists in main-char mode
+            if (mainKey != null && mainKey !in toMap) {
+                toMap[mainKey] = ModeSettings.VNRelationship(
+                    fromSlotKey = fromKey,
+                    toSlotKey = mainKey,
+                    levels = mutableListOf(),
+                    upTriggers = "",
+                    downTriggers = "",
+                    points = 0,
+                    notes = "",
+                    currentLevel = 0
+                )
+            }
+        }
+
+        vnSettings.characterBoards = newBoards
     }
 
     private fun launchRelationshipEditor(
@@ -206,6 +290,50 @@ class VNSettingsActivity : AppCompatActivity() {
         intent.putExtra("FROM_NAME", fromChar.name)
         intent.putExtra("TO_NAME", toChar.name)
         startActivityForResult(intent, EDIT_RELATIONSHIP_CODE)
+    }
+
+    private fun normalizeMainCharIdFromPlaceholder() {
+        if (!vnSettings.mainCharMode) return
+
+        // If no roster, there's nothing we can select.
+        if (selectedCharacters.isEmpty()) {
+            vnSettings.mainCharId = null
+            return
+        }
+
+        val rosterIds = characterIds.toSet()
+        val saved = vnSettings.mainCharId
+
+        // Already valid? keep it
+        if (saved != null && saved in rosterIds) return
+
+        // Try to extract slot index from either placeholder format:
+        // 1) "placeholder-slot-4-<ts>" (slot number is 4 → index 3)
+        // 2) "placeholder:3:<ts>"      (index is 3 → index 3)
+        fun extractIndexFromPlaceholder(id: String?): Int? {
+            if (id.isNullOrBlank()) return null
+
+            // Format 1: placeholder-slot-<n>-<ts>
+            Regex("""^placeholder-slot-(\d+)-""")
+                .find(id)?.groupValues?.getOrNull(1)?.toIntOrNull()?.let { n ->
+                    return (n - 1).coerceAtLeast(0)
+                }
+
+            // Format 2: placeholder:<idx>:<ts>
+            Regex("""^placeholder:(\d+):""")
+                .find(id)?.groupValues?.getOrNull(1)?.toIntOrNull()?.let { idx ->
+                    return idx.coerceAtLeast(0)
+                }
+
+            return null
+        }
+
+        val slotIndex = extractIndexFromPlaceholder(saved)
+        val fallbackId = slotIndex
+            ?.let { idx -> selectedCharacters.getOrNull(idx)?.id }
+            ?: selectedCharacters.first().id
+
+        vnSettings.mainCharId = fallbackId
     }
 
 

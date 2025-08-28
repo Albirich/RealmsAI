@@ -15,7 +15,7 @@ object Facilitator {
         withContext(Dispatchers.IO) {
             try {
                 val request = com.example.RealmsAI.network.OpenAiChatRequest(
-                    model = "gpt-4o-mini-2024-07-18",
+                    model = "gpt-4.1-mini-2025-04-14",
                     messages = listOf(
                         com.example.RealmsAI.network.Message(
                             role = "system",
@@ -36,7 +36,7 @@ object Facilitator {
             try {
                 Log.d("Facilitator", "[OpenAI] Character Prompt:\n$prompt")
                 val request = com.example.RealmsAI.network.OpenAiChatRequest(
-                    model = "gpt-4o-mini-2024-07-18",
+                    model = "gpt-5-mini-2025-08-07",
                     messages = listOf(
                         com.example.RealmsAI.network.Message(
                             role = "system",

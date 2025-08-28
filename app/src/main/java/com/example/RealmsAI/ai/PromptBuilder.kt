@@ -166,8 +166,9 @@ object PromptBuilder {
         - Only provide a detailed scene narration when a **new scene or area begins** or when **major events occur**. Do **not repeat the full environment description every turn** unless something significant changes.
         - Narrate the current area and location ONLY if it has not already been described. Do not repeat environmental narration.
         - Use the **"narrator" voice** (senderId "narrator") only for important descriptions – e.g. initially setting the scene or narrating the outcome of an action or dice roll. **Do not include narrator narration in every reply.**
-        - Narrator messages should be **brief (1-2 sentences)** and contain **no dialogue**, only atmospheric description (similar to how the standalone Narrator prompt works).
+        - Narrator messages are **brief (1-2 sentences)** and contain **no dialogue**, only atmospheric description (similar to how the standalone Narrator prompt works).
         - Narrate actions based on dice rolls that are in chat.
+        - ONLY use NARRATOR if something new happens or the characters need a description for something they are doing.
         - If there is nothing new to describe, do not include any narrator message at all.
         - ALL messages must come from "NARRATOR"        
         At the end of each message, if you need to change the health of a player, or add a status effect to a player add "actions" into the extra fields section of your output:
@@ -469,6 +470,7 @@ object PromptBuilder {
                         "[ID: ${rel.id}] ${rel.toName} is your ${rel.type}: ${rel.description}"
                     }
                 }
+                - More info: ${slotProfile.moreInfo}
 
             SESSION SUMMARY:            
             $sessionSummary
@@ -721,6 +723,7 @@ object PromptBuilder {
             - Any character with the ROLE of VILLAIN is one of the killers.
             - Do not reveal the identity of VILLAIN(s) directly; surface clues instead.
             - Characters must find out who the killer is and arrest them.
+            - DO NOT give the characters the answers by brining unnecessary attention to clues.
         """.trimIndent().lines().filter { it.isNotBlank() }.joinToString("\n")
     }
 
@@ -810,12 +813,10 @@ object PromptBuilder {
         val constraints = """
         Constraints:
         - Assign exactly ONE TARGET (the victim).
-        - ${if (randomize) "Choose at least ONE VILLAIN (killer) at random from non-GM, non-TARGET characters." else "If any characters already have role=VILLAIN, keep them as killers; otherwise choose ONE VILLAIN."}
-        - Never assign GM as TARGET or VILLAIN.
-        - Keep roles for GM unchanged.
+        - Choose at least ONE VILLAIN (killer) at random from non-TARGET characters.
         - Weapon must be short (<= 6 words).
-        - Scene <= 1000 chars, concise and gameable.
-        - Return 3–10 concise clues that *logically* point to the killer(s) (alibi holes, motive hints, physical evidence), no spoilers.
+        - Scene <= 1000 chars, concise and gameable. This is the murder scene. Make it an interesting kill, without clues that immediately incriminates the killer. This information is given directly to the killer and no one else so it should be concise a informative.
+        - Return 3–10 concise clues that *logically* point to the killer(s) (alibi holes, motive hints, physical evidence), no spoilers. Some clues should be red herrings.
     """.trimIndent()
 
         return """
@@ -836,6 +837,41 @@ object PromptBuilder {
         }
     """.trimIndent()
     }
+
+
+     fun buildMysteryTimelineTextPrompt(
+         slots: List<SlotProfile>,
+         rpg: ModeSettings.RPGSettings,
+         murder: ModeSettings.MurderSettings,
+         session: SessionProfile
+     ): String{
+         return """
+        Return ONLY valid JSON in this schema (no prose outside JSON):
+        
+        {
+          "characters": [
+            { "characterId": "<id>", "timelineText": "<multi-line plain text>" }
+          ]
+        }
+        
+        Rules for timelineText:
+        - 6–12 lines for the day.
+        - One event per line, 24h time, then " — " then location, optional companions, short note.
+        - Use "~" before time if approximate. Keep names consistent. Example lines:
+          "13:05 — Kitchen — with Naomi; Mr. Boddy — Argued about the will"
+          "~14:10 — Conservatory — alone — Passed through (seen by maid)"
+        
+        Do NOT change existing roles. Ensure no character is in two places at once.
+        
+        Context:
+        - Characters: ${rpg.characters.joinToString { "${it.characterId}:${it.role}" }}
+        - Locations: ${session.areas.joinToString { it.name }}
+        - Scene: ${murder.sceneDescription.take(300)}
+        - Weapon: ${murder.weapon}
+        - Clues: ${murder.clues.joinToString { it.title }}
+        """.trimIndent()
+    }
+
     fun buildMurdererInfo(
         murderSettings: ModeSettings.MurderSettings
     ): String{

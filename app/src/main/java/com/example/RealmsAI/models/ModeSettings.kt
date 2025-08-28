@@ -111,7 +111,7 @@ sealed class ModeSettings : java.io.Serializable {
         var monogamyEnabled: Boolean = false,
         var monogamyLevel: Int? = null,
         var jealousyEnabled: Boolean = false,
-        val characterBoards: MutableMap<String, MutableMap<String, VNRelationship>> = mutableMapOf(),
+        var characterBoards: MutableMap<String, MutableMap<String, VNRelationship>> = mutableMapOf(),
         var mainCharMode: Boolean = false
     )
 

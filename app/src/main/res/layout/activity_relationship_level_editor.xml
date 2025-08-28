@@ -44,16 +44,21 @@
         android:layout_height="wrap_content"
         android:text="Add Level" />
 
-    <!-- Current Level Picker -->
-    <TextView
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Set Current Level:"
-        android:paddingTop="16dp"/>
-    <Spinner
-        android:id="@+id/currentLevelSpinner"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"/>
+        android:orientation="horizontal">
+    <!-- Current Level Picker -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Set Starting Points:"
+            android:paddingTop="16dp"/>
+        <EditText
+            android:id="@+id/startingPointsEdit"
+            android:layout_width="80dp"
+            android:layout_height="wrap_content"/>
+    </LinearLayout>
 
     <!-- Save Button -->
     <Button

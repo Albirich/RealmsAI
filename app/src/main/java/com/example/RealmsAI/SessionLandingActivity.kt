@@ -55,8 +55,6 @@ class SessionLandingActivity : AppCompatActivity() {
     private lateinit var addcharacter: ImageButton
     private lateinit var sfwToggle: Switch
 
-
-
     // --- State ---
     private var chatProfile: ChatProfile? = null
     private var inviteProfile: InviteProfile? = null
@@ -99,6 +97,7 @@ class SessionLandingActivity : AppCompatActivity() {
         val res = (stats["resolve"] ?: 0)
         return (str / 2) + (res / 2) + 8
     }
+    private lateinit var mysteryMoreInfoByCharId: Map<String, String>
 
     // stuff for updating chars
     private val pendingUpdateDeltas = mutableMapOf<String, UpdateDelta>()  // baseId -> delta
@@ -161,12 +160,12 @@ class SessionLandingActivity : AppCompatActivity() {
                         }
                         sessionProfile = merged
                         bindModeJumpButtons(lobbySessionId!!, merged)
+                        checkForCharacterUpdates()
                     }
                     .addOnFailureListener { e ->
                         Log.e("Session", "Failed to fetch live session; using local cache", e)
                         bindModeJumpButtons(lobbySessionId!!, local)
                     }
-                checkForCharacterUpdates()
                 enteredFrom = "Sessionhub"
             }
             inviteProfilesJson != null -> {
@@ -220,6 +219,7 @@ class SessionLandingActivity : AppCompatActivity() {
                         }
                         sessionProfile = merged
                         bindModeJumpButtons(lobbySessionId!!, merged)
+                        checkForCharacterUpdates()
                     }
                     .addOnFailureListener { e ->
                         Log.e("Session", "Failed to fetch live session; using local cache", e)
@@ -472,7 +472,9 @@ class SessionLandingActivity : AppCompatActivity() {
             if (sessionProfile?.slotRoster!!.size >= 20) {
                 Toast.makeText(this, "You can only have 20 characters/personas per session.", Toast.LENGTH_SHORT).show()
             } else {
-                val intent = Intent(this, CharacterAdditionActivity::class.java)
+                val intent = Intent(this, CharacterSelectionActivity::class.java)
+                intent.putExtra("TEMP_SELECTION_MODE", true)
+                intent.putExtra("MAX_SELECT", 1)
                 startActivityForResult(intent, 101)
             }
         }
@@ -577,15 +579,30 @@ class SessionLandingActivity : AppCompatActivity() {
                         try { gson.fromJson(it, ModeSettings.MurderSettings::class.java) } catch (_: Exception) { null }
                     }
                     if (murderSettings?.enabled == true) {
-                        val (rpgUpd, murderUpd) = generateMurderSetup(
-                            slots = sessionProfile?.slotRoster ?: emptyList(), // raw slots are fine, or harmonized later
-                            rpgSettingsIn = rpgSettings,
-                            murderIn = murderSettings,
+                        // 1) Randomize only if requested
+                        if (murderSettings?.randomizeKillers == true) {
+                            val (rpgUpd, murderUpd) = generateMurderSetup(
+                                slots = sessionProfile?.slotRoster ?: emptyList(),
+                                rpgSettingsIn = rpgSettings,
+                                murderIn = murderSettings,
+                                sessionProfile = sessionProfile!!
+                            )
+                            rpgSettings = rpgUpd
+                            murderSettings = murderUpd
+                            Log.d("ai_response", "seeded: $murderSettings")
+                        } else {
+                            Log.d("ai_response", "randomizeKillers disabled; using creator roles")
+                        }
+
+                        // 2) Build timelines (single AI call → per-character map)
+                        mysteryMoreInfoByCharId = generateMysteryTimelineStrings(
+                            slots = sessionProfile?.slotRoster ?: emptyList(),
+                            rpgSettings = rpgSettings,
+                            murderSettings = murderSettings,
                             sessionProfile = sessionProfile!!
                         )
-                        rpgSettings = rpgUpd
-                        murderSettings = murderUpd
-                        Log.d("ai_response", "$murderSettings")
+                    } else {
+                        mysteryMoreInfoByCharId = emptyMap()
                     }
                     // ==== Harmonize all slots ====
                     val slots = sessionProfile?.slotRoster?.toMutableList() ?: mutableListOf()
@@ -593,12 +610,14 @@ class SessionLandingActivity : AppCompatActivity() {
                     val harmonizedSlots = mutableListOf<SlotProfile>()
                     for ((i, slot) in slots.withIndex()) {
                         val slotKey = ModeSettings.SlotKeys.fromPosition(i)
+                        val timelineText = mysteryMoreInfoByCharId[slot.slotId] ?: ""
                         val h = harmonizeAndCondenseSlot(
                             slot.toCharacterProfile(),
                             relationships,
                             rpgSettings,
                             murderSettings,
-                            currentSlotKey = slotKey
+                            currentSlotKey = slotKey,
+                            moreInfo = timelineText
                         )
                         harmonizedSlots.add(h)
 
@@ -819,13 +838,70 @@ class SessionLandingActivity : AppCompatActivity() {
         }
     }
 
+    private suspend fun generateMysteryTimelineStrings(
+        slots: List<SlotProfile>,
+        rpgSettings: ModeSettings.RPGSettings?,
+        murderSettings: ModeSettings.MurderSettings?,
+        sessionProfile: SessionProfile
+    ): Map<String, String> = withContext(Dispatchers.IO) {
+
+        if (rpgSettings == null || murderSettings == null || !murderSettings.enabled) return@withContext emptyMap()
+
+        val prompt = PromptBuilder.buildMysteryTimelineTextPrompt(slots, rpgSettings, murderSettings, sessionProfile)
+
+        val raw = try {
+            Facilitator.callActivationAI(prompt, BuildConfig.OPENAI_API_KEY)
+        } catch (e: Exception) {
+            Log.e("MysteryTimeline", "AI call failed", e)
+            ""
+        }
+
+        Log.d("timeline", "raw: ${raw.take(600)}")
+
+        // Extract JSON safely
+        val jsonStart = raw.indexOf('{')
+        val jsonEnd = raw.lastIndexOf('}')
+        val json = if (jsonStart != -1 && jsonEnd > jsonStart) raw.substring(jsonStart, jsonEnd + 1) else raw
+
+        val out = try {
+            Gson().fromJson(json, AIMysteryTimelineTextOut::class.java)
+        } catch (e: Exception) {
+            Log.e("MysteryTimeline", "Bad JSON from AI", e)
+            AIMysteryTimelineTextOut()
+        }
+
+        // Build resolver to convert ANY id (slotId or baseId) → baseCharacterId
+        val anyToBase: Map<String, String> = buildMap {
+            slots.forEach { s ->
+                val base = s.baseCharacterId ?: s.slotId
+                put(base, base)         // base -> base
+                put(s.slotId, base)     // slot -> base
+            }
+            rpgSettings.characters.forEach { rc ->
+                put(rc.characterId, rc.characterId) // ensure all base ids resolve
+            }
+        }
+
+        // Normalize keys to baseCharacterId and trim text
+        val map = out.characters.mapNotNull { c ->
+            val base = anyToBase[c.characterId]
+            if (base == null) {
+                Log.w("timeline", "unknown id from AI: ${c.characterId}")
+                null
+            } else base to c.timelineText.trim()
+        }.toMap()
+
+        Log.d("timeline", "built ${map.size} timelines: ${map.keys}")
+        map
+    }
 
     private suspend fun harmonizeAndCondenseSlot(
         profile: CharacterProfile,
         relationships: List<Relationship>,
         rpgSettings: ModeSettings.RPGSettings?,
         murder: ModeSettings.MurderSettings?,
-        currentSlotKey: String
+        currentSlotKey: String,
+        moreInfo: String = ""
     ): SlotProfile = withContext(Dispatchers.IO) {
         val roleForThisChar = rpgSettings
             ?.characters
@@ -854,7 +930,7 @@ class SessionLandingActivity : AppCompatActivity() {
         - The full, correct list of this character's session relationships (by toName, type, etc.).
         Your job:
         1. Rewrite the character's backstory as a series of short memories, each with 2-4 descriptive tags (characters, themes, events, etc).
-        2. Write a condensed summary (1–2 vivid sentences, <100 tokens) combining their summary, personality, and privateDescription.
+        2. Write a condensed summary (1–2 vivid sentences, <100 tokens) combining their summary, background, moreinfo, personality, and privateDescription.
         Return only a single JSON object with these fields:
         {
           "memories": [
@@ -1004,7 +1080,8 @@ class SessionLandingActivity : AppCompatActivity() {
             defense = defense,
             linkedTo = links,
             vnRelationships = vnRelMap,
-            hiddenRoles = roleName
+            hiddenRoles = roleName,
+            moreInfo = moreInfo.takeIf { it.isNotBlank() }
         )
     }
 
@@ -1386,44 +1463,40 @@ class SessionLandingActivity : AppCompatActivity() {
         val vn = try { Gson().fromJson(vnJson, ModeSettings.VNSettings::class.java) } catch (_: Exception) { null }
         if (vn == null) return
 
-        // Build a resolver: slotKey ("character1") -> baseCharacterId (template) for this session
         val roster = sessionProfile?.slotRoster.orEmpty()
 
-        // If roster has an explicit position, prefer that; otherwise rely on list order.
-        // Assuming 'roster' is in visual order 0..n
-        val slotKeyToBaseId: Map<String, String> = roster.mapIndexedNotNull { index, slot ->
-            val slotKey = ModeSettings.SlotKeys.fromPosition(index)
-            val baseId = slot.baseCharacterId
-            // Skip placeholders or empty base ids — nothing to persist for those
-            if (slot.isPlaceholder || baseId.isNullOrBlank()) null else slotKey to baseId
-        }.toMap()
+        // Map slotKey -> (collection, id)
+        data class DocRef(val col: String, val id: String)
 
-        if (slotKeyToBaseId.isEmpty()) return // nothing resolvable to save
+        val slotKeyToRef: Map<String, DocRef> = roster.mapIndexedNotNull { index, slot ->
+            val baseId = slot.baseCharacterId
+            if (slot.isPlaceholder || baseId.isNullOrBlank()) null else {
+                val col = if (slot.profileType == "player") "personas" else "characters"
+                ModeSettings.SlotKeys.fromPosition(index) to DocRef(col, baseId)
+            }
+        }.toMap()
 
         val db = FirebaseFirestore.getInstance()
         val batch = db.batch()
 
-        // vn.characterBoards: Map<fromSlotKey, Map<toSlotKey, VNRelationship>>
         vn.characterBoards.forEach { (fromSlotKey, boardByToKey) ->
-            val fromBaseId = slotKeyToBaseId[fromSlotKey] ?: return@forEach // skip unresolved "from"
+            val fromRef = slotKeyToRef[fromSlotKey] ?: return@forEach
 
-            // Serialize board to Firestore-friendly map keyed by TO base id
+            // 🚫 Only persist for CHARACTER docs (skip personas)
+            if (fromRef.col != "characters") return@forEach
+
+            // Build board only for CHARACTER targets as well
             val boardData: Map<String, Any> = boardByToKey.mapNotNull { (toSlotKey, rel) ->
-                val toBaseId = slotKeyToBaseId[toSlotKey] ?: return@mapNotNull null // skip unresolved "to"
+                val toRef = slotKeyToRef[toSlotKey] ?: return@mapNotNull null
+                if (toRef.col != "characters") return@mapNotNull null
 
-                // Levels are already scoped to rel.toSlotKey via the editor; just persist fields
                 val levelsList = rel.levels.map { lvl ->
-                    mapOf(
-                        "level" to lvl.level,
-                        "threshold" to lvl.threshold,
-                        "personality" to lvl.personality
-                        // targetSlotKey is implied by the edge (from->to), no need to store here
-                    )
+                    mapOf("level" to lvl.level, "threshold" to lvl.threshold, "personality" to lvl.personality)
                 }
 
-                toBaseId to mapOf(
-                    "fromId"       to fromBaseId,
-                    "toId"         to toBaseId,
+                toRef.id to mapOf(
+                    "fromId"       to fromRef.id,
+                    "toId"         to toRef.id,
                     "notes"        to rel.notes,
                     "currentLevel" to rel.currentLevel,
                     "upTriggers"   to rel.upTriggers,
@@ -1434,8 +1507,7 @@ class SessionLandingActivity : AppCompatActivity() {
             }.toMap()
 
             if (boardData.isNotEmpty()) {
-                val cref = db.collection("characters").document(fromBaseId)
-                // Merge so we don’t blow away other character fields
+                val cref = db.collection("characters").document(fromRef.id)
                 batch.set(cref, mapOf("vnBoard" to boardData), com.google.firebase.firestore.SetOptions.merge())
             }
         }
@@ -1620,6 +1692,7 @@ class SessionLandingActivity : AppCompatActivity() {
         relationships: List<Relationship> = emptyList(),
         slotId: String = UUID.randomUUID().toString()
     ): SlotProfile {
+        val initialLastSynced = this.lastTimestamp ?: this.createdAt
         return SlotProfile(
             slotId = slotId,
             baseCharacterId = this.id,
@@ -1643,7 +1716,8 @@ class SessionLandingActivity : AppCompatActivity() {
             currentOutfit = this.currentOutfit ?: "",
             sfwOnly = this.sfwOnly,
             relationships = relationships,
-            profileType = this.profileType ?: "bot"
+            profileType = this.profileType ?: "bot",
+            lastSynced = initialLastSynced
         )
     }
 
@@ -1975,6 +2049,7 @@ class SessionLandingActivity : AppCompatActivity() {
             }
         }
     }
+
     private fun checkForCharacterUpdates() {
         // 1) Collect only real baseIds (skip placeholders / blanks)
         val slots = sessionProfile?.slotRoster.orEmpty()
@@ -1997,33 +2072,61 @@ class SessionLandingActivity : AppCompatActivity() {
 
         // Helper to finalize after all chunks complete
         fun finalizeAndNotify() {
-            // Compare each slot against the freshest base doc we have
+            // Recompute from scratch each time
+            needsUpdateIds.clear()
+            pendingUpdateDeltas.clear()
+
+            val characterBackedIds = baseMap.keys
+
             slots.forEach { slot ->
                 val baseId = slot.baseCharacterId ?: return@forEach
                 val base   = baseMap[baseId] ?: return@forEach
-
-                // 3) Null-safe timestamp logic
                 val baseTs = base.lastTimestamp ?: base.createdAt
                 val lastSynced = slot.lastSynced
+                Log.d("update", "${slot.name} $base ${base.profileType} ${slot.lastSynced}")
 
-                val isNewer =
-                    baseTs != null &&
-                            (lastSynced == null || baseTs.toDate().after(lastSynced.toDate()))
+                // Only use the time gate if BOTH timestamps exist
+                val haveBothTimes = (baseTs != null && lastSynced != null)
+                val timeSaysNewer = haveBothTimes && baseTs!!.toDate().after(lastSynced!!.toDate())
+                val isPersona = base.profileType == "player"
+                if (isPersona) {
+                    Log.d("update", "skip persona slot=${slot.name}")
+                    return@forEach
+                }
 
-                if (!isNewer) return@forEach
-
+                // Compute the actual content differences you care about
                 val delta = computeDelta(base, slot)
-                if (delta.hasChanges) {
+
+                // Rule:
+                // - If we CAN compare by time: require timeSaysNewer AND actual delta.
+                // - If we CAN'T compare by time (e.g., lastSynced == null): rely ONLY on actual delta.
+                val needsUpdate = !isPersona && (
+                        if (haveBothTimes) (timeSaysNewer && delta.hasChanges)
+                        else delta.hasChanges
+                        )
+
+                if (needsUpdate) {
                     needsUpdateIds += baseId
                     pendingUpdateDeltas[baseId] = delta
                 }
             }
 
+            // Update UI highlights no matter what (clears old halos when empty)
+            (charRecycler.adapter as? CharacterRowAdapter)?.setHighlightIds(needsUpdateIds)
+
             if (needsUpdateIds.isNotEmpty()) {
-                (charRecycler.adapter as? CharacterRowAdapter)?.setHighlightIds(needsUpdateIds)
                 Toast.makeText(this, "Some characters have updates available.", Toast.LENGTH_SHORT).show()
             }
+
+            // Debug logging
+            slots.forEach { slot ->
+                val baseId = slot.baseCharacterId
+                val base = baseId?.let { baseMap[it] }
+                val baseTs = base?.lastTimestamp ?: base?.createdAt
+                Log.d("Update", "for ${slot.name} Base=$baseTs  Slot.lastSynced=${slot.lastSynced}  needs=${needsUpdateIds.contains(baseId)}")
+            }
         }
+
 
         // 2) Query by DOCUMENT ID, not "id" field
         var remaining = chunks.size
@@ -2047,9 +2150,9 @@ class SessionLandingActivity : AppCompatActivity() {
     }
 
     private fun computeDelta(base: CharacterProfile, slot: SlotProfile): UpdateDelta {
-        val summaryChanged = (base.summary ?: "") != (slot.summary ?: "")
+        val summaryChanged = false // slot uses condensed summary by design
         val privateChanged = (base.privateDescription ?: "") != (slot.privateDescription ?: "")
-        val posesChanged = (base.outfits ?: emptyList()) != (slot.outfits ?: emptyList<Outfit>()) ||
+        val posesChanged   = (base.outfits ?: emptyList()) != (slot.outfits ?: emptyList<Outfit>()) ||
                 (base.currentOutfit ?: "") != (slot.currentOutfit ?: "")
         return UpdateDelta(summaryChanged, privateChanged, posesChanged)
     }
@@ -2062,18 +2165,16 @@ class SessionLandingActivity : AppCompatActivity() {
             .get()
             .addOnSuccessListener { doc ->
                 val base = doc.toObject(CharacterProfile::class.java) ?: return@addOnSuccessListener
-                val newLastSynced = base.lastTimestamp ?: base.createdAt
+                val newLastSynced = Timestamp.now() // <<< fallback
 
-                // Update the slot(s) that point to this base character
                 val newRoster = sessionProfile?.slotRoster?.map { slot ->
                     if (slot.baseCharacterId != baseCharacterId) return@map slot
-
                     slot.copy(
                         summary = base.summary ?: slot.summary,
                         privateDescription = base.privateDescription ?: slot.privateDescription,
                         outfits = base.outfits ?: slot.outfits,
                         currentOutfit = base.currentOutfit ?: slot.currentOutfit,
-                        lastSynced = newLastSynced
+                        lastSynced = newLastSynced // <<< will now be non-null
                     )
                 } ?: return@addOnSuccessListener
 
@@ -2081,25 +2182,10 @@ class SessionLandingActivity : AppCompatActivity() {
                     .document(sessionId)
                     .update("slotRoster", newRoster)
                     .addOnSuccessListener {
-                        // Local mirror + UI cleanup
                         sessionProfile?.slotRoster = newRoster
                         needsUpdateIds.remove(baseCharacterId)
                         (charRecycler.adapter as? CharacterRowAdapter)?.setHighlightIds(needsUpdateIds)
                         displaySession(sessionProfile!!)
-                        // Optional: tell the user what changed
-                        pendingUpdateDeltas[baseCharacterId]?.let { delta ->
-                            val fields = buildList {
-                                if (delta.summaryChanged) add("description")
-                                if (delta.privateChanged) add("private description")
-                                if (delta.posesChanged) add("poses")
-                            }
-                            Toast.makeText(
-                                this,
-                                if (fields.isEmpty()) "No changes detected."
-                                else "Updated ${fields.joinToString(", ")}.",
-                                Toast.LENGTH_SHORT
-                            ).show()
-                        }
                     }
             }
     }
@@ -2112,22 +2198,20 @@ private suspend fun generateMurderSetup(
     sessionProfile: SessionProfile
 ): Pair<ModeSettings.RPGSettings?, ModeSettings.MurderSettings?> = withContext(Dispatchers.IO) {
 
-    if (rpgSettingsIn == null || murderIn == null || !murderIn.enabled) {
+    // Only seed when enabled AND randomized
+    if (rpgSettingsIn == null || murderIn == null || !murderIn.enabled || murderIn.randomizeKillers != true) {
         return@withContext rpgSettingsIn to murderIn
     }
 
-    // Build prompt
-    val prompt = PromptBuilder.buildMurderSeedingPrompt(slots, rpgSettingsIn, murderIn, sessionProfile )
+    val prompt = PromptBuilder.buildMurderSeedingPrompt(slots, rpgSettingsIn, murderIn, sessionProfile)
 
-    // Call your model (use OpenAI for structured JSON; adjust if you prefer Mixtral)
     val raw = try {
-        Facilitator.callOpenAiApi(prompt, BuildConfig.OPENAI_API_KEY)
+        Facilitator.callActivationAI(prompt, BuildConfig.OPENAI_API_KEY)
     } catch (e: Exception) {
-        Log.e("MurderSeed", "AI call failed", e)
-        ""
+        Log.e("MurderSeed", "AI call failed", e); ""
     }
 
-    // Extract JSON safely
+    // Extract JSON
     val jsonStart = raw.indexOf('{')
     val jsonEnd = raw.lastIndexOf('}')
     val json = if (jsonStart != -1 && jsonEnd > jsonStart) raw.substring(jsonStart, jsonEnd + 1) else raw
@@ -2135,44 +2219,52 @@ private suspend fun generateMurderSetup(
     val out = try {
         Gson().fromJson(json, AIMurderOut::class.java)
     } catch (e: Exception) {
-        Log.e("MurderSeed", "Bad JSON from AI: $raw", e)
-        AIMurderOut()
+        Log.e("MurderSeed", "Bad JSON from AI: $raw", e); AIMurderOut()
     }
 
-    // Fallbacks if AI output is weak
-    val safeRoles = out.roles.toMutableList()
-    val charIds = rpgSettingsIn.characters.map { it.characterId }.toSet()
-    val nonGM = rpgSettingsIn.characters.filter { it.role != ModeSettings.CharacterRole.GM }.map { it.characterId }
-    fun pickRandom(list: List<String>) = list.shuffled().firstOrNull()
+    Log.d("ai_response", "raw output $out")
 
-    // Ensure exactly one TARGET
-    if (safeRoles.count { it.role.equals("TARGET", true) && it.characterId in charIds } != 1) {
-        val existingTarget = rpgSettingsIn.characters.firstOrNull { it.role == ModeSettings.CharacterRole.TARGET }?.characterId
-        val targetId = existingTarget ?: pickRandom(nonGM) ?: nonGM.first()
-        // remove any old TARGET assignments
-        safeRoles.removeAll { it.role.equals("TARGET", true) }
-        safeRoles.add(AIMurderRole(targetId, "TARGET"))
-    }
-    // Ensure at least one VILLAIN
-    if (safeRoles.none { it.role.equals("VILLAIN", true) && it.characterId in charIds }) {
-        val existingVillains = rpgSettingsIn.characters.filter { it.role == ModeSettings.CharacterRole.VILLAIN }.map { it.characterId }
-        val pick = existingVillains.firstOrNull() ?: pickRandom(nonGM.filter { id -> safeRoles.none { it.characterId == id } })
-        if (pick != null) safeRoles.add(AIMurderRole(pick, "VILLAIN"))
+    // ---- Normalize ids to baseCharacterId (accept slotId or baseId) ----
+    val idResolver: Map<String, String> = buildMap {
+        // map base->base and slot->base
+        slots.forEach { s ->
+            val base = s.baseCharacterId ?: s.slotId
+            put(base, base)
+            put(s.slotId, base)
+        }
+        // make sure every RPG base id resolves
+        rpgSettingsIn.characters.forEach { rc ->
+            put(rc.characterId, rc.characterId)
+        }
     }
 
-    // Apply roles to RPG settings (others default to HERO unless previously GM/Sidekick/etc.)
+    val aiRolesBase: List<AIMurderRole> = out.roles.mapNotNull { r ->
+        val base = idResolver[r.characterId]
+        if (base == null) {
+            Log.w("MurderSeed", "Unknown id from AI: ${r.characterId}"); null
+        } else AIMurderRole(base, r.role.uppercase())
+    }
+
+    // Validate AI roles
+    val targets = aiRolesBase.filter { it.role == "TARGET" }.map { it.characterId }.distinct()
+    val villains = aiRolesBase.filter { it.role == "VILLAIN" }.map { it.characterId }.distinct()
+    val validRoles = (targets.size == 1 && villains.isNotEmpty())
+    if (!validRoles) Log.e("MurderSeed", "AI roles invalid (targets=${targets.size}, villains=${villains.size}). Keeping existing roles.")
+
+    // Apply to RPG (strictly from AI if valid; otherwise leave as-is)
+    val forced = if (validRoles) aiRolesBase.associate { it.characterId to it.role } else emptyMap()
+
     val updatedRpg = rpgSettingsIn.copy(
         characters = rpgSettingsIn.characters.map { rc ->
-            val forced = safeRoles.firstOrNull { it.characterId == rc.characterId }?.role?.uppercase()
-            when (forced) {
+            when (forced[rc.characterId]) {
                 "TARGET"  -> rc.copy(role = ModeSettings.CharacterRole.TARGET)
                 "VILLAIN" -> rc.copy(role = ModeSettings.CharacterRole.VILLAIN)
-                else -> rc // keep whatever they had
+                else      -> rc
             }
         }.toMutableList()
     )
 
-    // Apply weapon/scene/clues into MurderSettings
+    // Update weapon/scene/clues
     val updatedMurder = murderIn.copy(
         weapon = (out.weapon.takeIf { it.isNotBlank() } ?: murderIn.weapon).take(60),
         sceneDescription = (out.scene.takeIf { it.isNotBlank() } ?: murderIn.sceneDescription).take(600),
@@ -2187,6 +2279,7 @@ private suspend fun generateMurderSetup(
         } else murderIn.clues
     )
 
+    Log.d("MurderSeed", "Applied roles -> " + updatedRpg.characters.joinToString { "${it.characterId}:${it.role}" })
     Log.d("ai_response", "updating $updatedMurder")
 
     updatedRpg to updatedMurder
@@ -2206,4 +2299,13 @@ data class CleanedData(
     val cleanedDescription: String,
     val cleanedSecretDescription: String,
     val cleanedRelationships: List<Relationship>
+)
+
+data class AIMysteryTimelineTextOut(
+    val characters: List<PerCharTimelineText> = emptyList()
+)
+
+data class PerCharTimelineText(
+    val characterId: String = "",
+    val timelineText: String = "" // ← this is the entire plain-text timeline we’ll store
 )

@@ -13,13 +13,14 @@ import com.example.RealmsAI.models.ModeSettings
 import com.example.RealmsAI.models.ModeSettings.VNRelationship
 import com.example.RealmsAI.models.ModeSettings.RelationshipLevel
 import com.google.gson.Gson
+import com.example.RealmsAI.FacilitatorResponseParser.updateRelationshipLevel
 
 class RelationshipLevelEditorActivity : AppCompatActivity() {
     private lateinit var upTriggerEdit: EditText
     private lateinit var downTriggerEdit: EditText
     private lateinit var levelsRecycler: RecyclerView
     private lateinit var addLevelButton: Button
-    private lateinit var currentLevelSpinner: Spinner
+    private lateinit var startingPointsEdit: EditText
     private lateinit var saveButton: Button
 
     private val levels = mutableListOf<RelationshipLevel>()
@@ -35,7 +36,7 @@ class RelationshipLevelEditorActivity : AppCompatActivity() {
         downTriggerEdit = findViewById(R.id.downTriggerEdit)
         levelsRecycler = findViewById(R.id.levelsRecycler)
         addLevelButton = findViewById(R.id.btnAddLevel)
-        currentLevelSpinner = findViewById(R.id.currentLevelSpinner)
+        startingPointsEdit = findViewById(R.id.startingPointsEdit)
         saveButton = findViewById(R.id.btnSaveLevel)
 
         // Load relationship from intent
@@ -52,11 +53,17 @@ class RelationshipLevelEditorActivity : AppCompatActivity() {
         adapter = RelationshipLevelAdapter(levels) { index ->
             levels.removeAt(index)
             adapter.notifyDataSetChanged()
-            updateCurrentLevelSpinner()
         }
         levelsRecycler.layoutManager = LinearLayoutManager(this)
         levelsRecycler.adapter = adapter
 
+        // Prefill "Starting points" from existing data
+        val initialPoints = when {
+            rel.points > 0 -> rel.points
+            else -> rel.levels.firstOrNull { it.level == rel.currentLevel }?.threshold ?: 0
+        }
+
+        startingPointsEdit.setText(initialPoints.toString())
         // --- Add Level ---
         addLevelButton.setOnClickListener {
             val nextLevel = (levels.maxOfOrNull { it.level } ?: 0) + 1
@@ -72,14 +79,10 @@ class RelationshipLevelEditorActivity : AppCompatActivity() {
             )
 
             adapter.notifyDataSetChanged()
-            updateCurrentLevelSpinner()
         }
 
-
-        updateCurrentLevelSpinner()
-
         saveButton.setOnClickListener {
-            // Force all edits to commit before we read values
+            // commit pending edits
             currentFocus?.clearFocus()
             levelsRecycler.clearFocus()
             upTriggerEdit.clearFocus()
@@ -88,7 +91,10 @@ class RelationshipLevelEditorActivity : AppCompatActivity() {
             rel.upTriggers = upTriggerEdit.text.toString()
             rel.downTriggers = downTriggerEdit.text.toString()
             rel.levels = levels
-            rel.currentLevel = currentLevelSpinner.selectedItemPosition
+
+            val pointsText = startingPointsEdit.text.toString().toIntOrNull() ?: 0
+            rel.points = pointsText
+            updateRelationshipLevel(rel) // sets rel.currentLevel based on points and thresholds
 
             val data = Intent().apply {
                 putExtra("UPDATED_RELATIONSHIP_JSON", Gson().toJson(rel))
@@ -98,21 +104,4 @@ class RelationshipLevelEditorActivity : AppCompatActivity() {
             finish()
         }
     }
-
-    private fun updateCurrentLevelSpinner() {
-        val levelsList = levels.map { "Level ${it.level}" }
-        val adapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, levelsList)
-        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-        currentLevelSpinner.adapter = adapter
-
-        if (levels.isEmpty()) {
-            currentLevelSpinner.isEnabled = false
-            // Optionally set selection to -1 or 0 safely, or leave blank
-            return
-        }
-
-        currentLevelSpinner.isEnabled = true
-        currentLevelSpinner.setSelection(currentLevel.coerceIn(levels.indices))
-    }
-
 }

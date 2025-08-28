@@ -3,6 +3,7 @@ package com.example.RealmsAI
 
 import android.util.Log
 import com.example.RealmsAI.models.ChatMessage
+import com.example.RealmsAI.models.ModeSettings
 import com.example.RealmsAI.models.ModeSettings.VNRelationship
 import com.example.RealmsAI.models.Relationship
 import com.example.RealmsAI.models.SlotProfile
@@ -176,13 +177,12 @@ object FacilitatorResponseParser {
             }
 
             val relationshipChanges = roleplayResponse.relationship?.mapNotNull { entry ->
-                val toSlotId = entry.toId // or entry[0] as? String for old format
-                val slotProfile = slotRoster.find { it.slotId == toSlotId }
-                val baseCharacterId = slotProfile?.baseCharacterId
-                if (!baseCharacterId.isNullOrBlank()) {
-                    RelationshipPointChange(senderId, baseCharacterId, entry.change)
-                } else null
+                // entry.toId can be slotId, baseCharacterId, slotKey, or a name
+                val toKey = resolveToSlotKey(entry.toId, slotRoster) ?: return@mapNotNull null
+                val fromKey = resolveFromSlotKey(senderId, slotRoster) ?: return@mapNotNull null
+                RelationshipPointChange(fromKey, toKey, entry.change)
             } ?: emptyList()
+
 
             return ParsedRoleplayResult(
                 messages = safeMessages,
@@ -209,8 +209,8 @@ object FacilitatorResponseParser {
     )
 
     data class RelationshipPointChange(
-        val fromId: String,
-        val toId: String,
+        val fromSlotKey: String,
+        val toSlotKey: String,
         val delta: Int
     )
 
@@ -229,17 +229,26 @@ object FacilitatorResponseParser {
     )
 
     fun updateRelationshipsFromChanges(
-        relationshipMap: MutableMap<String, VNRelationship>,
+        boards: MutableMap<String, MutableMap<String, VNRelationship>>,
         changes: List<RelationshipPointChange>
     ) {
-        for (change in changes) {
-            // Find the relationship by toId
-            val rel = relationshipMap[change.toId]
-            if (rel != null) {
-                rel.points += change.delta
-                updateRelationshipLevel(rel)
+        for (chg in changes) {
+            val row = boards.getOrPut(chg.fromSlotKey) { mutableMapOf() }
+            val rel = row.getOrPut(chg.toSlotKey) {
+                ModeSettings.VNRelationship(
+                    fromSlotKey = chg.fromSlotKey,
+                    toSlotKey   = chg.toSlotKey,
+                    levels      = mutableListOf(),
+                    upTriggers  = "",
+                    downTriggers= "",
+                    points      = 0,
+                    notes       = "",
+                    currentLevel= 0
+                )
             }
-            Log.d("ai_cycle", "we are changing $")
+            rel.points += chg.delta
+            updateRelationshipLevel(rel)
+            // Optional: clamp to [0..max] or apply monogamy/jealousy here
         }
     }
 
@@ -260,6 +269,110 @@ object FacilitatorResponseParser {
             }
         }
         relationship.currentLevel = newLevel
+    }
+
+    // --- slot key helpers for a chat roster ---
+    private fun slotKeyFromIndex(idx0: Int): String =
+        ModeSettings.SlotKeys.fromPosition(idx0) // 0-based idx → "character{idx+1}"
+
+    private fun slotKeyForSlotId(slotId: String, roster: List<SlotProfile>): String? {
+        val i = roster.indexOfFirst { it.slotId == slotId }
+        return if (i >= 0) slotKeyFromIndex(i) else null
+    }
+
+    private fun slotKeyForBaseId(baseId: String, roster: List<SlotProfile>): String? {
+        val i = roster.indexOfFirst { it.baseCharacterId == baseId }
+        return if (i >= 0) slotKeyFromIndex(i) else null
+    }
+
+    private fun slotKeyForName(name: String, roster: List<SlotProfile>): String? {
+        val i = roster.indexOfFirst { it.name.equals(name, ignoreCase = true) }
+        return if (i >= 0) slotKeyFromIndex(i) else null
+    }
+
+    private fun looksLikeSlotKey(s: String) =
+        s.startsWith("character") && s.removePrefix("character").toIntOrNull() != null
+
+    private fun resolveToSlotKey(anyId: String, roster: List<SlotProfile>): String? {
+        if (looksLikeSlotKey(anyId)) return anyId
+        slotKeyForSlotId(anyId, roster)?.let { return it }
+        slotKeyForBaseId(anyId, roster)?.let { return it }
+        slotKeyForName(anyId, roster)?.let { return it }
+        return null
+    }
+
+    /** If sender is a character id/slotId/name/slotKey, map to slotKey; otherwise null (e.g., user/narrator). */
+    private fun resolveFromSlotKey(senderId: String, roster: List<SlotProfile>): String? =
+        resolveToSlotKey(senderId, roster)
+
+    // helper: "character4" -> 3 (0-based)
+    private fun idxFromSlotKey(key: String): Int? =
+        key.removePrefix("character").toIntOrNull()?.minus(1)?.takeIf { it >= 0 }
+
+    /** Apply deltas and jealousy in one place. */
+    fun applyRelationshipChangesWithJealousy(
+        boards: MutableMap<String, MutableMap<String, ModeSettings.VNRelationship>>,
+        roster: List<SlotProfile>,
+        vnSettings: ModeSettings.VNSettings,
+        changes: List<RelationshipPointChange>,
+        jealousyPenalty: Int = 1
+    ) {
+        if (changes.isEmpty()) return
+
+        // 1) Direct changes
+        for (chg in changes) {
+            val row = boards.getOrPut(chg.fromSlotKey) { mutableMapOf() }
+            val rel = row.getOrPut(chg.toSlotKey) {
+                ModeSettings.VNRelationship(
+                    fromSlotKey = chg.fromSlotKey,
+                    toSlotKey   = chg.toSlotKey,
+                    levels      = mutableListOf(),
+                    upTriggers  = "",
+                    downTriggers= "",
+                    points      = 0,
+                    notes       = "",
+                    currentLevel= 0
+                )
+            }
+            rel.points += chg.delta
+            updateRelationshipLevel(rel)
+        }
+
+        // 2) Jealousy on positive gains
+        if (!vnSettings.jealousyEnabled) return
+        val gains = changes.filter { it.delta > 0 }
+        if (gains.isEmpty()) return
+
+        for (g in gains) {
+            val fromIdx = idxFromSlotKey(g.fromSlotKey) ?: continue
+            val speaker = roster.getOrNull(fromIdx) ?: continue
+            val speakerLoc = speaker.lastActiveLocation
+
+            // Penalize others' relationship toward the same target as the gain
+            val targetKey = g.toSlotKey
+
+            roster.forEachIndexed { i, slot ->
+                if (i == fromIdx) return@forEachIndexed
+                if (slot.lastActiveLocation != speakerLoc) return@forEachIndexed
+
+                val otherKey = slotKeyFromIndex(i)
+                val row2 = boards.getOrPut(otherKey) { mutableMapOf() }
+                val rel2 = row2.getOrPut(targetKey) {
+                    ModeSettings.VNRelationship(
+                        fromSlotKey = otherKey,
+                        toSlotKey   = targetKey,
+                        levels      = mutableListOf(),
+                        upTriggers  = "",
+                        downTriggers= "",
+                        points      = 0,
+                        notes       = "",
+                        currentLevel= 0
+                    )
+                }
+                rel2.points -= jealousyPenalty
+                updateRelationshipLevel(rel2)
+            }
+        }
     }
 
     data class NewMemory(

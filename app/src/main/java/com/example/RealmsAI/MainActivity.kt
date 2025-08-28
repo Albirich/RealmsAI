@@ -963,6 +963,10 @@ class MainActivity : AppCompatActivity() {
         sheetView.findViewById<TextView>(R.id.summaryView).text =
             if (slotProfile.summary.isNotBlank()) slotProfile.summary else "No summary provided."
 
+        // More Info
+        sheetView.findViewById<TextView>(R.id.moreInfo).text =
+            if (slotProfile.moreInfo!!.isNotBlank()) slotProfile.moreInfo else "Nothing to add here."
+
         content.addView(sheetView)
     }
 
@@ -1477,51 +1481,52 @@ class MainActivity : AppCompatActivity() {
                             val speakerSlotId = roleplayResult?.messages?.firstOrNull()?.senderId ?: nextSlot
                             val speakerSlot = sessionProfile.slotRoster.find { it.slotId == speakerSlotId }
                             if (speakerSlot != null && roleplayResult?.relationshipChanges?.isNotEmpty() == true) {
-                                val fromId = speakerSlot.baseCharacterId
-
-                                // 1. Get the acting character's relationship map (vnRelationships)
-                                val relMap = speakerSlot.vnRelationships
-
-                                // 2. Apply all relationship changes to this map
-                                updateRelationshipsFromChanges(relMap, roleplayResult.relationshipChanges)
-
-                                // 3. Enforce monogamy if enabled
+                                // 1) Load VN settings
                                 val vnSettingsJson = sessionProfile.modeSettings["vn"] as? String
                                 val vnSettings = if (!vnSettingsJson.isNullOrBlank())
                                     Gson().fromJson(vnSettingsJson, ModeSettings.VNSettings::class.java)
                                 else
                                     ModeSettings.VNSettings()
 
-                                if (vnSettings.monogamyEnabled && vnSettings.monogamyLevel != null) {
-                                    enforceMonogamy(
-                                        relMap,
-                                        vnSettings.monogamyLevel!!
+                                // 2) Resolve speaker's slotKey safely (no returns)
+                                val fromKey = sessionProfile.slotRoster
+                                    .indexOfFirst { it.slotId == speakerSlot.slotId }
+                                    .takeIf { it >= 0 }
+                                    ?.let { ModeSettings.SlotKeys.fromPosition(it) }
+
+                                if (fromKey == null) {
+                                    android.util.Log.w("VN", "Couldn't resolve slotKey for speaker ${speakerSlot.slotId}; skipping relationship changes.")
+                                } else {
+                                    // 3) Apply relationship deltas to the full matrix
+                                    FacilitatorResponseParser.updateRelationshipsFromChanges(
+                                        vnSettings.characterBoards,
+                                        roleplayResult.relationshipChanges
                                     )
-                                }
 
-                                // 4. Trigger Jealousy
-                                if (vnSettings.jealousyEnabled) {
-                                    val jealousyPenalty = 1 // Or whatever penalty you want
-                                    val toId = roleplayResult.relationshipChanges.first().toId // Assumes one per turn, adjust as needed
-
-                                    // Lower relationship points for all other characters in the same location
-                                    for (otherSlot in sessionProfile.slotRoster) {
-                                        if (otherSlot.baseCharacterId != fromId &&
-                                            otherSlot.lastActiveLocation == speakerSlot.lastActiveLocation) {
-
-                                            val relMap = otherSlot.vnRelationships
-                                            val rel = relMap[toId]
-                                            if (rel != null) {
-                                                rel.points -= jealousyPenalty
-                                                updateRelationshipLevel(rel)
-                                            }
-                                        }
+                                    // 4) Enforce monogamy on this speaker's row
+                                    if (vnSettings.monogamyEnabled && vnSettings.monogamyLevel != null) {
+                                        val row = vnSettings.characterBoards.getOrPut(fromKey) { mutableMapOf() }
+                                        enforceMonogamy(row, vnSettings.monogamyLevel!!)
                                     }
-                                }
 
-                                // 5. Save back to sessionProfile
-                                sessionProfile.slotRoster = sessionProfile.slotRoster.map { slot ->
-                                    if (slot.slotId == speakerSlot.slotId) speakerSlot else slot
+                                    // 5) Jealousy (still here if you want it here)
+                                    if (vnSettings.jealousyEnabled) {
+                                        FacilitatorResponseParser.applyRelationshipChangesWithJealousy(
+                                            boards     = vnSettings.characterBoards,
+                                            roster     = sessionProfile.slotRoster,
+                                            vnSettings = vnSettings,
+                                            changes    = roleplayResult.relationshipChanges
+                                        )
+                                    }
+
+                                    // 6) Mirror matrix back to slots for UI/state
+                                    sessionProfile.slotRoster.forEachIndexed { idx, slot ->
+                                        val key = ModeSettings.SlotKeys.fromPosition(idx)
+                                        slot.vnRelationships = vnSettings.characterBoards[key] ?: mutableMapOf()
+                                    }
+
+                                    // 7) Persist VN settings
+                                    sessionProfile.modeSettings["vn"] = Gson().toJson(vnSettings)
                                 }
                             }
 
@@ -2021,51 +2026,52 @@ class MainActivity : AppCompatActivity() {
                             val speakerSlotId = roleplayResult?.messages?.firstOrNull()?.senderId ?: nextSlot
                             val speakerSlot = sessionProfile.slotRoster.find { it.slotId == speakerSlotId }
                             if (speakerSlot != null && roleplayResult?.relationshipChanges?.isNotEmpty() == true) {
-                                val fromId = speakerSlot.baseCharacterId
-
-                                // 1. Get the acting character's relationship map (vnRelationships)
-                                val relMap = speakerSlot.vnRelationships
-
-                                // 2. Apply all relationship changes to this map
-                                updateRelationshipsFromChanges(relMap, roleplayResult.relationshipChanges)
-
-                                // 3. Enforce monogamy if enabled
+                                // 1) Load VN settings
                                 val vnSettingsJson = sessionProfile.modeSettings["vn"] as? String
                                 val vnSettings = if (!vnSettingsJson.isNullOrBlank())
                                     Gson().fromJson(vnSettingsJson, ModeSettings.VNSettings::class.java)
                                 else
                                     ModeSettings.VNSettings()
 
-                                if (vnSettings.monogamyEnabled && vnSettings.monogamyLevel != null) {
-                                    enforceMonogamy(
-                                        relMap,
-                                        vnSettings.monogamyLevel!!
+                                // 2) Resolve speaker's slotKey safely (no returns)
+                                val fromKey = sessionProfile.slotRoster
+                                    .indexOfFirst { it.slotId == speakerSlot.slotId }
+                                    .takeIf { it >= 0 }
+                                    ?.let { ModeSettings.SlotKeys.fromPosition(it) }
+
+                                if (fromKey == null) {
+                                    android.util.Log.w("VN", "Couldn't resolve slotKey for speaker ${speakerSlot.slotId}; skipping relationship changes.")
+                                } else {
+                                    // 3) Apply relationship deltas to the full matrix
+                                    FacilitatorResponseParser.updateRelationshipsFromChanges(
+                                        vnSettings.characterBoards,
+                                        roleplayResult.relationshipChanges
                                     )
-                                }
 
-                                // 4. Trigger Jealousy
-                                if (vnSettings.jealousyEnabled) {
-                                    val jealousyPenalty = 1 // Or whatever penalty you want
-                                    val toId = roleplayResult.relationshipChanges.first().toId // Assumes one per turn, adjust as needed
-
-                                    // Lower relationship points for all other characters in the same location
-                                    for (otherSlot in sessionProfile.slotRoster) {
-                                        if (otherSlot.baseCharacterId != fromId &&
-                                            otherSlot.lastActiveLocation == speakerSlot.lastActiveLocation) {
-
-                                            val relMap = otherSlot.vnRelationships
-                                            val rel = relMap[toId]
-                                            if (rel != null) {
-                                                rel.points -= jealousyPenalty
-                                                updateRelationshipLevel(rel)
-                                            }
-                                        }
+                                    // 4) Enforce monogamy on this speaker's row
+                                    if (vnSettings.monogamyEnabled && vnSettings.monogamyLevel != null) {
+                                        val row = vnSettings.characterBoards.getOrPut(fromKey) { mutableMapOf() }
+                                        enforceMonogamy(row, vnSettings.monogamyLevel!!)
                                     }
-                                }
 
-                                // 5. Save back to sessionProfile
-                                sessionProfile.slotRoster = sessionProfile.slotRoster.map { slot ->
-                                    if (slot.slotId == speakerSlot.slotId) speakerSlot else slot
+                                    // 5) Jealousy (still here if you want it here)
+                                    if (vnSettings.jealousyEnabled) {
+                                        FacilitatorResponseParser.applyRelationshipChangesWithJealousy(
+                                            boards     = vnSettings.characterBoards,
+                                            roster     = sessionProfile.slotRoster,
+                                            vnSettings = vnSettings,
+                                            changes    = roleplayResult.relationshipChanges
+                                        )
+                                    }
+
+                                    // 6) Mirror matrix back to slots for UI/state
+                                    sessionProfile.slotRoster.forEachIndexed { idx, slot ->
+                                        val key = ModeSettings.SlotKeys.fromPosition(idx)
+                                        slot.vnRelationships = vnSettings.characterBoards[key] ?: mutableMapOf()
+                                    }
+
+                                    // 7) Persist VN settings
+                                    sessionProfile.modeSettings["vn"] = Gson().toJson(vnSettings)
                                 }
                             }
 
@@ -2599,13 +2605,14 @@ class MainActivity : AppCompatActivity() {
                         chatHistory = historyString,
                         gmStyle = gmStyleDescription
                     )
-                    val gmPrompt = buildString {
+                    val gmPrompt =
                         if (murderSettings?.enabled == true) {
                             gmLines + PromptBuilder.buildRPGLiteRules() + PromptBuilder.buildMurderAddon(ms = murderSettings)
                         }else{
                             gmLines + PromptBuilder.buildRPGLiteRules() + PromptBuilder.buildActAddon(act = act)
                         }
-                    }
+
+                    Log.d("AI_Cycle", "sending $gmPrompt")
                     var activationResponse = Facilitator.callActivationAI(gmPrompt,BuildConfig.OPENAI_API_KEY)
                     Log.d("ai_cycle", "$gmPrompt")
                     ensureActive()
@@ -2929,8 +2936,8 @@ class MainActivity : AppCompatActivity() {
                         Log.d("AI_response", "History: $chatHistory")
                         val nsfwinstructions =  "\n - Be descriptive and explicit. The more sexual and erotic the better"
                         val nsfwRejection = "\n - If responding to not safe for work messages, reject them while remaining in character."
-                        val nsfwRejectionPrompt = vnCheckedPrompt + nsfwRejection
-                        val nsfwPrompt = vnCheckedPrompt + nsfwinstructions
+                        val nsfwRejectionPrompt = finalRoleplayPrompt + nsfwRejection
+                        val nsfwPrompt = finalRoleplayPrompt + nsfwinstructions
 
                         // Switch models as needed
                         val roleplayResponse =
@@ -2941,7 +2948,7 @@ class MainActivity : AppCompatActivity() {
                                     Facilitator.callMixtralApi(nsfwPrompt, BuildConfig.MIXTRAL_API_KEY)
                                 }
                             else
-                                Facilitator.callOpenAiApi(vnCheckedPrompt, BuildConfig.OPENAI_API_KEY)
+                                Facilitator.callOpenAiApi(finalRoleplayPrompt, BuildConfig.OPENAI_API_KEY)
                         ensureActive()
                         Log.d("ai_cycle", "Roleplay Prompt is: $roleplayPrompt")
                         Log.d("AI_response", "Roleplay Response:\n$roleplayResponse")
@@ -2970,51 +2977,52 @@ class MainActivity : AppCompatActivity() {
                         val speakerSlotId = roleplayResult?.messages?.firstOrNull()?.senderId ?: nextSlot
                         val speakerSlot = sessionProfile.slotRoster.find { it.slotId == speakerSlotId }
                         if (speakerSlot != null && roleplayResult?.relationshipChanges?.isNotEmpty() == true) {
-                            val fromId = speakerSlot.baseCharacterId
-
-                            // 1. Get the acting character's relationship map (vnRelationships)
-                            val relMap = speakerSlot.vnRelationships
-
-                            // 2. Apply all relationship changes to this map
-                            updateRelationshipsFromChanges(relMap, roleplayResult.relationshipChanges)
-
-                            // 3. Enforce monogamy if enabled
+                            // 1) Load VN settings
                             val vnSettingsJson = sessionProfile.modeSettings["vn"] as? String
                             val vnSettings = if (!vnSettingsJson.isNullOrBlank())
                                 Gson().fromJson(vnSettingsJson, ModeSettings.VNSettings::class.java)
                             else
                                 ModeSettings.VNSettings()
 
-                            if (vnSettings.monogamyEnabled && vnSettings.monogamyLevel != null) {
-                                enforceMonogamy(
-                                    relMap,
-                                    vnSettings.monogamyLevel!!
+                            // 2) Resolve speaker's slotKey safely (no returns)
+                            val fromKey = sessionProfile.slotRoster
+                                .indexOfFirst { it.slotId == speakerSlot.slotId }
+                                .takeIf { it >= 0 }
+                                ?.let { ModeSettings.SlotKeys.fromPosition(it) }
+
+                            if (fromKey == null) {
+                                android.util.Log.w("VN", "Couldn't resolve slotKey for speaker ${speakerSlot.slotId}; skipping relationship changes.")
+                            } else {
+                                // 3) Apply relationship deltas to the full matrix
+                                FacilitatorResponseParser.updateRelationshipsFromChanges(
+                                    vnSettings.characterBoards,
+                                    roleplayResult.relationshipChanges
                                 )
-                            }
 
-                            // 4. Trigger Jealousy
-                            if (vnSettings.jealousyEnabled) {
-                                val jealousyPenalty = 1 // Or whatever penalty you want
-                                val toId = roleplayResult.relationshipChanges.first().toId // Assumes one per turn, adjust as needed
-
-                                // Lower relationship points for all other characters in the same location
-                                for (otherSlot in sessionProfile.slotRoster) {
-                                    if (otherSlot.baseCharacterId != fromId &&
-                                        otherSlot.lastActiveLocation == speakerSlot.lastActiveLocation) {
-
-                                        val relMap = otherSlot.vnRelationships
-                                        val rel = relMap[toId]
-                                        if (rel != null) {
-                                            rel.points -= jealousyPenalty
-                                            updateRelationshipLevel(rel)
-                                        }
-                                    }
+                                // 4) Enforce monogamy on this speaker's row
+                                if (vnSettings.monogamyEnabled && vnSettings.monogamyLevel != null) {
+                                    val row = vnSettings.characterBoards.getOrPut(fromKey) { mutableMapOf() }
+                                    enforceMonogamy(row, vnSettings.monogamyLevel!!)
                                 }
-                            }
 
-                            // 5. Save back to sessionProfile
-                            sessionProfile.slotRoster = sessionProfile.slotRoster.map { slot ->
-                                if (slot.slotId == speakerSlot.slotId) speakerSlot else slot
+                                // 5) Jealousy (still here if you want it here)
+                                if (vnSettings.jealousyEnabled) {
+                                    FacilitatorResponseParser.applyRelationshipChangesWithJealousy(
+                                        boards     = vnSettings.characterBoards,
+                                        roster     = sessionProfile.slotRoster,
+                                        vnSettings = vnSettings,
+                                        changes    = roleplayResult.relationshipChanges
+                                    )
+                                }
+
+                                // 6) Mirror matrix back to slots for UI/state
+                                sessionProfile.slotRoster.forEachIndexed { idx, slot ->
+                                    val key = ModeSettings.SlotKeys.fromPosition(idx)
+                                    slot.vnRelationships = vnSettings.characterBoards[key] ?: mutableMapOf()
+                                }
+
+                                // 7) Persist VN settings
+                                sessionProfile.modeSettings["vn"] = Gson().toJson(vnSettings)
                             }
                         }
 
@@ -4054,6 +4062,14 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
+    }
+
+    private fun slotKeyFromIndex(idx0: Int): String =
+        ModeSettings.SlotKeys.fromPosition(idx0) // 0-based -> "character{n}"
+
+    private fun slotKeyForBaseId(baseId: String, roster: List<SlotProfile>): String? {
+        val i = roster.indexOfFirst { it.baseCharacterId == baseId }
+        return if (i >= 0) slotKeyFromIndex(i) else null
     }
 
     override fun onStop() {

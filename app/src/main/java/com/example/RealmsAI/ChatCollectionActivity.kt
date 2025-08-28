@@ -59,20 +59,19 @@ class ChatCollectionActivity : AppCompatActivity() {
             }
         }
 
-        // Add Placeholder
+        // Add Placeholder (just adds an empty slot; no picker)
         findViewById<Button>(R.id.btnAddPlaceholder).setOnClickListener {
-            val slotIndex = selectedCharacters.size
-
-            val placeholder = CharacterProfile(
-                id = "placeholder:$slotIndex:${System.currentTimeMillis()}",
-                name = "Empty Slot",
-                avatarUri = null,
-                profileType = "placeholder"
+            val index = slotRoster.size
+            slotRoster.add(
+                SlotProfile(
+                    slotId = "slot-${index + 1}-${System.currentTimeMillis()}",
+                    baseCharacterId = null,
+                    name = "Empty Slot",
+                    isPlaceholder = true
+                )
             )
-            selectedCharacters.add(placeholder)
             rebind()
         }
-
 
         findViewById<Button>(R.id.btnAddCollection).setOnClickListener {
             loadUserCollections { userCollections ->
@@ -163,7 +162,8 @@ class ChatCollectionActivity : AppCompatActivity() {
         pendingReplaceIndex = index
         val intent = Intent(this, CharacterSelectionActivity::class.java)
         intent.putExtra("TEMP_SELECTION_MODE", true)
-        // no need to pass TARGET_INDEX unless your picker echoes it back
+        intent.putExtra("MAX_SELECT", 1)
+        intent.putExtra("from", "collections")
         startActivityForResult(intent, 2001)
     }
 

@@ -43,7 +43,8 @@ class CharacterSelectionActivity : AppCompatActivity() {
         val initialCount = intent.getIntExtra("INITIAL_COUNT", 0)
         isTempMode = intent.getBooleanExtra("TEMP_SELECTION_MODE", false)
         fromSource = intent.getStringExtra("from") ?: ""
-        selectionCap = 20 - initialCount
+        val maxSelectFromCaller = intent.getIntExtra("MAX_SELECT", -1)
+        selectionCap = if (maxSelectFromCaller > 0) maxSelectFromCaller else (20 - initialCount)
 
         selectedIds.addAll(preSelected)
 
@@ -69,11 +70,6 @@ class CharacterSelectionActivity : AppCompatActivity() {
         personalBtn.setOnClickListener { loadPersonalCharacters() }
         personasBtn.setOnClickListener {
             if (fromSource == "collections") return@setOnClickListener
-            // You can show personas for other entry points, but they won't be selectable here
-            // (collection expects characterIds). Easiest: just show nothing or a toast.
-            // If you WANT personas selectable elsewhere, you’d need a personas-enabled adapter.
-            // For now we’ll just no-op or toast.
-            // Toast.makeText(this, "Personas not selectable here.", Toast.LENGTH_SHORT).show()
             loadPersonasPreview() // optional: preview only; not selectable
         }
 
@@ -133,20 +129,20 @@ class CharacterSelectionActivity : AppCompatActivity() {
             .whereEqualTo("author", currentUserId)
             .get()
             .addOnSuccessListener { snap ->
-                // Convert to fake CharacterProfile previews (non-selectable)
-                val previews = snap.documents.mapNotNull { doc ->
+                val personasAsChars = snap.documents.mapNotNull { doc ->
                     doc.toObject(PersonaProfile::class.java)?.let { p ->
                         CharacterProfile(
-                            id = "persona:${doc.id}",
+                            id = "persona:${doc.id}",      // <<<<<<<<<< IMPORTANT
                             name = p.name ?: "Persona",
                             avatarUri = p.avatarUri,
                             author = p.author,
-                            private = false
+                            private = false,
+                            profileType = "persona"        // optional, handy for UI
                         )
                     }
                 }
-                currentChars = previews
-                bindCharacters(currentChars, selectable = false)
+                currentChars = personasAsChars
+                bindCharacters(currentChars, selectable = true) // <<<< selectable
             }
     }
 
@@ -158,14 +154,36 @@ class CharacterSelectionActivity : AppCompatActivity() {
             selectedIds = selectedIds,
             onToggle = { charId ->
                 if (!selectable) return@CharacterSelectAdapter
+
+                if (selectionCap == 1) {
+                    val prev = selectedIds.firstOrNull()
+                    if (prev == charId) {
+                        // allow deselect (optional) — or ignore to force exactly one
+                        selectedIds.clear()
+                        notifyChange(chars, prev)
+                    } else {
+                        selectedIds.clear()
+                        selectedIds.add(charId)
+                        notifyChange(chars, prev)
+                        notifyChange(chars, charId)
+
+                        // Optional UX: auto-finish on selection for single-pick flows:
+                        // if (isTempMode || fromSource == "chat_creation" || fromSource == "session_landing") {
+                        //     finishWithResult()
+                        // }
+                    }
+                    updateDoneCounter()
+                    return@CharacterSelectAdapter
+                }
+
+                // Multi-select path (existing)
                 if (selectedIds.contains(charId)) {
                     selectedIds.remove(charId)
                 } else if (selectedIds.size < selectionCap) {
                     selectedIds.add(charId)
                 }
                 updateDoneCounter()
-                val idx = chars.indexOfFirst { it.id == charId }
-                if (idx >= 0) recycler.adapter?.notifyItemChanged(idx)
+                notifyChange(chars, charId)
             },
             loadAvatar = { imageView, avatarUri ->
                 if (!avatarUri.isNullOrEmpty()) {
@@ -183,10 +201,32 @@ class CharacterSelectionActivity : AppCompatActivity() {
         updateDoneCounter()
     }
 
+    private fun notifyChange(chars: List<CharacterProfile>, id: String?) {
+        if (id == null) return
+        val idx = chars.indexOfFirst { it.id == id }
+        if (idx >= 0) recycler.adapter?.notifyItemChanged(idx)
+    }
+
+    private fun finishWithResult() {
+        val result = Intent().apply {
+            putStringArrayListExtra("selectedCharacterIds", ArrayList(selectedIds))
+            if (!isTempMode) {
+                when (intent.getStringExtra("mode")) {
+                    "edit" -> putExtra("collectionId", intent.getStringExtra("collectionId"))
+                    "create" -> putExtra("collectionName", intent.getStringExtra("collectionName"))
+                }
+            }
+        }
+        setResult(RESULT_OK, result)
+        finish()
+    }
+
     // ---------- UI helpers ----------
 
     private fun updateDoneCounter() {
-        doneButton.text = "Done — Selected: ${selectedIds.size} / $selectionCap"
+        val cap = if (selectionCap == Int.MAX_VALUE) "∞" else selectionCap
+        doneButton.text = if (selectionCap == 1) "Done — Pick 1" else "Done — Selected: ${selectedIds.size} / $cap"
         doneButton.isEnabled = selectedIds.isNotEmpty()
+        doneButton.setOnClickListener { finishWithResult() }
     }
 }

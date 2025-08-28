@@ -30,7 +30,6 @@ class CharacterSelectAdapter(
             bg.setImageResource(
                 if (isSelected) R.drawable.chat_card_selected else R.drawable.chat_card
             )
-
             itemView.setOnClickListener {
                 onToggle(character.id)
             }
