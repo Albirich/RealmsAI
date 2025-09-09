@@ -1,2 +1,28 @@
-// Top-level build file; individual modules apply their own plugins.
-// Keeping this mostly empty so you can set common gradle or kotlin versions if needed.
+import org.jetbrains.compose.desktop.application.dsl.TargetFormat
+
+plugins {
+    kotlin("jvm") version "2.0.0"
+    id("org.jetbrains.compose") version "1.7.0"
+}
+
+repositories {
+    mavenCentral()
+    google()
+}
+
+dependencies {
+    implementation(compose.desktop.currentOs)
+}
+
+kotlin { jvmToolchain(17) }
+
+compose.desktop {
+    application {
+        mainClass = "com.realms.desktop.MainKt"
+        nativeDistributions {
+            targetFormats(TargetFormat.Exe)
+            packageName = "RealmsAI"
+            packageVersion = "0.1.0"
+        }
+    }
+}
