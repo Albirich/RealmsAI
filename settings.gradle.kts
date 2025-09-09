@@ -22,3 +22,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "RealmsAI"
 include(":app")
+include(":desktopApp")
