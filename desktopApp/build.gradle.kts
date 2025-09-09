@@ -1,9 +1,10 @@
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 
 plugins {
-    kotlin("jvm") version "2.0.0"
-    id("org.jetbrains.compose") version "1.7.0"
+    kotlin("jvm")
+    id("org.jetbrains.compose")
 }
+
 
 repositories {
     mavenCentral()
