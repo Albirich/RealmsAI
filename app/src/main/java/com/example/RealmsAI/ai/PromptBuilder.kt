@@ -855,11 +855,13 @@ object PromptBuilder {
         }
         
         Rules for timelineText:
-        - 6–12 lines for the day.
+        - 6–12 lines for the day up until the body was discovered.
         - One event per line, 24h time, then " — " then location, optional companions, short note.
         - Use "~" before time if approximate. Keep names consistent. Example lines:
           "13:05 — Kitchen — with Naomi; Mr. Boddy — Argued about the will"
           "~14:10 — Conservatory — alone — Passed through (seen by maid)"
+        - The villain MUST have a time slot where the murder happened
+        - The Victims timeline ends when they are murdered
         
         Do NOT change existing roles. Ensure no character is in two places at once.
         

@@ -610,7 +610,8 @@ class SessionLandingActivity : AppCompatActivity() {
                     val harmonizedSlots = mutableListOf<SlotProfile>()
                     for ((i, slot) in slots.withIndex()) {
                         val slotKey = ModeSettings.SlotKeys.fromPosition(i)
-                        val timelineText = mysteryMoreInfoByCharId[slot.slotId] ?: ""
+                        val idKey = slot.baseCharacterId ?: slot.slotId
+                        val timelineText = mysteryMoreInfoByCharId[idKey].orEmpty()
                         val h = harmonizeAndCondenseSlot(
                             slot.toCharacterProfile(),
                             relationships,
@@ -625,6 +626,28 @@ class SessionLandingActivity : AppCompatActivity() {
                         db.collection("sessions").document(sessionId).update("readyCount", i + 1)
                     }
                     Log.d("ai_response", "final harmonizedSlots size=${harmonizedSlots.size}")
+                    // After the harmonize loop:
+                    val baseToSlot: Map<String, String> = harmonizedSlots
+                        .filter { !it.baseCharacterId.isNullOrBlank() }
+                        .associate { it.baseCharacterId!! to it.slotId }
+
+                    val targetBaseId = rpgSettings?.characters
+                        ?.firstOrNull { it.role == ModeSettings.CharacterRole.TARGET }
+                        ?.characterId
+
+                    val victimSlotIdResolved = targetBaseId?.let { baseToSlot[it] }
+
+                    val killerSlotIdsSet: MutableSet<String> = rpgSettings?.characters
+                        ?.filter { it.role == ModeSettings.CharacterRole.VILLAIN }
+                        ?.mapNotNull { baseToSlot[it.characterId] }
+                        ?.toMutableSet() ?: mutableSetOf()
+
+                    murderSettings = murderSettings?.copy(
+                        victimSlotId = victimSlotIdResolved,
+                        killerSlotIds = killerSlotIdsSet
+                    )
+
+                    Log.d("mystery", "victimSlotId=$victimSlotIdResolved killers=$killerSlotIdsSet")
 
 
                     // Build current user and player lists

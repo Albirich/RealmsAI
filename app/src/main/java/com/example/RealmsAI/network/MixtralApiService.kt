@@ -13,7 +13,7 @@ interface MixtralApiService {
 
 data class MixtralChatRequest(
     // deepseek/deepseek-chat-v3-0324"mistralai/mistral-medium-3.1
-    val model: String = "mistralai/devstral-medium",
+    val model: String = "cognitivecomputations/dolphin3.0-r1-mistral-24b:free",
     val messages: List<Message>
 )
 

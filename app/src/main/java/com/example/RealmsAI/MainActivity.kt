@@ -2,6 +2,7 @@ package com.example.RealmsAI
 
 import ChatAdapter
 import ChatAdapter.AdapterMode
+import android.content.Context
 import android.content.Intent
 import android.graphics.Color
 import android.graphics.Rect
@@ -34,7 +35,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.tasks.await
 import android.text.TextWatcher
 import android.text.Editable
+import android.view.Gravity
 import android.view.LayoutInflater
+import android.view.ViewGroup
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.constraintlayout.widget.ConstraintSet
 import com.example.RealmsAI.FacilitatorResponseParser.Action
@@ -49,8 +52,7 @@ import com.example.RealmsAI.models.ModeSettings.RPGSettings
 import com.example.RealmsAI.models.ModeSettings.VNRelationship
 import com.google.firebase.firestore.Query
 import org.json.JSONArray
-import com.google.gson.JsonObject
-import com.google.gson.JsonArray
+import kotlin.math.roundToInt
 
 class MainActivity : AppCompatActivity() {
     companion object { private const val TAG = "MainActivity" }
@@ -848,15 +850,31 @@ class MainActivity : AppCompatActivity() {
             val tabBar = findViewById<LinearLayout>(R.id.characterTabBar)
             tabBar.removeAllViews()
 
-            sessionProfile.slotRoster.forEach { slotProfile ->
+            // inline: is murder mode enabled?
+            val murderEnabled = ((sessionProfile?.modeSettings?.get("murder") as? String)?.let {
+                try { Gson().fromJson(it, ModeSettings.MurderSettings::class.java).enabled } catch (_: Exception) { false }
+            }) == true
+
+            // inline: your active slot id (use your global if you’ve got it)
+            val myActiveSlotId = activeSlotId // fall back if you want: ?: sessionProfile?.userMap?.get(FirebaseAuth.getInstance().currentUser?.uid ?: "")?.activeSlotId
+
+            sessionProfile?.slotRoster?.forEach { slotProfile ->
+                val allowed = !murderEnabled || myActiveSlotId.isNullOrBlank() || slotProfile.slotId == myActiveSlotId
+
                 val button = Button(this).apply {
                     text = slotProfile.name
-                    // Optionally set an avatar icon via setCompoundDrawablesWithIntrinsicBounds
-                    setOnClickListener { showCharacterSheet(slotProfile) }
+                    isEnabled = allowed
+                    alpha = if (allowed) 1f else 0.5f
+                    setOnClickListener {
+                        if (!allowed) {
+                            Toast.makeText(this@MainActivity, "During murder-mystery, you can only open your own sheet.", Toast.LENGTH_SHORT).show()
+                            return@setOnClickListener
+                        }
+                        showCharacterSheet(slotProfile)
+                    }
                 }
                 tabBar.addView(button)
             }
-
         }
 
         // -- Roll History --
@@ -894,81 +912,159 @@ class MainActivity : AppCompatActivity() {
     fun updateRPGToggleVisibility() {
         val isRPG = sessionProfile.modeSettings.containsKey("rpg") ||
                 sessionProfile.enabledModes.contains("rpg")
+        val isVN = sessionProfile.modeSettings.containsKey("vn") ||
+                sessionProfile.enabledModes.contains("visual_novel")
         if (isRPG) {
             rpgToggleContainer.visibility = View.VISIBLE
             rollButton.visibility = View.VISIBLE
         } else {
-            rpgToggleContainer.visibility = View.GONE
-            rollButton.visibility = View.GONE
+            if (isVN){
+                rpgToggleContainer.visibility = View.VISIBLE
+                rollButton.visibility = View.GONE
+                rollHistoryButton.visibility = View.GONE
+            }else{
+                rpgToggleContainer.visibility = View.GONE
+                rollButton.visibility = View.GONE
+            }
         }
+
         Log.d("rpg", "is this session an rpg? $isRPG")
     }
 
-    private fun showCharacterSheet(slotProfile: SlotProfile) {
+    private fun showCharacterSheet(slot: SlotProfile) {
         val content = findViewById<LinearLayout>(R.id.characterSheetContent)
         content.removeAllViews()
-        val inflater = LayoutInflater.from(this)
-        val sheetView = inflater.inflate(R.layout.item_character_sheet_fantasy, content, false)
+        val sheet = layoutInflater.inflate(R.layout.item_character_sheet_fantasy, content, false)
 
-        // Avatar
-        val avatar = sheetView.findViewById<ImageView>(R.id.avatarView)
-        if (!slotProfile.avatarUri.isNullOrBlank()) {
-            Glide.with(this).load(slotProfile.avatarUri).into(avatar)
-        }
+        // ----- mode flags -----
+        val rpgEnabled = (sessionProfile?.modeSettings?.get("rpg") as? String)?.isNotBlank() == true
+        val murderEnabled = ((sessionProfile?.modeSettings?.get("murder") as? String)?.let {
+            try { Gson().fromJson(it, ModeSettings.MurderSettings::class.java).enabled } catch (_: Exception) { false }
+        }) == true
+        val vnEnabled = (sessionProfile?.modeSettings?.get("vn") as? String)?.isNotBlank() == true
 
-        // Text fields
-        sheetView.findViewById<TextView>(R.id.nameView).text = slotProfile.name
-        sheetView.findViewById<TextView>(R.id.classView).text = "Class: ${slotProfile.rpgClass}"
-        sheetView.findViewById<TextView>(R.id.hpView).text = "HP: ${slotProfile.hp}/${slotProfile.maxHp}"
-        sheetView.findViewById<TextView>(R.id.defenseView).text = "Defense: ${slotProfile.defense}"
+        // ----- required views (fail fast if layout ids don’t exist) -----
+        fun <T: View> req(id: Int): T =
+            sheet.findViewById<T>(id) ?: error("Missing view id in item_character_sheet_fantasy: ${resources.getResourceEntryName(id)}")
 
-        // Abilities
-        sheetView.findViewById<TextView>(R.id.abilitiesView).text =
-            if (slotProfile.abilities.isNotBlank()) slotProfile.abilities else "None"
+        val root = req<androidx.constraintlayout.widget.ConstraintLayout>(R.id.sheetRootColumn)   // <- make root a ConstraintLayout with this id
+        val header = req<View>(R.id.headerBlock)
+        val rpgSection = sheet.findViewById<View>(R.id.rpgSection)                        // optional
+        val vnSection  = sheet.findViewById<View>(R.id.vnSection)                         // optional
 
-        // Status Effects
-        val statusList = sheetView.findViewById<LinearLayout>(R.id.statusList)
-        statusList.removeAllViews()
-        if (slotProfile.statusEffects.isNotEmpty()) {
-            slotProfile.statusEffects.forEach { status ->
-                val statusView = TextView(this)
-                statusView.text = status
-                statusList.addView(statusView)
+        // MoreInfo may be either a container or just the TextView; try both gracefully
+        val moreInfoBlock = sheet.findViewById<View>(R.id.moreInfoTV)
+            ?: sheet.findViewById<View>(R.id.moreInfo)
+        val moreInfoText  = sheet.findViewById<TextView>(R.id.moreInfo)                   // ok if null when using a container w/ inner TextView
+
+        // ----- header visuals -----
+        req<TextView>(R.id.nameView).text = slot.name
+        slot.avatarUri?.takeIf { it.isNotBlank() }?.let { Glide.with(this).load(it).into(req(R.id.avatarView)) }
+
+        // ----- RPG fill + visibility -----
+        val hasRpg = rpgEnabled && (slot.rpgClass.isNotBlank() || slot.stats.isNotEmpty() || (slot.hp > 0 && slot.maxHp > 0))
+        rpgSection?.apply {
+            visibility = if (hasRpg) View.VISIBLE else View.GONE
+            if (hasRpg) {
+                sheet.findViewById<TextView>(R.id.classView)?.text   = "Class: ${slot.rpgClass}"
+                sheet.findViewById<TextView>(R.id.hpView)?.text      = "HP: ${slot.hp}/${slot.maxHp}"
+                sheet.findViewById<TextView>(R.id.defenseView)?.text = "Defense: ${slot.defense}"
+                sheet.findViewById<TextView>(R.id.abilitiesView)?.text =
+                    if (slot.abilities.isNotBlank()) slot.abilities else "None"
+
+                sheet.findViewById<LinearLayout>(R.id.statusList)?.let { list ->
+                    list.removeAllViews()
+                    if (slot.statusEffects.isNotEmpty()) slot.statusEffects.forEach { s ->
+                        list.addView(TextView(this@MainActivity).apply { text = s })
+                    } else list.addView(TextView(this@MainActivity).apply { text = "None" })
+                }
+                sheet.findViewById<LinearLayout>(R.id.statsList)?.let { list ->
+                    list.removeAllViews()
+                    slot.stats.forEach { (k, v) -> list.addView(TextView(this@MainActivity).apply { text = "$k: $v" }) }
+                }
+                sheet.findViewById<LinearLayout>(R.id.equipmentList)?.let { list ->
+                    list.removeAllViews()
+                    slot.equipment.forEach { item -> list.addView(TextView(this@MainActivity).apply { text = item }) }
+                }
             }
-        } else {
-            val noneView = TextView(this)
-            noneView.text = "None"
-            statusList.addView(noneView)
         }
 
-        // Stats
-        val statsList = sheetView.findViewById<LinearLayout>(R.id.statsList)
-        statsList.removeAllViews()
-        slotProfile.stats.forEach { (stat, value) ->
-            val statView = TextView(this)
-            statView.text = "$stat: $value"
-            statsList.addView(statView)
+        // --- More Info (role + timeline) ---
+        val roleRaw = (slot.hiddenRoles ?: "").trim()
+        val roleDisplay = when (roleRaw.uppercase()) {
+            "VILLAIN" -> "killer"
+            "TARGET"  -> "victim"
+            // treat everyone else as "innocent" only when murder mode is on
+            "HERO", "GM", "SIDEKICK", "" -> if (murderEnabled) "innocent" else ""
+            else -> roleRaw.lowercase()
         }
 
-        // Equipment
-        val eqList = sheetView.findViewById<LinearLayout>(R.id.equipmentList)
-        eqList.removeAllViews()
-        slotProfile.equipment.forEach { item ->
-            val itemView = TextView(this)
-            itemView.text = item
-            eqList.addView(itemView)
+        val timelineText = slot.moreInfo?.takeIf { it.isNotBlank() }
+        val headerLine = if (roleDisplay.isNotBlank()) "Role: ${roleDisplay.replaceFirstChar { it.uppercase() }}" else null
+
+// Compose: Role (if any) above timeline (or fallback)
+        val composed = buildString {
+            headerLine?.let { append(it).append('\n') }
+            append(timelineText ?: "Nothing to add here.")
         }
 
-        // Summary
-        sheetView.findViewById<TextView>(R.id.summaryView).text =
-            if (slotProfile.summary.isNotBlank()) slotProfile.summary else "No summary provided."
+        moreInfoText?.text = composed
 
-        // More Info
-        sheetView.findViewById<TextView>(R.id.moreInfo).text =
-            if (slotProfile.moreInfo!!.isNotBlank()) slotProfile.moreInfo else "Nothing to add here."
+// Show the section if we have a timeline OR (in murder mode) a role to display
+        val showMoreInfo = (timelineText != null) || (murderEnabled && roleDisplay.isNotBlank())
+        moreInfoBlock?.visibility = if (showMoreInfo) View.VISIBLE else View.GONE
 
-        content.addView(sheetView)
+        // ----- VN section -----
+        val showVn = vnEnabled && !slot.vnRelationships.isNullOrEmpty()
+        vnSection?.apply {
+            visibility = if (showVn) View.VISIBLE else View.GONE
+            if (showVn) {
+                val vnList = sheet.findViewById<LinearLayout>(R.id.vnRelationshipsList)
+                vnList?.removeAllViews()
+                val byKey = (sessionProfile?.slotRoster ?: emptyList()).mapIndexed { idx, s ->
+                    ModeSettings.SlotKeys.fromPosition(idx) to s
+                }.toMap()
+                slot.vnRelationships.forEach { (toKey, rel) ->
+                    val other = byKey[toKey] ?: return@forEach
+                    val maxL = rel.levels.maxOfOrNull { it.level } ?: 5
+                    val filled = rel.currentLevel.coerceIn(0, maxL)
+                    val hearts = "❤".repeat(filled) + "♡".repeat((maxL - filled).coerceAtLeast(0))
+                    val row = LinearLayout(this@MainActivity).apply {
+                        orientation = LinearLayout.HORIZONTAL; setPadding(0, 8, 0, 8); gravity = Gravity.CENTER_VERTICAL
+                    }
+                    val icon = ImageView(this@MainActivity).apply {
+                        layoutParams = LinearLayout.LayoutParams(64, 64).apply { rightMargin = 12 }
+                        scaleType = ImageView.ScaleType.CENTER_CROP
+                    }
+                    if (!other.avatarUri.isNullOrBlank()) Glide.with(this@MainActivity).load(other.avatarUri).circleCrop().into(icon)
+                    else icon.setImageResource(R.drawable.placeholder_avatar)
+                    val label = TextView(this@MainActivity).apply { text = "${other.name}  $hearts" }
+                    row.addView(icon); row.addView(label)
+                    vnList?.addView(row)
+                }
+            }
+        }
+
+        // ----- Constraint wiring: header top, then RPG -> MoreInfo -> VN -----
+        fun dp(n: Int) = (n * resources.displayMetrics.density).toInt()
+        val cs = androidx.constraintlayout.widget.ConstraintSet().apply { clone(root) }
+
+        fun topToParent(id: Int, m: Int) { cs.clear(id, ConstraintSet.TOP); cs.connect(id, ConstraintSet.TOP, ConstraintSet.PARENT_ID, ConstraintSet.TOP, dp(m)) }
+        fun topToBottom(id: Int, anchor: Int, m: Int) { cs.clear(id, ConstraintSet.TOP); cs.connect(id, ConstraintSet.TOP, anchor, ConstraintSet.BOTTOM, dp(m)) }
+
+        topToParent(R.id.headerBlock, 8)
+        var anchor = R.id.headerBlock
+        if (hasRpg && rpgSection != null) { topToBottom(R.id.rpgSection, anchor, 12); anchor = R.id.rpgSection }
+        if (murderEnabled && moreInfoBlock != null) { topToBottom(moreInfoBlock.id, anchor, 12); anchor = moreInfoBlock.id }
+        if (showVn && vnSection != null) { topToBottom(R.id.vnSection, anchor, 12) }
+
+        cs.applyTo(root)
+
+        // finally attach
+        content.addView(sheet)
     }
+
+    private fun Context.dp(n: Int): Int = (n * resources.displayMetrics.density).roundToInt()
 
     fun dockTogglesAbove(viewBelowId: Int) {
         val root = findViewById<ConstraintLayout>(R.id.chatRoot)
@@ -3132,27 +3228,57 @@ class MainActivity : AppCompatActivity() {
 
     }
 
-    fun showCharacterPickerDialog(slotRoster: List<SlotProfile>, onCharacterSelected: (SlotProfile) -> Unit) {
+    fun showCharacterPickerDialog(
+        slotRoster: List<SlotProfile>,
+        onCharacterSelected: (SlotProfile) -> Unit
+    ) {
         val dialogView = layoutInflater.inflate(R.layout.dialog_character_picker, null)
         val spinner = dialogView.findViewById<Spinner>(R.id.characterSpinner)
         val confirmButton = dialogView.findViewById<Button>(R.id.confirmButton)
 
-        // Prepare spinner data
+        // Detect Murder mode
+        val murderEnabled: Boolean = try {
+            val murderJson = sessionProfile?.modeSettings?.get("murder") as? String
+            if (!murderJson.isNullOrBlank()) {
+                Gson().fromJson(murderJson, ModeSettings.MurderSettings::class.java).enabled
+            } else {
+                false
+            }
+        } catch (_: Exception) {
+            false
+        }
+        // Collect victims by hidden role (TARGET/VICTIM)
+        var title = if (murderEnabled) {
+            val victims = slotRoster
+                .filter { s ->
+                    val role = s.hiddenRoles?.uppercase() ?: ""
+                    role == "TARGET" || role == "VICTIM"
+                }
+                .map { it.name }
+            if (victims.isNotEmpty()) {
+                val plural = if (victims.size > 1) "s are" else " is"
+                "Please choose a character to take control of" + "\nMurder victim$plural ${victims.joinToString(", ")}."
+            }else "Please choose a character to take control of"
+        } else {
+            // Build the base title
+            "Please choose a character to take control of"
+        }
+        // Spinner data
         val characterNames = slotRoster.map { it.name }
         val adapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, characterNames)
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
         spinner.adapter = adapter
 
         val dialog = AlertDialog.Builder(this)
-            .setTitle("Please choose a character to take control of")
+            .setTitle(title)
             .setView(dialogView)
             .setCancelable(false)
             .create()
 
         confirmButton.setOnClickListener {
-            val selectedPosition = spinner.selectedItemPosition
-            if (selectedPosition in slotRoster.indices) {
-                onCharacterSelected(slotRoster[selectedPosition])
+            val pos = spinner.selectedItemPosition
+            if (pos in slotRoster.indices) {
+                onCharacterSelected(slotRoster[pos])
                 dialog.dismiss()
             }
         }
