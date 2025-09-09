@@ -3,7 +3,7 @@ name: Build Desktop EXE
 on:
   workflow_dispatch:
   push:
-    branches: [ main, desktop-port ]  # build on these branches
+    branches: [ main, desktop-port ]
 
 jobs:
   build-windows:
@@ -28,10 +28,10 @@ jobs:
           java -version
           & .\gradlew.bat -v
 
-      - name: Sanity check – list tasks
+      - name: Sanity check – list desktop tasks
         shell: pwsh
         run: |
-          & .\gradlew.bat tasks --all
+          & .\gradlew.bat :desktopApp:tasks --all
 
       - name: Build Desktop EXE
         shell: pwsh
