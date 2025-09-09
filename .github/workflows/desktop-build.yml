@@ -8,7 +8,6 @@ on:
 jobs:
   build-windows:
     runs-on: windows-latest
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -20,16 +19,35 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Ensure jpackage on PATH
+      - name: Put jpackage on PATH
         shell: pwsh
         run: |
-          # put JAVA_HOME\bin on PATH so Gradle can find jpackage
           "$env:JAVA_HOME\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
       - name: Set up Gradle (wrapper + caching)
         uses: gradle/actions/setup-gradle@v3
 
-      - name: Java & Gradle info
+      - name: Repo tree (top 2 levels)
+        shell: pwsh
+        run: |
+          Get-ChildItem -Depth 2 | Select-Object FullName | Out-String | Write-Host
+
+      # ---- Build ONLY the desktop module first (skip configuring Android) ----
+      # Using -p desktopApp treats desktopApp/ as the project root for this run.
+      # This avoids AGP/Android SDK checks during configuration.
+      - name: Desktop-only sanity (list tasks)
+        shell: pwsh
+        run: |
+          & .\gradlew.bat -p desktopApp tasks --all
+
+      - name: Build desktop distributable (desktop-only)
+        shell: pwsh
+        run: |
+          & .\gradlew.bat -p desktopApp createDistributable --stacktrace --info --no-daemon 2>&1 | Tee-Object -FilePath desktop-only.log
+
+      # ---- If desktop-only succeeded, try full root build for the .exe ----
+      - name: Java & Gradle info (root)
+        if: always()
         shell: pwsh
         run: |
           java -version
@@ -37,45 +55,36 @@ jobs:
           where.exe jpackage
           & .\gradlew.bat -v
 
-      - name: Sanity check – list desktop tasks
-        shell: pwsh
-        run: |
-          & .\gradlew.bat :desktopApp:tasks --all
-
-      # Build a distributable folder/zip first (works even if jpackage misbehaves)
-      - name: Build Desktop distributable
-        shell: pwsh
-        run: |
-          & .\gradlew.bat :desktopApp:createDistributable --stacktrace --info --no-daemon
-
-      - name: Upload distributable
+      - name: Desktop tasks (root)
         if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: RealmsAI-Desktop-Distributable
-          path: |
-            desktopApp/build/compose/**/**/distributable/**
-            desktopApp/build/compose/**/distributable/**
-          if-no-files-found: warn
-
-      # Then build the .exe
-      - name: Build Desktop EXE
         shell: pwsh
         run: |
-          & .\gradlew.bat :desktopApp:packageExe --stacktrace --info --no-daemon
+          & .\gradlew.bat :desktopApp:tasks --all 2>&1 | Tee-Object -FilePath root-tasks.log
+
+      - name: Build Desktop EXE (root)
+        if: always()
+        shell: pwsh
+        run: |
+          & .\gradlew.bat :desktopApp:packageExe --stacktrace --info --no-daemon 2>&1 | Tee-Object -FilePath root-packageExe.log
 
       - name: Show compose outputs
         if: always()
         shell: pwsh
         run: |
-          Get-ChildItem -Recurse desktopApp\build\compose | Out-String | Write-Host
+          if (Test-Path desktopApp\build\compose) {
+            Get-ChildItem -Recurse desktopApp\build\compose | Out-String | Write-Host
+          } else { Write-Host "No compose outputs folder yet." }
 
-      - name: Upload EXE artifact
+      - name: Upload artifacts (logs + outputs)
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: RealmsAI-Desktop-EXE
+          name: RealmsAI-Desktop-Outputs
           path: |
+            desktop-only.log
+            root-tasks.log
+            root-packageExe.log
+            desktopApp/build/compose/**/**/distributable/**
             desktopApp/build/compose/**/**/*.exe
             desktopApp/build/compose/**/*.exe
           if-no-files-found: warn
