@@ -1,10 +1,9 @@
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 
 plugins {
-    kotlin("jvm")
-    id("org.jetbrains.compose")
+    kotlin("jvm")                 // keep versionless to use 2.0.21 already on classpath
+    id("org.jetbrains.compose") version "1.7.0"   // ← add this version
 }
-
 
 repositories {
     mavenCentral()
@@ -13,6 +12,7 @@ repositories {
 
 dependencies {
     implementation(compose.desktop.currentOs)
+    implementation(compose.material3)
 }
 
 kotlin { jvmToolchain(17) }
