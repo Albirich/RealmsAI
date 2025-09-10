@@ -1,24 +1,22 @@
-import org.jetbrains.compose.desktop.application.dsl.TargetFormat
-
 plugins {
-  kotlin("jvm")
-  id("org.jetbrains.kotlin.plugin.compose")   // required on Kotlin 2.x
-  id("org.jetbrains.compose")                 // Compose Multiplatform Gradle plugin
-  application
+    kotlin("jvm")
+    id("org.jetbrains.kotlin.plugin.compose")
+    id("org.jetbrains.compose")
+}
+
+kotlin {
+    jvmToolchain(17)
 }
 
 dependencies {
     implementation(compose.desktop.currentOs)
-    implementation(compose.material3)
 }
-
-kotlin { jvmToolchain(17) }
 
 compose.desktop {
     application {
-        mainClass = "MainKt"
+        mainClass = "com.realmsai.desktop.MainKt"
         nativeDistributions {
-            targetFormats(TargetFormat.Exe)
+            targetFormats(org.jetbrains.compose.desktop.application.dsl.TargetFormat.Exe)
             packageName = "RealmsAI"
             packageVersion = "0.1.0"
         }
