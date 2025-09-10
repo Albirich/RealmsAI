@@ -1,7 +1,7 @@
 plugins {
-    kotlin("jvm")
-    id("org.jetbrains.kotlin.plugin.compose")
+    id("org.jetbrains.kotlin.jvm")
     id("org.jetbrains.compose")
+    id("org.jetbrains.kotlin.plugin.compose")
 }
 
 kotlin {
@@ -14,11 +14,6 @@ dependencies {
 
 compose.desktop {
     application {
-        mainClass = "com.realmsai.desktop.MainKt"
-        nativeDistributions {
-            targetFormats(org.jetbrains.compose.desktop.application.dsl.TargetFormat.Exe)
-            packageName = "RealmsAI"
-            packageVersion = "0.1.0"
-        }
+        mainClass = "MainKt" // or whatever your entry point is
     }
 }
