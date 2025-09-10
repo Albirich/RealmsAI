@@ -5,11 +5,6 @@ plugins {
     id("org.jetbrains.compose") version "1.7.0"   // ← add this version
 }
 
-repositories {
-    mavenCentral()
-    google()
-}
-
 dependencies {
     implementation(compose.desktop.currentOs)
     implementation(compose.material3)
