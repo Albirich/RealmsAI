@@ -1,26 +1,44 @@
 package com.realms.desktop
 
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
+import androidx.compose.ui.window.rememberWindowState
 
-@Composable
-fun App() {
-    MaterialTheme {
-        Surface {
-            Column(Modifier.fillMaxSize().padding(24.dp)) {
-                Text("RealmsAI Desktop bootstrap", style = MaterialTheme.typography.headlineSmall)
-                Spacer(Modifier.height(8.dp))
-                Text("If you see this, the desktop module is wired.")
-            }
-        }
+fun main() = application {
+    Window(
+        onCloseRequest = ::exitApplication,
+        title = "RealmsAI",
+        state = rememberWindowState(width = 1200.dp, height = 800.dp)
+    ) {
+        RealmsDesktopApp()
     }
 }
 
-fun main() = application {
-    Window(onCloseRequest = ::exitApplication, title = "RealmsAI") { App() }
+@Composable
+fun RealmsDesktopApp() {
+    // TODO: swap this palette to match your phone app colors
+    val scheme = darkColorScheme(
+        primary = Color(0xFF6750A4),
+        secondary = Color(0xFF625B71)
+    )
+
+    MaterialTheme(colorScheme = scheme) {
+        Surface(tonalElevation = 2.dp) {
+            Column(
+                modifier = Modifier.fillMaxSize().padding(24.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+                horizontalAlignment = Alignment.Start
+            ) {
+                Text("RealmsAI Desktop", style = MaterialTheme.typography.headlineMedium)
+                Text("Pipeline smoke test build. Replace this with your real screens next.")
+                Button(onClick = {}) { Text("It builds!") }
+            }
+        }
+    }
 }
