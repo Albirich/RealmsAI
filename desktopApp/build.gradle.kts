@@ -10,9 +10,7 @@ plugins {
 
 dependencies {
     implementation(compose.desktop.currentOs)
-    implementation(compose.material3)
-    // If you later see a resolve error for material3, swap to:
-    // implementation("org.jetbrains.compose.material3:material3-desktop:1.7.0")
+    implementation("org.jetbrains.compose.material3:material3-desktop:1.7.0")
 }
 
 kotlin { jvmToolchain(17) }
