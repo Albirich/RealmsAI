@@ -1,16 +1,13 @@
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 
 plugins {
-    kotlin("jvm")                                   // no version here (uses 2.0.21 from classpath)
-    id("org.jetbrains.compose") version "1.7.0"     // keep this
-    id("org.jetbrains.kotlin.plugin.compose") version "2.0.21" // ← add this
+    kotlin("jvm")                 // version is provided from classpath (AGP pulls Kotlin 2.0.21)
+    id("org.jetbrains.compose") version "1.7.0"  // keep the version here (or centralize in settings)
 }
-
-// no repositories {} block here (keep repos centralized in settings)
 
 dependencies {
     implementation(compose.desktop.currentOs)
-    implementation("org.jetbrains.compose.material3:material3-desktop:1.7.0")
+    implementation(compose.material3)
 }
 
 kotlin { jvmToolchain(17) }
