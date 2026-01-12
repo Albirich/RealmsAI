@@ -50,6 +50,7 @@ import com.example.RealmsAI.ai.PromptBuilder.buildMurdererInfo
 import com.example.RealmsAI.ai.PromptBuilder.buildVNPrompt
 import com.example.RealmsAI.models.ModeSettings.RPGSettings
 import com.example.RealmsAI.models.ModeSettings.VNRelationship
+import com.google.android.gms.tasks.Tasks
 import com.google.firebase.firestore.Query
 import org.json.JSONArray
 import kotlin.math.roundToInt
@@ -650,6 +651,15 @@ class MainActivity : AppCompatActivity() {
 
             takeControl.setOnClickListener {
                 val selectedSlot = presentSlots[characterSpinner.selectedItemPosition]
+
+                // --- NEW GUARD CLAUSE ---
+                // Check if the selected character is already marked as a player
+                if (selectedSlot.profileType == "player") {
+                    Toast.makeText(this, "Character is already being controlled by a player", Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
+                // ------------------------
+
                 val oldActiveSlotId = sessionProfile.userMap[userId]?.activeSlotId
 
                 // Update slotRoster with correct profile types
@@ -1143,12 +1153,15 @@ class MainActivity : AppCompatActivity() {
             activationRound = 0
             return
         }
-
+        maxActivationRounds = 3
         if (activationRound >= maxActivationRounds){
             return
             updateButtonState(ButtonState.SEND)
         }
         activationRound++
+
+        Log.d ("ai_cycle", "Round $activationRound")
+
         updateButtonState(ButtonState.INTERRUPT)
         aiJob = lifecycleScope.launch(Dispatchers.IO) {
             try {
@@ -1173,28 +1186,42 @@ class MainActivity : AppCompatActivity() {
                         }.toMap()
 
                     val condensedMap: Map<String, String> = sessionProfile.slotRoster.associate {
-                        it.slotId to it.summary // or whatever your condensed field is
+                        it.slotId to it.summary
                     }
                     val lastNonNarratorId = chatHistory.lastOrNull { it.senderId != "narrator" }?.senderId
                     var playerSlot = sessionProfile.slotRoster.find { it.slotId == activeSlotId }
-                    val coLocatedSlotIds = if (activationRound !== 1) {
+                    Log.d("FilterDebug", "ActivePlayer: ${playerSlot?.name} at ${playerSlot?.lastActiveArea}/${playerSlot?.lastActiveLocation}")
+                    Log.d("FilterDebug", "LastSpeakerID: $lastNonNarratorId")
+
+                    sessionProfile.slotRoster.forEach { slot ->
+                        val matchArea = slot.lastActiveArea?.trim()?.lowercase() == playerSlot?.lastActiveArea?.trim()?.lowercase()
+                        val matchLoc = slot.lastActiveLocation?.trim()?.lowercase() == playerSlot?.lastActiveLocation?.trim()?.lowercase()
+                        val matchId = slot.slotId != lastNonNarratorId
+                        val notTyping = !slot.typing
+                        val notPlayer = slot.profileType != "player"
+
+                        Log.d("FilterDebug", "Checking ${slot.name}: Area($matchArea) Loc($matchLoc) NotLastSpeaker($matchId) NotTyping($notTyping) NotPlayer($notPlayer)")
+                    }
+                    val coLocatedSlotIds = if (activationRound > 1) {
+                        // Round 2+: Allow the player to be picked (so the AI can yield turn to you)
                         sessionProfile.slotRoster
                             .filter {
                                 it.lastActiveArea == playerSlot?.lastActiveArea &&
                                         it.lastActiveLocation == playerSlot?.lastActiveLocation &&
                                         it.slotId != lastNonNarratorId &&
                                         !it.typing
-
+                                // We REMOVED 'it.profileType != "player"' here so the player is a valid candidate
                             }
                             .map { it.slotId }
-                    }else{
+                    } else {
+                        // Round 1: Bots only (Strictly exclude player)
                         sessionProfile.slotRoster
                             .filter {
                                 it.lastActiveArea == playerSlot?.lastActiveArea &&
                                         it.lastActiveLocation == playerSlot?.lastActiveLocation &&
-                                        it.slotId != lastNonNarratorId && it.profileType != "player" &&
-                                        !it.typing
-
+                                        it.slotId != lastNonNarratorId &&
+                                        !it.typing &&
+                                        it.profileType != "player" // Keep this restriction for the first round
                             }
                             .map { it.slotId }
                     }
@@ -1573,6 +1600,7 @@ class MainActivity : AppCompatActivity() {
                                 }
                                 null
                             }
+                            Log.e("ai_Response", "Recieved \n$roleplayResult")
 
                             val speakerSlotId = roleplayResult?.messages?.firstOrNull()?.senderId ?: nextSlot
                             val speakerSlot = sessionProfile.slotRoster.find { it.slotId == speakerSlotId }
@@ -1640,7 +1668,7 @@ class MainActivity : AppCompatActivity() {
                                     pose = cleanedPose
                                 )
                             }
-                            Log.d("AI_response", "filtered messages: $filteredMessages")
+                            Log.d("AI_response", "filtered messages: \n$filteredMessages")
 
                             val newMemory = roleplayResult?.newMemory
                             if (newMemory != null) {
@@ -1681,22 +1709,20 @@ class MainActivity : AppCompatActivity() {
                                 sessionProfile = sessionProfile.copy(slotRoster = updatedRoster)
                             }
 
-                            withContext(Dispatchers.Main) {if (!nextSlot.isNullOrBlank()) {
+                            saveMessagesSequentially(filteredMessages!!, sessionId, chatId)
+                            val updatedHistory = chatAdapter.getMessages()
+                            if (activationRound < maxActivationRounds && isActive) {
+                                withContext(Dispatchers.Main) { updateButtonState(ButtonState.INTERRUPT) }
+                                processActivationRound("", updatedHistory)
+                            }
                                 setSlotTyping(sessionId, nextSlot!!, false)
                                 saveSessionProfile(sessionProfile, sessionId)
-                            }
-                                saveMessagesSequentially(filteredMessages!!, sessionId, chatId)
-                                val updatedHistory = chatAdapter.getMessages()
-                                if (activationRound < maxActivationRounds && isActive) {
-                                    withContext(Dispatchers.Main) { updateButtonState(ButtonState.INTERRUPT) }
-                                    processActivationRound("", updatedHistory)
-                                }
-                            }
-
                         }
                     } else {
                         activationRound = 0
                         withContext(Dispatchers.Main) { updateButtonState(ButtonState.SEND) }
+                        setSlotTyping(sessionId, nextSlot!!, false)
+                        saveSessionProfile(sessionProfile, sessionId)
                     }
                     // --------------------------------------------------------
                     true // Mark that completion was successful
@@ -1743,13 +1769,16 @@ class MainActivity : AppCompatActivity() {
             activationRound = 0
             return
         }
-
+        maxActivationRounds = 2
         if (activationRound >= maxActivationRounds){
             return
             updateButtonState(ButtonState.SEND)
         }
         activationRound++
+
+        Log.d ("ai_cycle", "Round: $activationRound")
         updateButtonState(ButtonState.INTERRUPT)
+
 
         aiJob = lifecycleScope.launch(Dispatchers.IO) {
             try {
@@ -1778,13 +1807,41 @@ class MainActivity : AppCompatActivity() {
                     }
                     val lastNonNarratorId = chatHistory.lastOrNull { it.senderId != "narrator" }?.senderId
                     var playerSlot = sessionProfile.slotRoster.find { it.slotId == activeSlotId }
-                    val coLocatedSlotIds = sessionProfile.slotRoster
-                        .filter {
-                            it.lastActiveArea == playerSlot?.lastActiveArea &&
-                                    it.lastActiveLocation == playerSlot?.lastActiveLocation &&
-                                    !it.typing
-                        }
-                        .map { it.slotId }
+                    Log.d("FilterDebug", "ActivePlayer: ${playerSlot?.name} at ${playerSlot?.lastActiveArea}/${playerSlot?.lastActiveLocation}")
+                    Log.d("FilterDebug", "LastSpeakerID: $lastNonNarratorId")
+
+                    sessionProfile.slotRoster.forEach { slot ->
+                        val matchArea = slot.lastActiveArea?.trim()?.lowercase() == playerSlot?.lastActiveArea?.trim()?.lowercase()
+                        val matchLoc = slot.lastActiveLocation?.trim()?.lowercase() == playerSlot?.lastActiveLocation?.trim()?.lowercase()
+                        val matchId = slot.slotId != lastNonNarratorId
+                        val notTyping = !slot.typing
+                        val notPlayer = slot.profileType != "player"
+
+                        Log.d("FilterDebug", "Checking ${slot.name}: Area($matchArea) Loc($matchLoc) NotLastSpeaker($matchId) NotTyping($notTyping) NotPlayer($notPlayer)")
+                    }
+                    val coLocatedSlotIds = if (activationRound > 1) {
+                        // Round 2+: Allow the player to be picked (so the AI can yield turn to you)
+                        sessionProfile.slotRoster
+                            .filter {
+                                it.lastActiveArea == playerSlot?.lastActiveArea &&
+                                        it.lastActiveLocation == playerSlot?.lastActiveLocation &&
+                                        it.slotId != lastNonNarratorId &&
+                                        !it.typing
+                                // We REMOVED 'it.profileType != "player"' here so the player is a valid candidate
+                            }
+                            .map { it.slotId }
+                    } else {
+                        // Round 1: Bots only (Strictly exclude player)
+                        sessionProfile.slotRoster
+                            .filter {
+                                it.lastActiveArea == playerSlot?.lastActiveArea &&
+                                        it.lastActiveLocation == playerSlot?.lastActiveLocation &&
+                                        it.slotId != lastNonNarratorId &&
+                                        !it.typing &&
+                                        it.profileType != "player" // Keep this restriction for the first round
+                            }
+                            .map { it.slotId }
+                    }
                     val memoriesMap: Map<String, List<TaggedMemory>> =
                         sessionProfile.slotRoster
                             .filter { it.slotId in coLocatedSlotIds }
@@ -2290,14 +2347,15 @@ class MainActivity : AppCompatActivity() {
             activationRound = 0
             return
         }
-
+        maxActivationRounds = 2
         var needsPostNarration = false
 
         val messagesRef = FirebaseFirestore.getInstance()
             .collection("sessions")
             .document(sessionId)
             .collection("messages")
-
+        activationRound++
+        Log.d ("ai_cycle", "Round: $activationRound")
         if (activationRound >= maxActivationRounds) {
             lifecycleScope.launch {
                 try {
@@ -2352,14 +2410,41 @@ class MainActivity : AppCompatActivity() {
                             chatHistory.lastOrNull { it.senderId != "narrator" }?.senderId
                         var playerSlot =
                             sessionProfile.slotRoster.find { it.slotId == activeSlotId }
-                        val coLocatedSlotIds = sessionProfile.slotRoster
-                            .filter {
-                                it.lastActiveArea == playerSlot?.lastActiveArea &&
-                                        it.lastActiveLocation == playerSlot?.lastActiveLocation &&
-                                        it.slotId != lastNonNarratorId &&
-                                        !it.typing
-                            }
-                            .map { it.slotId }
+                        Log.d("FilterDebug", "ActivePlayer: ${playerSlot?.name} at ${playerSlot?.lastActiveArea}/${playerSlot?.lastActiveLocation}")
+                        Log.d("FilterDebug", "LastSpeakerID: $lastNonNarratorId")
+
+                        sessionProfile.slotRoster.forEach { slot ->
+                            val matchArea = slot.lastActiveArea?.trim()?.lowercase() == playerSlot?.lastActiveArea?.trim()?.lowercase()
+                            val matchLoc = slot.lastActiveLocation?.trim()?.lowercase() == playerSlot?.lastActiveLocation?.trim()?.lowercase()
+                            val matchId = slot.slotId != lastNonNarratorId
+                            val notTyping = !slot.typing
+                            val notPlayer = slot.profileType != "player"
+
+                            Log.d("FilterDebug", "Checking ${slot.name}: Area($matchArea) Loc($matchLoc) NotLastSpeaker($matchId) NotTyping($notTyping) NotPlayer($notPlayer)")
+                        }
+                        val coLocatedSlotIds = if (activationRound > 1) {
+                            // Round 2+: Allow the player to be picked (so the AI can yield turn to you)
+                            sessionProfile.slotRoster
+                                .filter {
+                                    it.lastActiveArea == playerSlot?.lastActiveArea &&
+                                            it.lastActiveLocation == playerSlot?.lastActiveLocation &&
+                                            it.slotId != lastNonNarratorId &&
+                                            !it.typing
+                                    // We REMOVED 'it.profileType != "player"' here so the player is a valid candidate
+                                }
+                                .map { it.slotId }
+                        } else {
+                            // Round 1: Bots only (Strictly exclude player)
+                            sessionProfile.slotRoster
+                                .filter {
+                                    it.lastActiveArea == playerSlot?.lastActiveArea &&
+                                            it.lastActiveLocation == playerSlot?.lastActiveLocation &&
+                                            it.slotId != lastNonNarratorId &&
+                                            !it.typing &&
+                                            it.profileType != "player" // Keep this restriction for the first round
+                                }
+                                .map { it.slotId }
+                        }
                         val memoriesMap: Map<String, List<TaggedMemory>> =
                             sessionProfile.slotRoster
                                 .filter { it.slotId in coLocatedSlotIds }
@@ -2591,7 +2676,6 @@ class MainActivity : AppCompatActivity() {
         activationRound++
         updateButtonState(ButtonState.INTERRUPT)
 
-
         aiJob = lifecycleScope.launch(Dispatchers.IO) {
             try {
                 Log.d("ai_cycle", "actually processing ontable round")
@@ -2624,14 +2708,25 @@ class MainActivity : AppCompatActivity() {
                     }
                     val lastNonNarratorId = chatHistory.lastOrNull { it.senderId != "narrator" }?.senderId
                     var playerSlot = sessionProfile.slotRoster.find { it.slotId == activeSlotId }
-                    val coLocatedSlotIds = sessionProfile.slotRoster
-                        .filter {
-                            it.lastActiveArea == playerSlot?.lastActiveArea &&
-                                    it.lastActiveLocation == playerSlot?.lastActiveLocation &&
-                                    it.slotId != lastNonNarratorId &&
-                                    !it.typing
+                    val coLocatedSlotIds =
+                        if (activationRound == 1){
+                            sessionProfile.slotRoster
+                                .filter {
+                                    it.lastActiveArea == playerSlot?.lastActiveArea &&
+                                            it.lastActiveLocation == playerSlot?.lastActiveLocation &&
+                                            !it.typing &&
+                                            it.profileType == "bot"
+                                }
+                                .map { it.slotId }
+                        }else {
+                            sessionProfile.slotRoster
+                                .filter {
+                                    it.lastActiveArea == playerSlot?.lastActiveArea &&
+                                            it.lastActiveLocation == playerSlot?.lastActiveLocation &&
+                                            !it.typing
+                                }
+                                .map { it.slotId }
                         }
-                        .map { it.slotId }
                     val memoriesMap: Map<String, List<TaggedMemory>> =
                         sessionProfile.slotRoster
                             .filter { it.slotId in coLocatedSlotIds }
@@ -3445,7 +3540,7 @@ class MainActivity : AppCompatActivity() {
             val greetingMessage = ChatMessage(
                 id = UUID.randomUUID().toString(),
                 senderId = "system",
-                text = initialGreeting!! + "\n if a characters lastActiveArea and/or lastActiveLocation = null, move them to an area and location.",
+                text = initialGreeting!! + "\n if a characters lastActiveArea and/or lastActiveLocation = null, move them to an area and location. The locations should be used to make the story interesting.",
                 delay = 0,
                 timestamp = com.google.firebase.Timestamp.now(),
                 imageUpdates = null,
@@ -3453,11 +3548,11 @@ class MainActivity : AppCompatActivity() {
             )
             if (isOnTable) {
                 Log.d("ai_cycle", "proccessing isOnTable")
-                activationRound = 1
+                activationRound = 0
                 processOnTableRPGRound(userInput, listOf(greetingMessage))
             }else if (isAboveTable){
                 Log.d("ai_cycle", "proccessing isAboveTable")
-                activationRound = 1
+                activationRound = 0
                 processAboveTableRound(userInput, listOf(greetingMessage))
             } else {
                 Log.d("ai_cycle", "proccessing normal roleplay")
@@ -3530,24 +3625,23 @@ class MainActivity : AppCompatActivity() {
         val db = FirebaseFirestore.getInstance()
         val sessionRef = db.collection("sessions").document(sessionId)
 
-        db.runTransaction { transaction ->
-            val snapshot = transaction.get(sessionRef)
-            val sessionProfile = snapshot.toObject(SessionProfile::class.java) ?: return@runTransaction
-
-            // Update only the typing field for the matching slotId
-            val updatedSlotRoster = sessionProfile.slotRoster.map { slot ->
-                if (slot.slotId == slotId) slot.copy(typing = typing) else slot
+        sessionRef.get()
+            .continueWithTask { task ->
+                val sessionProfile = task.result?.toObject(SessionProfile::class.java)
+                    ?: return@continueWithTask Tasks.forException(IllegalStateException("No session"))
+                val updatedSlotRoster = sessionProfile.slotRoster.map { slot ->
+                    if (slot.slotId == slotId) slot.copy(typing = typing) else slot
+                }
+                sessionRef.update("slotRoster", updatedSlotRoster)
             }
-
-            transaction.update(sessionRef, "slotRoster", updatedSlotRoster)
-            null
-        }.addOnSuccessListener {
-            // Optionally log success
-            Log.d("Typing", "Typing status for slot $slotId set to $typing")
-        }.addOnFailureListener { e ->
-            Log.e("Typing", "Failed to set typing status for $slotId: $e")
-        }
+            .addOnSuccessListener {
+                Log.d("Typing", "Typing status for $slotId set to $typing")
+            }
+            .addOnFailureListener { e ->
+                Log.e("Typing", "Failed to set typing status for $slotId: $e")
+            }
     }
+
 
     fun updateTypingIndicator() {
         typingIndicatorBar.removeAllViews()
@@ -3692,13 +3786,14 @@ class MainActivity : AppCompatActivity() {
         val playerArea = playerSlot?.lastActiveArea
         val playerLocation = playerSlot?.lastActiveLocation
 
-        avatarSlotAssignments.forEach { index, slotId ->
+        // Change .forEach { index, slotId -> ... } to this for loop:
+        for ((index, slotId) in avatarSlotAssignments) {
             val view = avatarViews[index]
             if (slotId == null) {
                 Glide.with(this).clear(view)
                 view.setImageResource(R.drawable.silhouette)
                 view.visibility = View.INVISIBLE
-                return@forEach
+                continue // Use 'continue' instead of 'return@forEach' inside a for loop
             }
 
             val slotProfile = slotProfiles.find { it.slotId == slotId }
@@ -3706,7 +3801,7 @@ class MainActivity : AppCompatActivity() {
                 Glide.with(this).clear(view)
                 view.setImageResource(R.drawable.silhouette)
                 view.visibility = View.INVISIBLE
-                return@forEach
+                continue
             }
 
             // Must be in the same place as the player
@@ -3722,7 +3817,7 @@ class MainActivity : AppCompatActivity() {
                 Glide.with(this).clear(view)
                 view.setImageResource(R.drawable.silhouette)
                 view.visibility = View.INVISIBLE
-                return@forEach
+                continue
             }
 
             val poseName = slotProfile.pose?.trim().orEmpty()
@@ -3732,7 +3827,7 @@ class MainActivity : AppCompatActivity() {
                 Glide.with(this).clear(view)
                 view.setImageResource(R.drawable.silhouette)
                 view.visibility = View.INVISIBLE
-                return@forEach
+                continue
             }
 
             // --- Robust outfit & pose resolution ---

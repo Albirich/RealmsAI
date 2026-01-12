@@ -34,17 +34,16 @@ object PromptBuilder {
         
         INSTRUCTIONS:
         - Move characters ONLY if chat or actions *explicitly* says it (do NOT move characters arbitrarily).
-        - After ANY character moves, you MUST output area/location for EVERY character (even those who did not move) in "area_changes".
-            - "area_changes" must be a map: { "<slotId>": { "area": "AreaName", "location": "LocationName" }, ... }
+        - "area_changes":
+            - Output a map of ONLY the characters that actually moved: { "<slotId>": { "area": "AreaName", "location": "LocationName" } }
             - If NO ONE moves, output an empty object: "area_changes": {}
-            - Never leave a character's area or location undefined or null.
-            - DO NOT move a character unless the scene or chat says they move.
-            - (EXAMPLE: If Alice leaves the Kitchen to go to the Garden, and Bob stays, then area_changes should list both Alice and Bob and their new locations.)
+            - Do not list characters whose location has not changed.
             - Always keep one or more other characters in the same location as PLAYER: (slotId=${activeSlotId})
 
         - For "next_slot", pick ONLY from the list in VALID NEXT_SLOT CHOICES.
             - Never pick the same character twice in a row (see last speaker above).
             - "next_slot" is the slotId of the next character to act.
+            - Prioritize players that haven't had a turn in a while.
             - If it is a player slot (profileType == "player"), this means it is now the user's turn—do NOT generate a message for them.
             - When choosing the player, output an empty message or skip further actions until the user responds.
             
@@ -84,8 +83,10 @@ object PromptBuilder {
             - privateDescription is 400 characters of their secrets, desires, kinks, goals
             - sfwOnly should be true ONLY if the character is under 18 years old.
             
-        - If nsfw = true then next_slot cannot be Narrator.
-        - Always output only valid JSON:
+        - Finaly decide if the story is going in an NSFW direction.
+            - NSFW is defined as anything sexual, graphic, gore, or something that will go against your guidlines.*
+            - If nsfw = true then next_slot cannot be Narrator.
+        - Always output only valid JSON (This is an example do not actually use this information):
         {
           "area_changes": { "<slotId>": { "area": "AreaName", "location": "LocationName" }, ... },
           "next_slot": "<slotId>",          
@@ -428,7 +429,7 @@ object PromptBuilder {
                     - Add up to 5 tags for each memory, it can be any combination of the types of tags (example: [Sasuke, Sakura, Training, combo]) 
             
             # OUTPUT FORMAT (STRICT JSON ONLY)
-            Respond with a single valid JSON object. **Do not use markdown, tool calls, or explanations. DO NOT mark it as json. ALWAYS use the format as is** The format is:
+            Respond with a single valid JSON object. Do not use markdown, tool calls, or explanations. DO NOT mark it as json. ALWAYS use this format:
             
             {
               "messages": [

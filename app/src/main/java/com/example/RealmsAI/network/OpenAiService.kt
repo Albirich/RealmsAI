@@ -9,7 +9,7 @@ interface OpenAiService {
 }
 
 data class OpenAiChatRequest(
-    val model: String = "gpt-4.1-2025-04-14",
+    val model: String = "gpt-5-nano-2025-08-07",
     val messages: List<Message>    // <-- uses the shared Message
 )
 
