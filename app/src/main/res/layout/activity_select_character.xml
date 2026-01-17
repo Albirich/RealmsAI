@@ -1,4 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/chatRoot"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/deep_space_black"> <com.example.RealmsAI.StarfieldView
+    android:id="@+id/starfieldBackground"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent" />
+
+    <ImageView
+        android:id="@+id/backgroundImageView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="centerCrop"
+        android:alpha="1.0" />
 <LinearLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     android:orientation="vertical"
@@ -13,6 +29,7 @@
         android:layout_height="wrap_content"
         android:text="Selected: 0 / 20"
         android:layout_gravity="right"
+        android:textColor="@color/white"
         android:textSize="16sp"
         android:layout_marginBottom="8dp" />
 
@@ -28,4 +45,4 @@
         android:layout_height="wrap_content"
         android:text="Done" />
 </LinearLayout>
-
+</androidx.constraintlayout.widget.ConstraintLayout>

@@ -35,10 +35,16 @@ object PromptBuilder {
         INSTRUCTIONS:
         - Move characters ONLY if chat or actions *explicitly* says it (do NOT move characters arbitrarily).
         - "area_changes":
-            - Output a map of ONLY the characters that actually moved: { "<slotId>": { "area": "AreaName", "location": "LocationName" } }
-            - If NO ONE moves, output an empty object: "area_changes": {}
-            - Do not list characters whose location has not changed.
-            - Always keep one or more other characters in the same location as PLAYER: (slotId=${activeSlotId})
+        - Output a map of ONLY the characters that actually moved: { "<slotId>": { "area": "AreaName", "location": "LocationName" } }
+        - If NO ONE moves, output an empty object: "area_changes": {}
+        - Do not list characters whose location has not changed.
+        
+    - MOVEMENT LOGIC:
+        1. Explicit Moves: Move characters if the chat history *explicitly* describes them moving (e.g., "leaves the room").
+        2. Lonely Player Rule: If the PLAYER: (slotId=${activeSlotId}) is currently alone in a location, you SHOULD have a character move to the player's location to start a scene.
+           - This movement must be logical (e.g., "enters the room" or "walks up").
+           - Do not move characters if the player is already with someone.
+           - Do not randomly shuffle characters who are not involved in the scene.
 
         - For "next_slot", pick ONLY from the list in VALID NEXT_SLOT CHOICES.
             - Never pick the same character twice in a row (see last speaker above).
@@ -51,6 +57,7 @@ object PromptBuilder {
             - In your JSON output, include a field "memories" listing up to 5 relevant memory ids for the acting character. Do not include the full text.
             
         - If there is a new character that's not on the list that should talk, add them to a "new_npcs" array in your JSON output
+        - CRITICAL: Check the "Current Roster" list. DO NOT create an NPC if a character with that name is already in the roster.
         - The profile MUST HAVE ALL following fields: slotId, name, profileType, summary, lastActiveArea, lastActiveLocation, memories, age, abilities, bubbleColor, textColor, gender, height, weight, eyeColor, hairColor, physicalDescription, personality, privateDescripton, sfwOnly 
             - Each should have profileType: "npc", a unique slotId, and valid area/location.
             - Create a character with a personality and description needed for the character.
@@ -93,7 +100,6 @@ object PromptBuilder {
           "memories": ["id1", "id2", "id3"],
           "new_npcs": [
             {
-              "slotId": "6451f3a1-9d7a-488d-b6b2-71e072c415cb",
               "name": "Barkeep Genta",
               "profileType": "npc",
               "summary": "Gruff but kind-hearted barkeep.",
@@ -117,6 +123,7 @@ object PromptBuilder {
           ],
           "nsfw": true or false
         }
+        Your json MUST contain: next_slot, memories, and nsfw fields. All other fields are OPTIONAL
 
         SESSION SUMMARY:
         ${sessionSummary}
@@ -157,10 +164,9 @@ object PromptBuilder {
         gmStyle: String
     ): String {
         return """
-        You are now roleplaying as the following character. 
+        You are now roleplaying as the NARRATOR. 
         - Stay fully in character. 
         - Speak and narrate **only as this character**—never as other characters or as yourself. 
-        - Your character is the Gamemaster for a roleplaying game with the other characters as his players.
         - You make the story up as you go, and ask your players to roll for actions.
         - use the act summary and goal to formulate how the story should unfold.
         - As the game master, Describe the scene of your story and ask players what they want to do.
@@ -205,7 +211,7 @@ object PromptBuilder {
             If the chat says, “Bob walks into the kitchen to join Alice,” then “area_changes”: { “Bob”: { “area”: “Kitchen”, “location”: “Kitchen Table” }, “Alice”: { “area”: “Kitchen”, “location”: “Sink” } }
             If nothing in the chat suggests a character leaves or enters a location, their position stays the same.
             
-        - For "next_slot", pick ONLY from the list in VALID NEXT_SLOT CHOICES.
+        - For "next_slot", you MUST pick ONLY from the list in "VALID NEXT_SLOT CHOICES".
             - Never pick the same character twice in a row (see last speaker above).
             - "next_slot" is the slotId of the next character to act.
             - If it is a player slot (profileType == "player"), this means it is now the user's turn—do NOT generate a message for them.
@@ -263,11 +269,10 @@ object PromptBuilder {
             },   
             {
                 "area_changes": { "<slotId>": { "area": "AreaName", "location": "LocationName" }, ... },
-                "next_slot": "<slotId>",          
+                "next_slot": "< VALID NEXT_SLOT CHOICE>",          
                 "memories": ["id1", "id2", "id3"],
                 "new_npcs": [
                     {
-                        "slotId": "6451f3a1-9d7a-488d-b6b2-71e072c415cb",
                         "name": "Barkeep Genta",
                         "profileType": "npc",
                         "summary": "Gruff but kind-hearted barkeep.",
@@ -308,15 +313,10 @@ object PromptBuilder {
         
         CONDENSED INFO FOR NEARBY CHARACTERS:
            $condensedCharacterInfo
-            - NEVER make up new poses
-            - NEVER use neutral unless it is on the list.
-            - Only set a pose for characters whose available_poses list is not empty.
-            - If available_poses is empty for a character, do not include them in the pose map at all.
-            - NEVER make up new poses or use "neutral" unless it is explicitly in their list.
                     
         LAST SPEAKER: $lastNonNarratorId
         
-        VALID NEXT_SLOT CHOICES:
+        VALID NEXT_SLOT CHOICES (Next slot MUST be from THIS list):
         ${validNextSlotIds.joinToString(", ")}
         
         LOCATIONS:
@@ -408,6 +408,9 @@ object PromptBuilder {
                 - All replies MUST be fully in-character for **${slotProfile.name}**.
                 - Advance the story, relationship, or your character's goals—never stall or repeat.
                 - Write brief, natural dialogue (100 tokens), showing feelings and personality.
+                    - Describe actions/expressions between asterisks (*like this*).
+                    - Put spoken dialogue in quotation marks ("like this").
+                    - Combine the action and dialogue into a SINGLE message. Do NOT split them.
                 - Use vivid narration for **only your own** actions, emotions, or perceptions (never for other characters).
                 - Use immersive sensory description (sight, sound, smell, etc) to make the world feel alive.
                 - Always continue naturally from the chat history.
@@ -434,9 +437,8 @@ object PromptBuilder {
             {
               "messages": [
                 {
-                  "senderId": "${slotProfile.slotId}", // Use "${slotProfile.slotId}" for dialogue, "narrator" for actions/descriptions
+                  "senderId": "${slotProfile.slotId}",
                   "text": "<Limit to 300 characters>",
-                  "delay": 1500, // Use: 500 (snappy), 1500 (normal), 2500 (dramatic), 0 (rambling)
                   "pose": {
                     "slotId", "pose",
                     "slotId", "pose",
@@ -641,6 +643,7 @@ object PromptBuilder {
 
     fun buildRPGLiteRules(): String {
         return """
+        
         === RPGLite System Rules ===
         
         In RPGLite you are either a GAMESMASTER (GM) or a player. players have ROLES OF HERO, SIDEKICK, OR VILLAIN. 

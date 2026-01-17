@@ -1,6 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
 <androidx.constraintlayout.widget.ConstraintLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/chatRoot"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/deep_space_black"> <com.example.RealmsAI.StarfieldView
+    android:id="@+id/starfieldBackground"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent" />
+
+    <ImageView
+        android:id="@+id/backgroundImageView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="centerCrop"
+        android:alpha="1.0" />
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/sessionLandingRoot"
     android:fitsSystemWindows="true"
@@ -30,6 +46,7 @@
         android:text="Players"
         android:textStyle="bold"
         android:layout_marginTop="14dp"
+        android:textColor="@color/white"
         app:layout_constraintTop_toBottomOf="@id/sessionTitle"
         app:layout_constraintStart_toStartOf="parent"/>
     <include
@@ -76,6 +93,7 @@
         android:layout_marginTop="14dp"
         android:text="Characters"
         android:textStyle="bold"
+        android:textColor="@color/white"
         app:layout_constraintTop_toBottomOf="@id/playerRecycler"
         app:layout_constraintStart_toStartOf="parent"/>
     <include
@@ -129,13 +147,22 @@
         android:layout_height="wrap_content"
         android:text="Chat Info"
         android:textStyle="bold"
-        android:textColor="#000000"
+        android:textColor="@color/white"
         android:textSize="17sp"
         android:paddingTop="14dp"
         app:layout_constraintTop_toBottomOf="@id/charactersRecycler"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"/>
+        app:layout_constraintStart_toStartOf="parent"/>
 
+    <ImageView
+        android:id="@+id/landingdescriptionoutline"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        app:layout_constraintTop_toTopOf="@id/chatDescription"
+        app:layout_constraintBottom_toBottomOf="@id/chatDescription"
+        app:layout_constraintStart_toStartOf="@id/chatDescription"
+        app:layout_constraintEnd_toEndOf="@id/chatDescription"
+        android:src="@drawable/outline"
+        android:scaleType="fitXY"/>
     <TextView
         android:id="@+id/chatDescription"
         android:layout_width="0dp"
@@ -190,6 +217,17 @@
             android:visibility="gone"/>
     </androidx.constraintlayout.widget.ConstraintLayout>
 
+    <ImageView
+        android:id="@+id/freeoutline"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:paddingHorizontal="25dp"
+        app:layout_constraintTop_toTopOf="@id/sfwLayout"
+        app:layout_constraintBottom_toBottomOf="@id/sfwLayout"
+        app:layout_constraintStart_toStartOf="@id/sfwLayout"
+        app:layout_constraintEnd_toEndOf="@id/sfwLayout"
+        android:src="@drawable/outline"
+        android:scaleType="fitXY"/>
     <LinearLayout
         android:id="@+id/sfwLayout"
         android:orientation="horizontal"
@@ -223,4 +261,5 @@
         app:layout_constraintBottom_toBottomOf="parent"
         android:text="Start Session"/>
 
+</androidx.constraintlayout.widget.ConstraintLayout>
 </androidx.constraintlayout.widget.ConstraintLayout>

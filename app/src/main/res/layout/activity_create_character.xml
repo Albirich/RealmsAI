@@ -6,12 +6,31 @@
     android:fitsSystemWindows="true"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:padding="8dp">
+
     <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:id="@+id/charCreate"
         android:orientation="vertical">
 
+        <androidx.constraintlayout.widget.ConstraintLayout
+            xmlns:android="http://schemas.android.com/apk/res/android"
+            android:id="@+id/chatRoot"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@color/deep_space_black"> <com.example.RealmsAI.StarfieldView
+            android:id="@+id/starfieldBackground"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+
+            <ImageView
+                android:id="@+id/backgroundImageView"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="centerCrop"
+                android:alpha="1.0" />
+
+        </androidx.constraintlayout.widget.ConstraintLayout>
         <!-- Name Input -->
         <com.google.android.material.textfield.TextInputLayout
             android:id="@+id/charName"

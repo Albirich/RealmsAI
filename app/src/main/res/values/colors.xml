@@ -11,5 +11,6 @@
     <color name="realms_blue_dark">#006E9E</color>
     <color name="realms_charcoal">#212121</color>
     <color name="realms_background">#7099c4</color>
-
+    <color name="deep_space_black">#080810</color>
+    <color name="star_white">#FFFFFF</color>
 </resources>

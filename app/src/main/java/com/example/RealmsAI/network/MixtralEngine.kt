@@ -10,7 +10,7 @@ class MixtralEngine(
     suspend fun getBotOutput(prompt: String): String {
         val req = MixtralChatRequest(
             // nsfw bots here mistralai/devstral-medium, mistralai/mistral-small-3.1-24b-instruct
-            model    = "cognitivecomputations/dolphin-mistral-24b-venice-edition:free",
+            model    = "mistralai/mistral-small-3.1-24b-instruct",
             messages = listOf(
                 Message(role = "system", content = prompt)
             )

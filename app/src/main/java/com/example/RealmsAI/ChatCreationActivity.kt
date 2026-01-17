@@ -51,6 +51,7 @@ class ChatCreationActivity : AppCompatActivity() {
                 val charactersJson = result.data!!.getStringExtra("CHARACTERS_JSON")
                 val areasJson = result.data!!.getStringExtra("AREAS_JSON")
                 val assignmentJson = result.data!!.getStringExtra("CHARACTER_TO_AREA_JSON")
+                val locationAssignmentJson = result.data!!.getStringExtra("CHARACTER_TO_LOCATION_JSON")
                 if (charactersJson != null) {
                     val charListType = object : TypeToken<List<CharacterProfile>>() {}.type
                     selectedCharacters = gson.fromJson(charactersJson, charListType)
@@ -62,6 +63,10 @@ class ChatCreationActivity : AppCompatActivity() {
                 if (assignmentJson != null) {
                     val mapType = object : TypeToken<Map<String, String>>() {}.type
                     characterToAreaMap = gson.fromJson(assignmentJson, mapType)
+                }
+                if (locationAssignmentJson != null) {
+                    val mapType = object : TypeToken<Map<String, String>>() {}.type
+                    characterToLocationMap = gson.fromJson(locationAssignmentJson, mapType)
                 }
             }
         }
@@ -129,26 +134,6 @@ class ChatCreationActivity : AppCompatActivity() {
                 }
             }
 
-            val infoButtonChatGameMode: ImageButton = findViewById(R.id.infoButtonChatGameMode)
-            infoButtonChatGameMode.setOnClickListener {
-                AlertDialog.Builder(this@ChatCreationActivity)
-                    .setTitle("Game Modes")
-                    .setMessage("Choose what special rules you want to add. Modes are additive so you can mix and match them\n" +
-                            "RPG Mode - gives dice rolls, character sheets, light rpg rules\n" +
-                            "VN Mode - gives relationship levels that evolve the way characters interact\n" +
-                            "God Mode - removes the need for the user to have a character, all their messages will be system messages (Not implemented yet)")
-                    .setPositiveButton("OK", null)
-                    .show()
-            }
-
-            val infoButtonChatCreation: ImageButton = findViewById(R.id.infoButtonChatCreation)
-            infoButtonChatCreation.setOnClickListener {
-                AlertDialog.Builder(this@ChatCreationActivity)
-                    .setTitle("Relationships")
-                    .setMessage( "Use character#, # being the position in the character list you want to refer to. if the character in that position is replaced the name will be replaced.")
-                    .setPositiveButton("OK", null)
-                    .show()
-            }
             // Set modeSettings from loaded profile!
             modeSettings = profile.modeSettings.toMutableMap()
             enabledModes = profile.enabledModes.toMutableStateList()
@@ -173,6 +158,27 @@ class ChatCreationActivity : AppCompatActivity() {
                 VNButton.isEnabled = false
                 VNButton.visibility = View.GONE
             }
+        }
+
+        val infoButtonChatGameMode: ImageButton = findViewById(R.id.infoButtonChatGameMode)
+        infoButtonChatGameMode.setOnClickListener {
+            AlertDialog.Builder(this@ChatCreationActivity)
+                .setTitle("Game Modes")
+                .setMessage("Choose what special rules you want to add. Modes are additive so you can mix and match them\n" +
+                        "RPG Mode - gives dice rolls, character sheets, light rpg rules\n" +
+                        "VN Mode - gives relationship levels that evolve the way characters interact\n" +
+                        "God Mode - removes the need for the user to have a character, all their messages will be system messages (Not implemented yet)")
+                .setPositiveButton("OK", null)
+                .show()
+        }
+
+        val infoButtonChatCreation: ImageButton = findViewById(R.id.infoButtonChatCreation)
+        infoButtonChatCreation.setOnClickListener {
+            AlertDialog.Builder(this@ChatCreationActivity)
+                .setTitle("Relationships")
+                .setMessage( "Use character#, # being the position in the character list you want to refer to. if the character in that position is replaced the name will be replaced.")
+                .setPositiveButton("OK", null)
+                .show()
         }
 
         // Load collections (multi-select via CharacterSelectionActivity)

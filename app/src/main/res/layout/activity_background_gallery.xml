@@ -1,11 +1,30 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout
-    xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:orientation="vertical"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:fitsSystemWindows="true"
     android:padding="16dp">
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        xmlns:android="http://schemas.android.com/apk/res/android"
+        android:id="@+id/chatRoot"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@color/deep_space_black"> <com.example.RealmsAI.StarfieldView
+        android:id="@+id/starfieldBackground"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+        <ImageView
+            android:id="@+id/backgroundImageView"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scaleType="centerCrop"
+            android:alpha="1.0" />
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
 
     <!-- Recycler for all areas -->
     <androidx.recyclerview.widget.RecyclerView
@@ -13,25 +32,39 @@
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
+        app:layout_constraintStart_toStartOf="@id/loadAreaButton"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintBottom_toTopOf="@id/loadAreaButton"
         android:overScrollMode="never" />
 
     <com.google.android.material.button.MaterialButton
         android:id="@+id/addAreaButton"
-        android:layout_width="match_parent"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toStartOf="@id/loadAreaButton"
         android:text="Add Area"/>
 
     <com.google.android.material.button.MaterialButton
         android:id="@+id/loadAreaButton"
-        android:layout_width="match_parent"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:text="Copy Area"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toStartOf="@id/submitGalleryButton"
+        app:layout_constraintStart_toEndOf="@id/addAreaButton"
         android:layout_marginTop="8dp"/>
 
     <com.google.android.material.button.MaterialButton
         android:id="@+id/submitGalleryButton"
-        android:layout_width="match_parent"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:text="Save All Backgrounds"
-        android:layout_marginTop="8dp"/>
-</LinearLayout>
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toEndOf="@id/loadAreaButton"
+        android:layout_marginTop="8dp"
+        android:textSize="10dp"/>
+</androidx.constraintlayout.widget.ConstraintLayout>

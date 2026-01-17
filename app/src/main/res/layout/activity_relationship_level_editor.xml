@@ -1,71 +1,148 @@
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:id="@+id/relationshipLevelRoot"
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:fitsSystemWindows="true"
+    android:layout_height="match_parent">
+    <androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/chatRoot"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:padding="24dp"
-    android:orientation="vertical">
+    android:background="@color/deep_space_black"> <com.example.RealmsAI.StarfieldView
+    android:id="@+id/starfieldBackground"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent" />
 
-    <!-- Up Trigger -->
-    <EditText
-        android:id="@+id/upTriggerEdit"
+    <ImageView
+        android:id="@+id/backgroundImageView"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:hint="What makes the level go UP? (max 100 chars)"
-        android:maxLength="100"
-        android:inputType="text"/>
-
-    <!-- Down Trigger -->
-    <EditText
-        android:id="@+id/downTriggerEdit"
+        android:layout_height="match_parent"
+        android:scaleType="centerCrop"
+        android:alpha="1.0" />
+    <androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+        android:id="@+id/relationshipLevelRoot"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:hint="What makes the level go DOWN? (max 100 chars)"
-        android:maxLength="100"
-        android:inputType="text"/>
+        android:layout_height="match_parent"
+        android:padding="14dp"
+        android:orientation="vertical">
 
-    <!-- Levels List -->
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Relationship Levels:"
-        android:textStyle="bold"
-        android:paddingTop="16dp"/>
+        <ImageView
+            android:id="@+id/relationshipoutline"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:layout_marginTop="-10dp"
+            android:paddingTop="10dp"
+            app:layout_constraintTop_toTopOf="@id/upTriggerEdit"
+            app:layout_constraintBottom_toBottomOf="@id/startingpointscontainer"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            android:src="@drawable/outline"
+            android:scaleType="fitXY"/>
 
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/levelsRecycler"
-        android:layout_width="match_parent"
-        android:layout_height="150dp"
-        android:layout_marginBottom="8dp"/>
+        <!-- Up Trigger -->
+        <EditText
+            android:id="@+id/upTriggerEdit"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="What makes the level go UP? (max 100 chars)"
+            android:maxLength="100"
+            android:inputType="text"
+            android:layout_marginHorizontal="16dp"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintBottom_toTopOf="@id/downTriggerEdit"/>
 
-    <!-- Add Level Button -->
-    <Button
-        android:id="@+id/btnAddLevel"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Add Level" />
+        <!-- Down Trigger -->
+        <EditText
+            android:id="@+id/downTriggerEdit"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="16dp"
+            android:hint="What makes the level go DOWN? (max 100 chars)"
+            android:maxLength="100"
+            android:inputType="text"
+            app:layout_constraintTop_toBottomOf="@id/upTriggerEdit"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintBottom_toTopOf="@id/levellist"/>
 
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal">
-    <!-- Current Level Picker -->
+        <!-- Levels List -->
         <TextView
+            android:id="@+id/levellist"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Relationship Levels:"
+            android:textStyle="bold"
+            android:paddingTop="16dp"
+            android:layout_marginHorizontal="16dp"
+            app:layout_constraintTop_toBottomOf="@id/downTriggerEdit"
+            app:layout_constraintEnd_toStartOf="parent"
+            app:layout_constraintBottom_toTopOf="@id/levelsRecycler"/>
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/levelsRecycler"
+            android:layout_width="match_parent"
+            android:layout_height="150dp"
+            android:layout_marginBottom="8dp"
+            android:layout_marginHorizontal="16dp"
+            app:layout_constraintTop_toBottomOf="@id/levellist"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintBottom_toTopOf="@id/btnAddLevel"/>
+
+        <!-- Add Level Button -->
+        <Button
+            android:id="@+id/btnAddLevel"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Set Starting Points:"
-            android:paddingTop="16dp"/>
-        <EditText
-            android:id="@+id/startingPointsEdit"
-            android:layout_width="80dp"
-            android:layout_height="wrap_content"/>
-    </LinearLayout>
+            android:layout_marginHorizontal="16dp"
+            android:text="Add Level"
+            app:layout_constraintTop_toBottomOf="@id/levelsRecycler"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintBottom_toTopOf="@id/startingpointscontainer"/>
 
-    <!-- Save Button -->
-    <Button
-        android:id="@+id/btnSaveLevel"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Done"
-        android:layout_marginTop="16dp"/>
+        <LinearLayout
+            android:id="@+id/startingpointscontainer"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginHorizontal="16dp"
+            app:layout_constraintTop_toBottomOf="@id/btnAddLevel"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintBottom_toTopOf="@id/relationshiplevelspacer">
+        <!-- Current Level Picker -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Set Starting Points:"
+                android:paddingTop="16dp"/>
+            <EditText
+                android:id="@+id/startingPointsEdit"
+                android:layout_width="80dp"
+                android:layout_height="wrap_content"/>
+        </LinearLayout>
+        <ImageView
+            android:id="@+id/relationshiplevelspacer"
+            android:layout_width="match_parent"
+            android:layout_height="80dp"
+            app:layout_constraintTop_toBottomOf="@id/startingpointscontainer"/>
 
-</LinearLayout>
+        <!-- Save Button -->
+        <Button
+            android:id="@+id/btnSaveLevel"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Done"
+            android:layout_marginTop="16dp"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent"/>
+
+</androidx.constraintlayout.widget.ConstraintLayout>
+
+</androidx.constraintlayout.widget.ConstraintLayout>
+</androidx.constraintlayout.widget.ConstraintLayout>

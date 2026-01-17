@@ -56,7 +56,12 @@ import org.json.JSONArray
 import kotlin.math.roundToInt
 
 class MainActivity : AppCompatActivity() {
-    companion object { private const val TAG = "MainActivity" }
+    companion object {
+        private const val TAG = "MainActivity"
+        private const val FREE_DAILY_LIMIT = 70
+    }
+
+
 //   val infoButtonWardrobe: ImageButton = findViewById(R.id.infoButtonWardrobe)
 //   infoButtonCharRelationships.setOnClickListener {
 //      AlertDialog.Builder(this@CharacterCreationActivity)
@@ -152,6 +157,7 @@ class MainActivity : AppCompatActivity() {
     enum class ButtonState { SEND, INTERRUPT, WAITING }
     private var currentState: ButtonState = ButtonState.SEND
     private var aiJob: Job? = null
+
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -280,8 +286,18 @@ class MainActivity : AppCompatActivity() {
                 lifecycleScope.launch {
                     val deletedIds = saveEditedMessageAndDeleteFollowing(editedMessage, position)
                     deleteFromSlotPersonalHistories(sessionId, deletedIds)
-                    chatAdapter.removeMessagesFrom(position)
-                    chatAdapter.insertMessageAt(position, editedMessage)
+
+                    if (!mySlotId.isNullOrBlank()) {
+                        addToPersonalHistoryFirestore(sessionId, mySlotId!!, editedMessage)
+                    }
+
+                    if (position < chatAdapter.itemCount) {
+                        chatAdapter.removeMessagesFrom(position)
+                        chatAdapter.insertMessageAt(position, editedMessage)
+                    } else {
+                        Log.w(TAG, "Skipped manual adapter update: Position $position out of bounds.")
+                    }
+
                     sendToAI(editedMessage.text)
                 }
             },
@@ -786,16 +802,19 @@ class MainActivity : AppCompatActivity() {
                 .lastOrNull { it.senderId == sessionProfile.userMap[userId]?.activeSlotId }
 
             if (lastMessage != null) {
-                // Resend same text but with visibility=false and blank text
-                val resendMsg = lastMessage.copy(
-                    id = "System",
-                    text = "",
-                    visibility = false,
-                    timestamp = com.google.firebase.Timestamp.now()
-                )
-                SessionManager.sendMessage(chatId, sessionId, resendMsg)
-                // (Optional: Trigger AI if you want this to start a new round)
-                sendToAI("")
+                checkMessageLimit {
+                    // Resend same text but with visibility=false and blank text
+                    val resendMsg = lastMessage.copy(
+                        id = "System",
+                        text = "",
+                        visibility = false,
+                        timestamp = com.google.firebase.Timestamp.now()
+                    )
+                    activationRound = 0
+                    SessionManager.sendMessage(chatId, sessionId, resendMsg)
+                    // (Optional: Trigger AI if you want this to start a new round)
+                    sendToAI("")
+                }
             }
         }
 
@@ -906,11 +925,16 @@ class MainActivity : AppCompatActivity() {
             if (currentState == ButtonState.SEND) {
                 val text = messageEditText.text.toString().trim()
                 if (text.isNotEmpty()) {
-                    updateButtonState(ButtonState.INTERRUPT)
-                    setPlayerTyping(false)
-                    sendMessageAndCallAI(text)
-                    messageEditText.text.clear()
-                    ignoreTextWatcher = false
+                    // WRAP THE SEND LOGIC
+                    checkMessageLimit {
+                        // All the original logic goes here:
+                        updateButtonState(ButtonState.INTERRUPT)
+                        setPlayerTyping(false)
+                        activationRound = 0
+                        sendMessageAndCallAI(text)
+                        messageEditText.text.clear()
+                        ignoreTextWatcher = false
+                    }
                 }
             } else if (currentState == ButtonState.INTERRUPT) {
                 interruptAILoop()
@@ -1215,6 +1239,7 @@ class MainActivity : AppCompatActivity() {
                             .map { it.slotId }
                     } else {
                         // Round 1: Bots only (Strictly exclude player)
+                        Log.d("ai_cycle", "lastlocation is $playerSlot.lastActiveLocation")
                         sessionProfile.slotRoster
                             .filter {
                                 it.lastActiveArea == playerSlot?.lastActiveArea &&
@@ -1769,7 +1794,6 @@ class MainActivity : AppCompatActivity() {
             activationRound = 0
             return
         }
-        maxActivationRounds = 2
         if (activationRound >= maxActivationRounds){
             return
             updateButtonState(ButtonState.SEND)
@@ -2347,16 +2371,24 @@ class MainActivity : AppCompatActivity() {
             activationRound = 0
             return
         }
-        maxActivationRounds = 2
-        var needsPostNarration = false
 
-        val messagesRef = FirebaseFirestore.getInstance()
-            .collection("sessions")
-            .document(sessionId)
-            .collection("messages")
+
         activationRound++
+        updateButtonState(ButtonState.INTERRUPT)
         Log.d ("ai_cycle", "Round: $activationRound")
-        if (activationRound >= maxActivationRounds) {
+        // 1. The Gatekeeper: STOP if we are over the limit
+        if (activationRound > maxActivationRounds) {
+
+            // 2. The Decision: Check specific condition (using chatHistory is faster!)
+            val lastMsg = chatHistory.lastOrNull()
+            val needsNarration = lastMsg?.messageType == "roll"
+
+            if (needsNarration) {
+            val messagesRef = FirebaseFirestore.getInstance()
+                .collection("sessions")
+                .document(sessionId)
+                .collection("messages")
+
             lifecycleScope.launch {
                 try {
                     val snapshot = messagesRef
@@ -2671,10 +2703,13 @@ class MainActivity : AppCompatActivity() {
                 }
             }
             return
-        }
+        } else {
+                // Just unlock the button
+              updateButtonState(ButtonState.SEND)
+            }
 
-        activationRound++
-        updateButtonState(ButtonState.INTERRUPT)
+            return // <--- CRITICAL: Prevents falling through to normal AI
+        }
 
         aiJob = lifecycleScope.launch(Dispatchers.IO) {
             try {
@@ -2798,12 +2833,11 @@ class MainActivity : AppCompatActivity() {
                     )
                     val gmPrompt =
                         if (murderSettings?.enabled == true) {
-                            gmLines + PromptBuilder.buildRPGLiteRules() + PromptBuilder.buildMurderAddon(ms = murderSettings)
+                            PromptBuilder.buildRPGLiteRules() + gmLines + PromptBuilder.buildMurderAddon(ms = murderSettings)
                         }else{
-                            gmLines + PromptBuilder.buildRPGLiteRules() + PromptBuilder.buildActAddon(act = act)
+                            PromptBuilder.buildRPGLiteRules() + gmLines + PromptBuilder.buildActAddon(act = act)
                         }
 
-                    Log.d("AI_Cycle", "sending $gmPrompt")
                     var activationResponse = Facilitator.callActivationAI(gmPrompt,BuildConfig.OPENAI_API_KEY)
                     Log.d("ai_cycle", "$gmPrompt")
                     ensureActive()
@@ -3490,6 +3524,77 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    fun checkMessageLimit(onLimitCheckPassed: () -> Unit) {
+        val user = FirebaseAuth.getInstance().currentUser
+        if (user == null) return // Should not happen if logged in
+
+        val userRef = FirebaseFirestore.getInstance().collection("users").document(user.uid)
+
+        db.runTransaction { transaction ->
+            val snapshot = transaction.get(userRef)
+
+            // Handle case where UserProfile doc might not exist yet (lazy creation)
+            val isPremium = snapshot.getBoolean("isPremium") ?: false
+            if (isPremium) return@runTransaction true // Premium users always pass
+
+            val lastDate = snapshot.getString("lastMessageDate") ?: ""
+
+            // Use SimpleDateFormat for API 23 compatibility
+            val sdf = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault())
+            val today = sdf.format(java.util.Date())
+
+            val currentCount = if (lastDate == today) {
+                // It's the same day, use stored count (default to 0 if null)
+                snapshot.getLong("dailyMessageCount") ?: 0
+            } else {
+                // New day (or no date stored), reset to 0
+                0
+            }
+
+            // Check if limit reached
+            if (currentCount >= FREE_DAILY_LIMIT) {
+                return@runTransaction false // Fail
+            }
+
+            // Increment count and update date
+            transaction.set(
+                userRef,
+                mapOf(
+                    "dailyMessageCount" to currentCount + 1,
+                    "lastMessageDate" to today
+                ),
+                SetOptions.merge() // Merge so we don't wipe name/bio if they exist
+            )
+            return@runTransaction true // Pass
+
+        }.addOnSuccessListener { allowed ->
+            if (allowed) {
+                onLimitCheckPassed()
+            } else {
+                showPaywallDialog()
+            }
+        }.addOnFailureListener { e ->
+            Log.e("LimitCheck", "Failed to check limit", e)
+            // Fail open: If internet blips, let them play to avoid frustration?
+            // Or fail closed: onLimitCheckPassed() to allow.
+            onLimitCheckPassed()
+        }
+    }
+
+    // 3. The Dialog
+    // In MainActivity.kt
+    fun showPaywallDialog() {
+        AlertDialog.Builder(this)
+            .setTitle("Daily Limit Reached")
+            .setMessage("You've used your free messages for today! Upgrade to Premium for unlimited roleplay.")
+            .setPositiveButton("Upgrade") { _, _ ->
+                // LAUNCH THE NEW ACTIVITY
+                val intent = Intent(this, UpgradeActivity::class.java)
+                startActivity(intent)
+            }
+            .setNegativeButton("Wait until tomorrow", null)
+            .show()
+    }
 
     private fun sendMessageAndCallAI(text: String) {
         val activeSlotId = sessionProfile.userMap[userId]?.activeSlotId
@@ -3561,14 +3666,15 @@ class MainActivity : AppCompatActivity() {
                 processActivationRound(userInput, listOf(greetingMessage))
             }
         } else {
-
             if (isOnTable) {
                 Log.d("ai_cycle", "proccessing isOnTable")
-                activationRound = 1
+                activationRound = 0
+                maxActivationRounds = 2
                 processOnTableRPGRound(userInput, messages)
             }else if (isAboveTable){
                 Log.d("ai_cycle", "proccessing isAboveTable")
-                activationRound = 1
+                activationRound = 0
+                maxActivationRounds = 2
                 processAboveTableRound(userInput, messages)
             } else {
                 Log.d("ai_cycle", "proccessing normal roleplay")
@@ -4017,13 +4123,17 @@ class MainActivity : AppCompatActivity() {
                     // --- Save updated session profile! ---
                     sessionProfile = updatedProfile
 
+                    this.mySlotId = updatedProfile.userMap[userId]?.activeSlotId
+
+                    // Now use the class property
+                    val playerSlot = updatedProfile.slotRoster.find { it.slotId == this.mySlotId }
+                    val playerArea = playerSlot?.lastActiveArea
+
                     // --- Update typing indicator for all users! ---
                     updateTypingIndicator()
 
                     // --- Background change logic (optional) ---
                     val mySlotId = updatedProfile.userMap[userId]?.activeSlotId
-                    val playerSlot = updatedProfile.slotRoster.find { it.slotId == mySlotId }
-                    val playerArea = playerSlot?.lastActiveArea
                     val playerLocation = playerSlot?.lastActiveLocation
                     updateBackgroundIfChanged(playerArea, playerLocation, updatedProfile.areas)
 

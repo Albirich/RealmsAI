@@ -124,11 +124,13 @@ class ChatMapActivity : AppCompatActivity() {
             val areasJson = Gson().toJson(loadedAreas)
             val charactersJson = Gson().toJson(selectedCharacters)
             val assignmentJson = Gson().toJson(characterToAreaMap)
+            val locationAssignmentJson = Gson().toJson(characterToLocationMap)
 
             val resultIntent = Intent().apply {
                 putExtra("AREAS_JSON", areasJson)
                 putExtra("CHARACTERS_JSON", charactersJson)
                 putExtra("CHARACTER_TO_AREA_JSON", assignmentJson)
+                putExtra("CHARACTER_TO_LOCATION_JSON", locationAssignmentJson)
             }
             setResult(Activity.RESULT_OK, resultIntent)
             finish()

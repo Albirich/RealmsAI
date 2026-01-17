@@ -9,5 +9,8 @@ data class UserProfile(
     val userPicks: List<String> = emptyList(),
     val friends: List<String> = emptyList(),
     val pendingFriends: List<String> = emptyList(),
-    val recentChats: List<String> = emptyList()
+    val recentChats: List<String> = emptyList(),
+    val isPremium: Boolean = false,
+    val dailyMessageCount: Int = 0,
+    val lastMessageDate: String? = null
 )

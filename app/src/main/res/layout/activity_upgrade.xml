@@ -1,0 +1,142 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/chatRoot"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/deep_space_black"> <com.example.RealmsAI.StarfieldView
+    android:id="@+id/starfieldBackground"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent" />
+
+    <ImageView
+        android:id="@+id/backgroundImageView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="centerCrop"
+        android:alpha="1.0" />
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:fitsSystemWindows="true"
+    android:layout_height="match_parent">
+
+    <ImageView
+        android:id="@+id/freeoutline"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        app:layout_constraintTop_toTopOf="@id/freelisttitle"
+        app:layout_constraintBottom_toBottomOf="@id/freelist"
+        app:layout_constraintStart_toStartOf="@id/freelist"
+        app:layout_constraintEnd_toEndOf="@id/freelist"
+        android:src="@drawable/outline"
+        android:scaleType="fitXY"/>
+    <ImageView
+        android:id="@+id/Paidoutline"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        app:layout_constraintTop_toTopOf="@id/paidlisttitle"
+        app:layout_constraintBottom_toBottomOf="@id/paidlist"
+        app:layout_constraintStart_toStartOf="@id/paidlist"
+        app:layout_constraintEnd_toEndOf="@id/paidlist"
+        android:src="@drawable/outline"
+        android:scaleType="fitXY"
+        android:layout_marginStart="-5dp"/>
+
+    <TextView
+        android:id="@+id/upgradeTitle"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:textSize="35dp"
+        android:layout_margin="16dp"
+        android:layout_marginTop="20dp"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        android:text="Upgrade placeholder"
+        android:textColor="@color/white"
+        android:textAlignment="center"
+        />
+
+    <TextView
+        android:id="@+id/freelisttitle"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/upgradeTitle"
+        app:layout_constraintHorizontal_weight="1"
+        android:layout_marginStart="20dp"
+        android:textColor="@color/white"
+        android:textSize="25dp"
+        android:text="  FREE"
+        android:textAlignment="center"/>
+    <TextView
+        android:id="@+id/freelist"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        app:layout_constraintTop_toBottomOf="@id/freelisttitle"
+        app:layout_constraintStart_toStartOf="@id/freelisttitle"
+        android:paddingEnd="-25dp"
+        android:text="
+        \n- 70 daily messages
+        \n\n- up to20 characters per chat
+        \n- "/>
+
+    <TextView
+        android:id="@+id/paidlisttitle"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        app:layout_constraintStart_toEndOf="@id/freelisttitle"
+        app:layout_constraintTop_toBottomOf="@id/upgradeTitle"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_weight="1"
+        android:textColor="@color/white"
+        android:textSize="25dp"
+        android:text="PAID"
+        android:textAlignment="center"/>
+
+    <TextView
+        android:id="@+id/paidlist"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        app:layout_constraintTop_toBottomOf="@id/paidlisttitle"
+        app:layout_constraintStart_toEndOf="@id/freelist"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginEnd="16dp"
+        android:text="
+        \n- unlimited daily messages
+        \n\n- up to 50 characters per chat
+        \n- "/>
+
+    <Button
+        android:id="@+id/confirm_upgrade_button"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        app:layout_constraintTop_toBottomOf="@id/freelist"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:textAlignment="center"
+        android:text="confirm upgrade"
+        android:textSize="20dp"
+        android:layout_marginTop="40dp"/>
+
+    <Button
+        android:id="@+id/cancel_button"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        app:layout_constraintTop_toBottomOf="@id/confirm_upgrade_button"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:textAlignment="center"
+        android:text="cancel"
+        android:textSize="20dp"
+        android:layout_marginTop="40dp"/>
+
+    <include
+        layout="@layout/bottom_nav"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        app:layout_constraintBottom_toBottomOf="parent"/>
+</androidx.constraintlayout.widget.ConstraintLayout>
+</androidx.constraintlayout.widget.ConstraintLayout>

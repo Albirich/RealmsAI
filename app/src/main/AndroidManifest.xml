@@ -51,6 +51,7 @@
         <activity android:name=".RPGSettingsActivity"/>
         <activity android:name=".RelationshipLevelEditorActivity"/>
         <activity android:name=".VNSettingsActivity"/>
+        <activity android:name=".UpgradeActivity"/>
 
 
 

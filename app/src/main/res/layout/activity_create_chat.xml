@@ -1,36 +1,76 @@
 <?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/chatRoot"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/deep_space_black"> <com.example.RealmsAI.StarfieldView
+    android:id="@+id/starfieldBackground"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent" />
+
+    <ImageView
+        android:id="@+id/backgroundImageView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="centerCrop"
+        android:alpha="1.0" />
+
+
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:fitsSystemWindows="true"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    android:padding="16dp">
+    android:padding="16dp"
+    app:layout_constraintTop_toTopOf="parent"
+    app:layout_constraintBottom_toBottomOf="parent"
+    app:layout_constraintStart_toStartOf="parent"
+    app:layout_constraintEnd_toEndOf="parent">
 
-    <LinearLayout
+    <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical">
 
         <!-- Title -->
-        <EditText
-            android:id="@+id/titleEditText"
+        <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/titlebox"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="Enter chat title" />
+            app:counterMaxLength="100"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent">
+            <EditText
+                android:id="@+id/titleEditText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="Enter title"
+                android:maxHeight="200dp" />
+        </com.google.android.material.textfield.TextInputLayout>
         <include
             android:id="@+id/infoButtonChatCreation"
             layout="@layout/info_button"
             android:layout_width="25dp"
             android:layout_height="25dp"
             android:layout_marginStart="8dp"
-            android:layout_gravity="center_vertical" />
+            android:layout_gravity="center_vertical"
+            app:layout_constraintTop_toBottomOf="@id/titlebox"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintBottom_toTopOf="@id/descriptionbox"/>
 
        <!-- Description -->
         <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/descriptionbox"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             app:counterEnabled="true"
-            app:counterMaxLength="1000">
+            app:counterMaxLength="1000"
+            app:layout_constraintTop_toBottomOf="@id/infoButtonChatCreation"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintBottom_toTopOf="@id/secretbox">
             <EditText
                 android:id="@+id/descriptionEditText"
                 android:layout_width="match_parent"
@@ -41,10 +81,15 @@
 
         <!-- Secret Description -->
         <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/secretbox"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             app:counterEnabled="true"
-            app:counterMaxLength="1000">
+            app:counterMaxLength="1000"
+            app:layout_constraintTop_toBottomOf="@id/descriptionbox"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintBottom_toTopOf="@id/firstMessageBox">
             <EditText
                 android:id="@+id/secretDescriptionEditText"
                 android:layout_width="match_parent"
@@ -55,10 +100,15 @@
 
         <!-- First Message -->
         <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/firstMessageBox"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             app:counterEnabled="true"
-            app:counterMaxLength="100">
+            app:counterMaxLength="100"
+            app:layout_constraintTop_toBottomOf="@id/secretbox"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintBottom_toTopOf="@id/sfwtogglebox">
             <EditText
                 android:id="@+id/firstMessageEditText"
                 android:layout_width="match_parent"
@@ -68,12 +118,27 @@
         </com.google.android.material.textfield.TextInputLayout>
 
         <!-- Safe-for-Work Toggle -->
+
+        <ImageView
+            android:id="@+id/sfwoutline"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            app:layout_constraintTop_toTopOf="@id/sfwtogglebox"
+            app:layout_constraintBottom_toBottomOf="@id/privatebox"
+            app:layout_constraintStart_toStartOf="@id/sfwtogglebox"
+            app:layout_constraintEnd_toEndOf="@id/sfwtogglebox"
+            android:src="@drawable/outline"
+            android:scaleType="fitXY"/>
         <LinearLayout
-            android:layout_width="match_parent"
+            android:id="@+id/sfwtogglebox"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
             android:layout_marginTop="16dp"
-            android:gravity="center_vertical">
+            android:gravity="center_vertical"
+            app:layout_constraintTop_toBottomOf="@id/firstMessageBox"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintBottom_toTopOf="@id/privatebox">
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
@@ -86,11 +151,15 @@
                 android:layout_marginStart="8dp" />
         </LinearLayout>
         <LinearLayout
+            android:id="@+id/privatebox"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
             android:layout_marginTop="16dp"
-            android:gravity="center_vertical">
+            android:gravity="center_vertical"
+            app:layout_constraintTop_toBottomOf="@id/sfwtogglebox"
+            app:layout_constraintStart_toStartOf="@id/privatebox"
+            app:layout_constraintBottom_toTopOf="@id/charactersetuptitle">
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
@@ -105,17 +174,26 @@
 
         <!-- Characters (Load from Collection) -->
         <TextView
+            android:id="@+id/charactersetuptitle"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
             android:text="Character Setup"
-            android:textStyle="bold" />
+            android:textColor="@color/white"
+            android:textStyle="bold"
+            app:layout_constraintTop_toBottomOf="@id/privatebox"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintBottom_toTopOf="@id/btnLoadCollections"/>
 
         <Button
             android:id="@+id/btnLoadCollections"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Load Character Collections" />
+            android:text="Load Character Collections"
+            app:layout_constraintTop_toBottomOf="@id/charactersetuptitle"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintBottom_toTopOf="@id/btnOpenMap"/>
 
         <!-- Map Setup -->
         <com.google.android.material.button.MaterialButton
@@ -123,23 +201,45 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginVertical="8dp"
-            android:text="Open Map Builder" />
+            android:text="Open Map Builder"
+            app:layout_constraintTop_toBottomOf="@id/btnLoadCollections"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintBottom_toTopOf="@id/chatrelationshipBtn"/>
 
         <!-- Relationship Setup -->
         <Button
             android:id="@+id/chatrelationshipBtn"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Relationships" />
+            android:text="Relationships"
+            app:layout_constraintTop_toBottomOf="@id/btnOpenMap"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintBottom_toTopOf="@id/gameModeCheckboxContainer"/>
 
-
+        <ImageView
+            android:id="@+id/gameModeCheckboxContaineroutline"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            app:layout_constraintTop_toTopOf="@id/gameModeCheckboxContainer"
+            app:layout_constraintBottom_toBottomOf="@id/gameModeCheckboxContainer"
+            app:layout_constraintStart_toStartOf="@id/gameModeCheckboxContainer"
+            app:layout_constraintEnd_toEndOf="parent"
+            android:src="@drawable/outline"
+            android:scaleType="fitXY"/>
 
         <androidx.constraintlayout.widget.ConstraintLayout
             android:id="@+id/gameModeCheckboxContainer"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:layout_marginTop="16dp">
+            android:layout_marginTop="16dp"
+            android:paddingStart="15dp"
+            app:layout_constraintTop_toBottomOf="@id/chatrelationshipBtn"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintBottom_toTopOf="@+id/tagstitle"
+            >
             <!-- Game Mode Spinner -->
             <TextView
                 android:id="@+id/gameModeTextView"
@@ -171,6 +271,7 @@
                 android:id="@+id/rpgButton"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
+                android:layout_marginEnd="15dp"
                 app:layout_constraintTop_toTopOf="@id/checkboxRPG"
                 app:layout_constraintEnd_toEndOf="parent"
                 android:text="RPG settings"
@@ -187,6 +288,7 @@
                 android:id="@+id/visualNoveButton"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
+                android:layout_marginEnd="15dp"
                 app:layout_constraintTop_toTopOf="@id/checkboxVisualNovel"
                 app:layout_constraintEnd_toEndOf="parent"
                 android:text="VN settings"
@@ -203,6 +305,7 @@
                 android:id="@+id/godModeButton"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
+                android:layout_marginEnd="15dp"
                 app:layout_constraintTop_toTopOf="@id/checkboxGodMode"
                 app:layout_constraintEnd_toEndOf="parent"
                 android:text="GOD settings"
@@ -212,16 +315,34 @@
 
         <!-- Tags -->
         <TextView
+            android:id="@+id/tagstitle"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="15dp"
             android:text="Tags (comma-separated)"
-            android:textStyle="bold" />
+            android:textStyle="bold"
+            android:textColor="@color/white"
+            app:layout_constraintTop_toBottomOf="@id/gameModeCheckboxContainer"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintBottom_toTopOf="@id/tagsEditText"/>
         <EditText
             android:id="@+id/tagsEditText"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="e.g. fantasy, mystery" />
+            android:hint="e.g. fantasy, mystery"
+            android:textColor="@color/white"
+            app:layout_constraintTop_toBottomOf="@id/tagstitle"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintBottom_toTopOf="@id/spacercreatechat"/>
+        <ImageView
+            android:id="@+id/spacercreatechat"
+            android:layout_width="match_parent"
+            android:layout_height="30dp"
+            app:layout_constraintTop_toBottomOf="@id/tagsEditText"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"/>
+
 
         <!-- Create Button -->
         <Button
@@ -229,7 +350,11 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="24dp"
-            android:text="Create Chat" />
+            android:text="Create Chat"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent"/>
 
-    </LinearLayout>
+    </androidx.constraintlayout.widget.ConstraintLayout>
 </ScrollView>
+
+</androidx.constraintlayout.widget.ConstraintLayout>

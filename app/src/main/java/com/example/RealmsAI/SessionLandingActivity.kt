@@ -536,6 +536,13 @@ class SessionLandingActivity : AppCompatActivity() {
 
         // --- Start Session ---
         startSessionBtn.setOnClickListener {
+            // --- Make sure player has a character first ---
+            val rosterCount = sessionProfile?.slotRoster?.size ?: 0
+            if (rosterCount < 2) {
+                Toast.makeText(this, "You need at least 2 characters to start a session.", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+
             if (enteredFrom == "Sessionhub" && sessionProfile != null) {
                 // Just launch MainActivity immediately!
                 val intent = Intent(this, MainActivity::class.java)
@@ -612,13 +619,19 @@ class SessionLandingActivity : AppCompatActivity() {
                         val slotKey = ModeSettings.SlotKeys.fromPosition(i)
                         val idKey = slot.baseCharacterId ?: slot.slotId
                         val timelineText = mysteryMoreInfoByCharId[idKey].orEmpty()
+                        val areaMap = chatProfile?.characterToArea ?: emptyMap()
+                        val locMap = chatProfile?.characterToLocation ?: emptyMap()
                         val h = harmonizeAndCondenseSlot(
                             slot.toCharacterProfile(),
                             relationships,
                             rpgSettings,
                             murderSettings,
                             currentSlotKey = slotKey,
-                            moreInfo = timelineText
+                            moreInfo = timelineText,
+                            allAreas = loadedAreas,
+                            charToAreaMap = areaMap,
+                            charToLocationMap = locMap
+
                         )
                         harmonizedSlots.add(h)
 
@@ -924,7 +937,10 @@ class SessionLandingActivity : AppCompatActivity() {
         rpgSettings: ModeSettings.RPGSettings?,
         murder: ModeSettings.MurderSettings?,
         currentSlotKey: String,
-        moreInfo: String = ""
+        moreInfo: String = "",
+        allAreas: List<Area>,
+        charToAreaMap: Map<String, String>,
+        charToLocationMap: Map<String, String>
     ): SlotProfile = withContext(Dispatchers.IO) {
         val roleForThisChar = rpgSettings
             ?.characters
@@ -1003,7 +1019,16 @@ class SessionLandingActivity : AppCompatActivity() {
         val outfits = profile.outfits ?: emptyList()
         val defaultOutfit = outfits.firstOrNull()?.name ?: ""
         val actualCurrentOutfit = if (profile.currentOutfit.isNullOrBlank()) defaultOutfit else profile.currentOutfit
-        val startArea = null // You can set this if you want, or pull from chatProfile/area logic
+        val assignedAreaId = charToAreaMap[profile.id]
+        val assignedLocationId = charToLocationMap[profile.id]
+
+        // Find the actual objects so we can get their human-readable names
+        val areaObj = allAreas.find { it.id == assignedAreaId }
+        val locationObj = areaObj?.locations?.find { it.id == assignedLocationId }
+
+        // Use the found name, or null if not assigned
+        val startArea = areaObj?.name
+        val startLocation = locationObj?.name
         val slotId = UUID.randomUUID().toString()
 
         val matchingRpgCharacter = rpgSettings?.characters?.find { it.characterId == profile.id }
@@ -1091,7 +1116,7 @@ class SessionLandingActivity : AppCompatActivity() {
             sfwOnly = profile.sfwOnly,
             relationships = sessionRelationships,
             lastActiveArea = startArea,
-            lastActiveLocation = null,
+            lastActiveLocation = startLocation,
             profileType = profile.profileType,
             typing = false,
             memories = backgroundMemories,
@@ -1124,7 +1149,7 @@ class SessionLandingActivity : AppCompatActivity() {
 
     private fun updateCharacterProgress(current: Int, total: Int) {
         progressBar?.progress = current
-        progressTextView?.text = "Updating characters for the session: $current/$total done.\nPlease don’t close the app."
+        progressTextView?.text = "Updating characters for the session: $current/$total done.\nThis will take a while.\nPlease don’t close the app."
     }
 
     private fun dismissCharacterProgressDialog() {

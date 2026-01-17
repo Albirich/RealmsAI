@@ -64,16 +64,28 @@ object FacilitatorResponseParser {
             }
         }
 
+        // 1. Build a "Block List" of existing names (normalized)
+        val existingNames = slotRoster.map { it.name.trim().lowercase() }.toHashSet()
+
         val newNpcs = mutableListOf<SlotProfile>()
         if (jsonObj.has("new_npcs")) {
             val npcArray = jsonObj.optJSONArray("new_npcs")
             if (npcArray != null) {
                 for (i in 0 until npcArray.length()) {
                     val npcObj = npcArray.getJSONObject(i)
-                    // Construct SlotProfile from npcObj
+                    val npcName = npcObj.getString("name")
+
+                    // 2. The Safeguard: Check if name exists
+                    if (existingNames.contains(npcName.trim().lowercase())) {
+                        Log.d("FacilitatorParser", "Blocked duplicate NPC: $npcName")
+                        continue // Skip this iteration, do not add to list
+                    }
+
+                    // 3. Construct SlotProfile (Generate a FRESH ID here)
                     val newSlot = SlotProfile(
-                        slotId = npcObj.getString("slotId"),
-                        name = npcObj.getString("name"),
+                        slotId = UUID.randomUUID().toString(),
+                        baseCharacterId = UUID.randomUUID().toString(),
+                        name = npcName,
                         profileType = npcObj.optString("profileType", "npc"),
                         summary = npcObj.optString("summary", ""),
                         lastActiveArea = npcObj.optString("lastActiveArea"),
@@ -107,6 +119,9 @@ object FacilitatorResponseParser {
                         sfwOnly = npcObj.optBoolean("sfwOnly", false)
                     )
                     newNpcs.add(newSlot)
+
+                    // Add the new name to our block list immediately
+                    existingNames.add(npcName.trim().lowercase())
                 }
             }
         }

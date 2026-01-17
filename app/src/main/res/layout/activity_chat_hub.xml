@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/chatHubRoot"
     android:layout_width="match_parent"
@@ -8,12 +8,46 @@
     android:fitsSystemWindows="true"
     android:padding="8dp">
 
+    <androidx.constraintlayout.widget.ConstraintLayout
+        xmlns:android="http://schemas.android.com/apk/res/android"
+        android:id="@+id/chatRoot"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@color/deep_space_black"> <com.example.RealmsAI.StarfieldView
+        android:id="@+id/starfieldBackground"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+        <ImageView
+            android:id="@+id/backgroundImageView"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scaleType="centerCrop"
+            android:alpha="1.0" />
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+    <ImageView
+        android:id="@+id/filterbackground"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        app:layout_constraintTop_toTopOf="@id/chatfilterbox"
+        app:layout_constraintBottom_toBottomOf="@id/chatfilterbox"
+        app:layout_constraintStart_toStartOf="@id/chatfilterbox"
+        app:layout_constraintEnd_toEndOf="@id/chatfilterbox"
+        android:src="@drawable/outline"
+        android:scaleType="fitXY"/>
+
     <!-- Search + Spinner row -->
     <LinearLayout
+        android:id="@+id/chatfilterbox"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:padding="8dp">
+        android:padding="8dp"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
 
         <EditText
             android:id="@+id/searchEditText"
@@ -36,7 +70,11 @@
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:paddingTop="12dp"/>
+        android:paddingTop="12dp"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/chatfilterbox"
+        app:layout_constraintBottom_toTopOf="@id/bottomNavBar"/>
 
     <include
         android:id="@+id/bottomNavBar"
@@ -45,4 +83,4 @@
         android:layout_height="wrap_content"
         app:layout_constraintBottom_toBottomOf="parent"/>
 
-</LinearLayout>
+</androidx.constraintlayout.widget.ConstraintLayout>

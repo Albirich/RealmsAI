@@ -1,17 +1,27 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout
+<androidx.constraintlayout.widget.ConstraintLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
-    android:orientation="vertical"
+    android:id="@+id/chatRoot"
     android:layout_width="match_parent"
-    android:fitsSystemWindows="true"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_height="match_parent"
-    android:padding="16dp">
+    android:background="@color/deep_space_black"> <com.example.RealmsAI.StarfieldView
+    android:id="@+id/starfieldBackground"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent" />
+    <LinearLayout
+        xmlns:android="http://schemas.android.com/apk/res/android"
+        android:orientation="vertical"
+        android:layout_width="match_parent"
+        android:fitsSystemWindows="true"
+        xmlns:app="http://schemas.android.com/apk/res-auto"
+        android:layout_height="match_parent"
+        android:padding="16dp">
 
     <TextView
         android:id="@+id/wardrobDescription"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:textColor="@color/white"
         android:text="Name outfits and poses in a way to let the AI know what options it has. (Uniform, Casual, Super Saiyan Transformation, etc)"
         android:textSize="18dp"/>
 
@@ -46,3 +56,4 @@
         android:text="Save All Outfits"
         android:layout_marginTop="8dp"/>
 </LinearLayout>
+</androidx.constraintlayout.widget.ConstraintLayout>

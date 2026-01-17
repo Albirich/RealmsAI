@@ -17,7 +17,7 @@
             android:text="Chat Title"
             android:textSize="24sp"
             android:textStyle="bold"
-            android:textColor="@android:color/black"
+            android:textColor="@android:color/white"
             app:layout_constraintTop_toTopOf="parent"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
@@ -69,6 +69,15 @@
             android:backgroundTint="#3974D3"
             android:textColor="#FFF"/>
 
+        <ImageView
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            app:layout_constraintTop_toTopOf="@id/chatProfileDescription"
+            app:layout_constraintBottom_toBottomOf="@id/charactersRecyclerView"
+            app:layout_constraintStart_toStartOf="@id/chatProfileDescription"
+            app:layout_constraintEnd_toEndOf="@id/chatProfileDescription"
+            android:src="@drawable/outline"
+            android:scaleType="fitXY"/>
         <!-- Description -->
         <TextView
             android:id="@+id/chatProfileDescription"
