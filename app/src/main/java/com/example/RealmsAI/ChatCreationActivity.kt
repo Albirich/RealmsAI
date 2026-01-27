@@ -27,7 +27,6 @@ class ChatCreationActivity : AppCompatActivity() {
     private lateinit var firstMsgEt: EditText
     private lateinit var sfwSwitch: Switch
     private lateinit var privateSwitch: Switch
-    private lateinit var tagsEt: EditText
     private lateinit var createBtn: Button
     private lateinit var relationshipBtn: Button
     private lateinit var btnLoadCollections: Button
@@ -40,6 +39,22 @@ class ChatCreationActivity : AppCompatActivity() {
     private var chatRelationships: MutableList<Relationship> = mutableListOf()
     private var editingChatId: String? = null
     private var modeSettings: MutableMap<String, String> = mutableMapOf()
+
+
+
+    private lateinit var universeEt: EditText
+    private lateinit var selectTagsBtn: Button
+    private lateinit var selectedTagsTv: TextView
+
+    private val availableTags = arrayOf(
+        "Fantasy", "Sci-Fi", "Modern", "Male", "Female",
+        "Non-Binary", "Monster", "Hero", "Villain", "OC",
+        "Canon", "Tsundere", "Yandere", "Kuudere", "Dandere"
+    )
+    // Track selection state
+    private val checkedTags = BooleanArray(availableTags.size)
+    private val currentTags = mutableListOf<String>()
+
 
 
 
@@ -92,7 +107,9 @@ class ChatCreationActivity : AppCompatActivity() {
         firstMsgEt = findViewById(R.id.firstMessageEditText)
         sfwSwitch = findViewById(R.id.sfwSwitch)
         privateSwitch = findViewById(R.id.privateSwitch)
-        tagsEt = findViewById(R.id.tagsEditText)
+        universeEt = findViewById(R.id.universeEditText)
+        selectTagsBtn = findViewById(R.id.selectTagsButton)
+        selectedTagsTv = findViewById(R.id.selectedTagsText)
         createBtn = findViewById(R.id.createChatButton)
         relationshipBtn = findViewById(R.id.chatrelationshipBtn)
         btnLoadCollections = findViewById(R.id.btnLoadCollections)
@@ -121,7 +138,9 @@ class ChatCreationActivity : AppCompatActivity() {
             firstMsgEt.setText(profile.firstmessage)
             sfwSwitch.isChecked = profile.sfwOnly
             privateSwitch.isChecked = profile.private
-            tagsEt.setText(profile.tags.joinToString(", "))
+            universeEt = findViewById(R.id.universeEditText)
+            selectTagsBtn = findViewById(R.id.selectTagsButton)
+            selectedTagsTv = findViewById(R.id.selectedTagsText)
             // Store areas and characterToArea
             loadedAreas = profile.areas.toMutableList()
             characterToAreaMap = profile.characterToArea.toMutableMap()
@@ -132,6 +151,10 @@ class ChatCreationActivity : AppCompatActivity() {
                 loadCharactersFromFirestoreByIds(profile.characterIds) { chars ->
                     selectedCharacters = chars.toMutableList()
                 }
+            }
+
+            selectTagsBtn.setOnClickListener {
+                showTagSelectionDialog()
             }
 
             // Set modeSettings from loaded profile!
@@ -270,12 +293,34 @@ class ChatCreationActivity : AppCompatActivity() {
         }
 
         // Create or Save Chat button
+        // Inside onCreate...
+
         createBtn.setOnClickListener {
+            // 1. Basic Validation
             if (titleEt.text.isNullOrBlank()) {
                 titleEt.error = "Title required"
                 return@setOnClickListener
             }
-            saveAndLaunchChat()
+
+            // 2. Define the save action
+            val performSave = { isPrivateOverride: Boolean? ->
+                // If the user chose "Save as Public" in the dialog, flip the switch
+                if (isPrivateOverride == false) {
+                    privateSwitch.isChecked = false
+                }
+                saveAndLaunchChat()
+            }
+
+            // 3. Check Logic
+            val isPrivate = privateSwitch.isChecked
+
+            if (!isPrivate) {
+                // Public chats are always free
+                performSave(null)
+            } else {
+                // It's Private - Check Limits
+                attemptSaveLogic(editingChatId, performSave)
+            }
         }
     }
     companion object {
@@ -283,6 +328,30 @@ class ChatCreationActivity : AppCompatActivity() {
         private const val REQUEST_CODE_VN_SETTINGS = 1002
         private const val REQUEST_CODE_GOD_MODE_SETTINGS = 1003
         // ...add more if you have more mode settings screens
+    }
+
+    private fun showTagSelectionDialog() {
+        AlertDialog.Builder(this)
+            .setTitle("Select Chat Tags")
+            .setMultiChoiceItems(availableTags, checkedTags) { _, which, isChecked ->
+                checkedTags[which] = isChecked
+            }
+            .setPositiveButton("OK") { _, _ ->
+                updateTagsDisplay()
+            }
+            .setNeutralButton("Clear All") { _, _ ->
+                checkedTags.fill(false)
+                updateTagsDisplay()
+            }
+            .show()
+    }
+
+    private fun updateTagsDisplay() {
+        currentTags.clear()
+        availableTags.forEachIndexed { index, tag ->
+            if (checkedTags[index]) currentTags.add(tag)
+        }
+        selectedTagsTv.text = if (currentTags.isEmpty()) "None selected" else currentTags.joinToString(", ")
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
@@ -315,13 +384,77 @@ class ChatCreationActivity : AppCompatActivity() {
         }
     }
 
+    private fun attemptSaveLogic(editingId: String?, onPermissionGranted: (Boolean?) -> Unit) {
+        val userId = FirebaseAuth.getInstance().currentUser?.uid ?: return
+        val db = FirebaseFirestore.getInstance()
+        val PRIVATE_CHAT_LIMIT = 5 // Set your limit for free users
+
+        // Optional: Add a simple progress dialog here if you want visuals like CharacterCreation
+        // showProgressDialog()
+
+        // 1. Check if User is Premium
+        db.collection("users").document(userId).get()
+            .addOnSuccessListener { userDoc ->
+                val isPremium = userDoc.getBoolean("isPremium") ?: false
+
+                if (isPremium) {
+                    // Premium = Unlimited
+                    onPermissionGranted(null)
+                } else {
+                    // 2. Free = Count existing PRIVATE chats
+                    db.collection("chats")
+                        .whereEqualTo("author", userId)
+                        .whereEqualTo("private", true)
+                        .get()
+                        .addOnSuccessListener { snapshot ->
+
+                            // Edge Case: If editing an existing private chat, don't count it as a "new" slot
+                            val isEditingExistingPrivate = editingId != null &&
+                                    snapshot.documents.any { it.id == editingId }
+
+                            val effectiveCount = if (isEditingExistingPrivate) snapshot.size() - 1 else snapshot.size()
+
+                            if (effectiveCount >= PRIVATE_CHAT_LIMIT) {
+                                // Limit Reached
+                                showPremiumLimitDialog(PRIVATE_CHAT_LIMIT, onPermissionGranted)
+                            } else {
+                                // Allowed
+                                onPermissionGranted(null)
+                            }
+                        }
+                        .addOnFailureListener {
+                            Toast.makeText(this, "Failed to check limits.", Toast.LENGTH_SHORT).show()
+                        }
+                }
+            }
+            .addOnFailureListener {
+                Toast.makeText(this, "Connection error.", Toast.LENGTH_SHORT).show()
+            }
+    }
+
+    private fun showPremiumLimitDialog(limit: Int, onSaveCallback: (Boolean?) -> Unit) {
+        AlertDialog.Builder(this)
+            .setTitle("Private Chat Limit Reached")
+            .setMessage("Free users can create up to $limit private chats.\n\nYou can Upgrade to Premium for unlimited storage, or save this chat as Public for free.")
+            .setPositiveButton("Upgrade") { _, _ ->
+                startActivity(Intent(this, UpgradeActivity::class.java))
+            }
+            .setNeutralButton("Save as Public") { _, _ ->
+                // Callback with 'false' to indicate forcing private=false
+                onSaveCallback(false)
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
     private fun saveAndLaunchChat() {
         val chatId = editingChatId ?: System.currentTimeMillis().toString()
         val title = titleEt.text.toString().trim()
         val desc = descEt.text.toString().trim()
         val secretDesc = secretDescEt.text.toString().trim()
         val firstMsg = firstMsgEt.text.toString().trim()
-        val tags = tagsEt.text.toString().split(",").map { it.trim() }.filter { it.isNotEmpty() }
+        val universe = universeEt.text.toString().trim()
+        val tags = currentTags
         val sfwOnly = sfwSwitch.isChecked
         val private = privateSwitch.isChecked
         val enabledModes = mutableListOf<String>()
@@ -349,6 +482,7 @@ class ChatCreationActivity : AppCompatActivity() {
             timestamp = Timestamp.now(),
             author = authorId,
             tags = tags,
+            universe = universe,
             sfwOnly = sfwOnly,
             private = private
         )
@@ -379,6 +513,7 @@ class ChatCreationActivity : AppCompatActivity() {
             "timestamp" to Timestamp.now(),
             "author" to authorId,
             "tags" to profile.tags,
+            "universe" to profile.universe,
             "sfwOnly" to profile.sfwOnly,
             "private" to profile.private,
             "lastMessage" to "",

@@ -265,31 +265,59 @@
                 android:layout_height="0dp"
                 android:background="#DA222222"
                 app:layout_constraintTop_toBottomOf="@id/fadeTop"
-                app:layout_constraintBottom_toTopOf="@id/typingIndicatorBar"/>
+                app:layout_constraintBottom_toTopOf="@id/inputContainer"/>
 
             <androidx.recyclerview.widget.RecyclerView
                 android:id="@+id/chatRecyclerView"
                 android:layout_width="match_parent"
                 android:layout_height="0dp"
                 app:layout_constraintTop_toTopOf="@id/fadeTop"
-                app:layout_constraintBottom_toTopOf="@id/typingIndicatorBar"
+                app:layout_constraintBottom_toTopOf="@id/nextSpeakerContainer"
                 android:maxHeight="200dp"
                 android:textColor="#daaaaaaa"
                 android:textSize="20sp"/>
-        <LinearLayout
-            android:id="@+id/typingIndicatorBar"
-            android:layout_width="match_parent"
-            android:layout_height="30dp"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:background="#DA222222"
-            android:visibility="gone"
-            app:layout_constraintTop_toBottomOf="@id/chatRecyclerView"
-            app:layout_constraintStart_toStartOf="@id/inputContainer"
-            app:layout_constraintBottom_toTopOf="@id/inputContainer"
-            app:layout_constraintEnd_toEndOf="@id/inputContainer"
-            />
-        <androidx.constraintlayout.widget.ConstraintLayout
+
+            <LinearLayout
+                android:id="@+id/typingIndicatorBar"
+                android:layout_width="0dp"
+                android:layout_height="30dp"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:background="#DA222222"
+                android:visibility="gone"
+                app:layout_constraintTop_toBottomOf="@id/chatRecyclerView"
+                app:layout_constraintStart_toStartOf="@id/inputContainer"
+                app:layout_constraintBottom_toTopOf="@id/inputContainer"
+                app:layout_constraintEnd_toStartOf="@id/nextSpeakerContainer"
+                />
+            <LinearLayout
+                android:id="@+id/nextSpeakerContainer"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:background="#AA000000"
+                android:gravity="center_vertical"
+                android:padding="4dp"
+                android:visibility="gone"
+                app:layout_constraintBottom_toTopOf="@id/inputContainer"
+                app:layout_constraintEnd_toEndOf="@id/inputContainer">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Force Next:"
+                    android:textColor="#CCCCCC"
+                    android:textSize="12sp"
+                    android:layout_marginEnd="8dp"/>
+
+                <Spinner
+                    android:id="@+id/nextSpeakerSpinner"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:backgroundTint="#FFFFFF"/>
+            </LinearLayout>
+
+            <androidx.constraintlayout.widget.ConstraintLayout
             android:id="@+id/inputContainer"
             android:layout_width="match_parent"
             android:layout_height="78dp"
@@ -325,6 +353,7 @@
                 android:src="@drawable/ic_dice"
                 android:scaleType="fitXY"/>
         </androidx.constraintlayout.widget.ConstraintLayout>
+
     </androidx.constraintlayout.widget.ConstraintLayout>
 
     <ImageButton
@@ -333,7 +362,7 @@
         android:layout_height="30dp"
         android:src="@drawable/ic_chatbubble"
         android:layout_marginEnd="20dp"
-        android:layout_marginBottom="5dp"
+        app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintBottom_toTopOf="@id/controlBox"
         android:contentDescription="Return to chat"
@@ -346,8 +375,9 @@
     <androidx.constraintlayout.widget.ConstraintLayout
         android:id="@+id/controlBox"
         android:layout_width="0dp"
-        android:layout_height="300dp"
+        android:layout_height="0dp"
         android:orientation="vertical"
+        app:layout_constraintTop_toBottomOf="@id/toggleChatButton"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintBottom_toBottomOf="parent"
@@ -406,56 +436,41 @@
             android:id="@+id/moveOptions"
             android:layout_width="match_parent"
             android:layout_height="0dp"
-            app:layout_constraintTop_toBottomOf="@+id/controlMenuButtons"
+            android:background="#D9000000"
+            android:visibility="gone"
             app:layout_constraintBottom_toBottomOf="parent"
-            android:visibility="gone">
-            <TextView
-                android:id="@+id/areaTitle"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                app:layout_constraintTop_toTopOf="parent"
-                android:text="Area:"
-                android:textColor="@android:color/white"/>
-
-            <Spinner
-                android:id="@+id/areaSpinner"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                app:layout_constraintTop_toBottomOf="@+id/areaTitle"
-                android:backgroundTint="@color/white"
-                android:contentDescription="a list of all the areas in this chat"/>
+            app:layout_constraintTop_toBottomOf="@+id/controlMenuButtons">
 
             <TextView
-                android:id="@+id/locationTitle"
-                android:layout_width="match_parent"
+                android:id="@+id/moveTitle"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                app:layout_constraintTop_toBottomOf="@id/areaSpinner"
-                android:text="Location:"
-                android:textColor="@android:color/white"/>
-
-            <Spinner
-                android:id="@+id/locationSpinner"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                app:layout_constraintTop_toBottomOf="@+id/locationTitle"
-                android:backgroundTint="@color/white"
-                android:contentDescription="list of locations within the area in the area spinner"/>
-
-            <androidx.recyclerview.widget.RecyclerView
-                android:id="@+id/locationChar"
-                android:layout_width="match_parent"
-                android:layout_height="0dp"
-                app:layout_constraintTop_toBottomOf="@id/locationSpinner"
-                app:layout_constraintBottom_toTopOf="@id/moveConfirm"
-                android:contentDescription="icons of characters inside that location"/>
+                android:layout_margin="16dp"
+                android:text="Select a Character to Move, or Spy on a Location"
+                android:textColor="#FFFFFF"
+                android:textStyle="bold"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toTopOf="parent" />
 
             <Button
-                android:id="@+id/moveConfirm"
-                android:layout_width="match_parent"
+                android:id="@+id/stopSpyingButton"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="move"
+                android:text="Stop Spying"
+                android:visibility="gone"
+                android:backgroundTint="@android:color/holo_red_dark"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintTop_toTopOf="parent"
+                android:layout_marginEnd="8dp"/>
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/moveMapRecycler"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_marginTop="8dp"
                 app:layout_constraintBottom_toBottomOf="parent"
-                android:contentDescription="sets personas area and location"/>
+                app:layout_constraintTop_toBottomOf="@+id/moveTitle" />
+
         </androidx.constraintlayout.widget.ConstraintLayout>
 
         <androidx.constraintlayout.widget.ConstraintLayout
@@ -466,13 +481,23 @@
             app:layout_constraintBottom_toBottomOf="parent"
             android:visibility="gone">
 
+            <ImageView
+                android:id="@+id/personaSelectionOutline"
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                app:layout_constraintTop_toTopOf="@id/characterSpinnerTitle"
+                app:layout_constraintBottom_toBottomOf="@id/characterSpinner"
+                app:layout_constraintStart_toStartOf="@id/characterSpinnerTitle"
+                app:layout_constraintEnd_toEndOf="@id/characterSpinner"
+                android:src="@drawable/outline"
+                android:scaleType="fitXY"/>
+
             <TextView
                 android:id="@+id/characterSpinnerTitle"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 app:layout_constraintTop_toTopOf="parent"
                 app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintEnd_toStartOf="@id/slotSelector"
                 android:text="Character Selector"
                 android:textColor="@android:color/white"/>
 
@@ -484,23 +509,20 @@
                 android:backgroundTint="@android:color/white"
                 android:contentDescription="a list of all characters in this location, based on useractiveslotid"/>
 
-
-
             <androidx.constraintlayout.widget.ConstraintLayout
                 android:id="@+id/slotSelector"
                 android:layout_width="0dp"
                 android:layout_height="0dp"
+                app:layout_constraintTop_toBottomOf="@id/takeControl"
+                app:layout_constraintBottom_toTopOf="@id/outfitSpinnerTitle"
+                app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintEnd_toEndOf="parent"
-                app:layout_constraintTop_toTopOf="parent"
-                app:layout_constraintStart_toEndOf="@id/setImage"
-                app:layout_constraintBottom_toBottomOf="@id/setImage"
-                app:layout_constraintDimensionRatio="2:1"
                 android:contentDescription="this is just buttons that can be clicked to select which avatar slot should be updated">
 
                 <CheckBox
                     android:id="@+id/lockSlot0"
-                    android:layout_width="10dp"
-                    android:layout_height="10dp"
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
                     android:button="@drawable/lock_checkbox_selector"
                     app:layout_constraintTop_toTopOf="@id/slotSelector"
                     app:layout_constraintBottom_toTopOf="@id/selectSlot0"
@@ -514,12 +536,12 @@
                     app:layout_constraintEnd_toStartOf="@id/selectSlot1"
                     app:layout_constraintStart_toStartOf="parent"
                     android:src="@drawable/default_01"
-                    android:scaleType="centerCrop"/>
+                    android:scaleType="fitCenter"/>
 
                 <CheckBox
                     android:id="@+id/lockSlot1"
-                    android:layout_width="10dp"
-                    android:layout_height="10dp"
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
                     android:button="@drawable/lock_checkbox_selector"
                     app:layout_constraintTop_toTopOf="@id/slotSelector"
                     app:layout_constraintBottom_toTopOf="@id/selectSlot1"
@@ -534,12 +556,12 @@
                     app:layout_constraintStart_toEndOf="@id/selectSlot0"
                     app:layout_constraintEnd_toStartOf="@id/selectSlot2"
                     android:src="@drawable/default_01"
-                    android:scaleType="centerCrop"/>
+                    android:scaleType="fitCenter"/>
 
                 <CheckBox
                     android:id="@+id/lockSlot2"
-                    android:layout_width="10dp"
-                    android:layout_height="10dp"
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
                     android:button="@drawable/lock_checkbox_selector"
                     app:layout_constraintTop_toTopOf="@id/slotSelector"
                     app:layout_constraintBottom_toTopOf="@id/selectSlot2"
@@ -553,12 +575,12 @@
                     app:layout_constraintStart_toEndOf="@id/selectSlot1"
                     app:layout_constraintEnd_toStartOf="@id/selectSlot3"
                     android:src="@drawable/default_01"
-                    android:scaleType="centerCrop"/>
+                    android:scaleType="fitCenter"/>
 
                 <CheckBox
                     android:id="@+id/lockSlot3"
-                    android:layout_width="10dp"
-                    android:layout_height="10dp"
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
                     android:button="@drawable/lock_checkbox_selector"
                     app:layout_constraintTop_toTopOf="@id/slotSelector"
                     app:layout_constraintBottom_toTopOf="@id/selectSlot3"
@@ -572,10 +594,9 @@
                     app:layout_constraintStart_toEndOf="@id/selectSlot2"
                     app:layout_constraintEnd_toEndOf="parent"
                     android:src="@drawable/default_01"
-                    android:scaleType="centerCrop"/>
+                    android:scaleType="fitCenter"/>
 
             </androidx.constraintlayout.widget.ConstraintLayout>
-
 
             <Button
                 android:id="@+id/takeControl"
@@ -593,16 +614,39 @@
                 android:layout_height="wrap_content"
                 app:layout_constraintTop_toBottomOf="@id/characterSpinner"
                 app:layout_constraintStart_toEndOf="@id/takeControl"
-                app:layout_constraintEnd_toStartOf="@id/slotSelector"
                 android:text="Set Image"
                 android:layout_marginHorizontal="2dp"
                 android:contentDescription="this button will set the pose selected to the slot selected, and also set the slotid for that avatarslot"/>
 
+            <TextView
+                android:id="@+id/outfitSpinnerTitle"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintBottom_toTopOf="@id/outfitSpinner"
+                android:text="Outfit Selector"
+                android:textColor="@android:color/white"/>
+
+            <Spinner
+                android:id="@+id/outfitSpinner"
+                android:layout_width="wrap_content"
+                android:layout_height="40dp"
+                android:background="@drawable/halo_shape"
+                android:backgroundTint="#CC000000"
+                android:elevation="12dp"
+                android:paddingStart="12dp"
+                android:paddingEnd="24dp"
+                android:layout_marginBottom="4dp"
+                app:layout_constraintBottom_toTopOf="@id/personaPoseRecycler"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toEndOf="parent"/>
+
             <androidx.recyclerview.widget.RecyclerView
                 android:id="@+id/personaPoseRecycler"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
+                android:layout_height="300dp"
                 app:layout_constraintBottom_toBottomOf="parent"
+                android:layout_marginBottom="15dp"
                 android:contentDescription="this is a horizontal show of poses, clicking one will select it readyto be set by set image button.">
             </androidx.recyclerview.widget.RecyclerView>
 
@@ -615,8 +659,7 @@
             app:layout_constraintTop_toBottomOf="@+id/controlMenuButtons"
             app:layout_constraintBottom_toBottomOf="parent"
             android:paddingBottom="20dp"
-            android:paddingHorizontal="15dp"
-            android:visibility="gone">
+            android:paddingHorizontal="15dp">
 
             <Button
                 android:id="@+id/resetTyping"
@@ -642,13 +685,43 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Report a Bug"
+                android:layout_marginTop="16dp"
                 app:layout_constraintTop_toBottomOf="@id/returnHome"
                 app:layout_constraintStart_toStartOf="parent"
                 android:contentDescription="Send a bug report with debug info to the developers"/>
 
+            <Button
+                android:id="@+id/RPGInstructions"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Instructions"
+                android:layout_marginTop="16dp"
+                app:layout_constraintTop_toBottomOf="@id/reportBug"
+                app:layout_constraintStart_toStartOf="parent"
+                android:contentDescription="Set Instructions"/>
 
+            <Button
+                android:id="@+id/directorBtn"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Director Mode"
+                android:layout_marginTop="16dp"
+                app:layout_constraintTop_toBottomOf="@id/RPGInstructions"
+                app:layout_constraintStart_toStartOf="parent"
+                android:contentDescription="Enter director mode"/>
+
+            <TextView
+                android:id="@+id/optionsMessageCounter"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Messages: Loading..."
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:textColor="#FFFFFF"
+                android:layout_marginBottom="12dp"
+                app:layout_constraintTop_toTopOf="parent"
+                app:layout_constraintEnd_toEndOf="parent"/>
         </androidx.constraintlayout.widget.ConstraintLayout>
-
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 

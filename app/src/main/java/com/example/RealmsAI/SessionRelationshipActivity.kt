@@ -74,11 +74,9 @@ class SessionRelationshipActivity : AppCompatActivity() {
             Log.d("Relationships", "Participants after addAll: ${participants.map { it.name }}")
             adapter = ParticipantRelationshipAdapter(
                 participants,
-                relationships,
-                onAddRelationship = { fromId -> showAddRelationshipDialog(fromId) },
+                relationships, // Initial population
+                onAddRelationshipClick = { fromId -> showAddRelationshipDialog(fromId) },
                 onDeleteRelationship = { rel ->
-                    relationships.remove(rel)
-                    adapter.refresh()
                 }
             )
             recyclerView.adapter = adapter
@@ -97,13 +95,17 @@ class SessionRelationshipActivity : AppCompatActivity() {
     }
 
     private fun showAddRelationshipDialog(fromId: String) {
+        // Note: We removed the 'targets' check because users type the name manually,
+        // so they don't strictly need other participants in the list to create a relationship.
 
         val dialogView = layoutInflater.inflate(R.layout.dialog_add_relationship, null)
         val toNameEdit = dialogView.findViewById<EditText>(R.id.relationshipToNameEdit)
         val typeSpinner = dialogView.findViewById<Spinner>(R.id.relationshipTypeSpinner)
         val summaryEdit = dialogView.findViewById<EditText>(R.id.relationshipSummaryEdit)
 
-        typeSpinner.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, RELATIONSHIP_TYPES)
+        // Ensure types exist
+        val types = RELATIONSHIP_TYPES.ifEmpty { listOf("Friend", "Enemy", "Neutral", "Family", "Romantic") }
+        typeSpinner.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, types)
 
         AlertDialog.Builder(this)
             .setTitle("Add Relationship")
@@ -114,15 +116,23 @@ class SessionRelationshipActivity : AppCompatActivity() {
                     Toast.makeText(this, "Please enter a name.", Toast.LENGTH_SHORT).show()
                     return@setPositiveButton
                 }
-                val type = RELATIONSHIP_TYPES[typeSpinner.selectedItemPosition]
-                val summary = summaryEdit.text.toString()
-                Log.d("REL_DEBUG", "Adding relationship fromId: $fromId toName: $toName type: $type summary: $summary")
-                relationships.add(Relationship(fromId, toName, type, summary))
-                adapter.refresh()
+
+                val type = if (typeSpinner.adapter.count > 0) types[typeSpinner.selectedItemPosition] else "Neutral"
+                val summary = summaryEdit.text.toString().trim()
+
+                // Create object
+                val newRel = Relationship(
+                    fromId = fromId,
+                    toName = toName,
+                    type = type,
+                    description = summary // Ensure your class uses 'description', 'summary', or whatever field matches
+                )
+
+                // DIRECTLY UPDATE ADAPTER
+                adapter.addRelationship(newRel)
             }
             .setNegativeButton("Cancel", null)
             .show()
-        Log.d("REL_DEBUG", "showAddRelationshipDialog for fromId: $fromId")
     }
 
     /**

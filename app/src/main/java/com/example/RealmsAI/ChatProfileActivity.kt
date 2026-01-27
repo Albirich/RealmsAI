@@ -10,6 +10,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.example.RealmsAI.models.ChatProfile
 import com.example.RealmsAI.models.CharacterProfile
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.gson.Gson
 
@@ -21,6 +22,7 @@ class ChatProfileActivity : AppCompatActivity() {
     private lateinit var descriptionView: TextView
     private lateinit var charactersRecycler: RecyclerView
     private lateinit var sessionButton: Button
+    private lateinit var reportBtn: ImageButton
 
     private val db = FirebaseFirestore.getInstance()
     private val characters = mutableListOf<CharacterProfile>()
@@ -36,6 +38,7 @@ class ChatProfileActivity : AppCompatActivity() {
         descriptionView = findViewById(R.id.chatProfileDescription)
         charactersRecycler = findViewById(R.id.charactersRecyclerView)
         sessionButton = findViewById(R.id.chatProfileSessionButton)
+        reportBtn = findViewById(R.id.chatProfileReportButton)
 
         characterAdapter = CharacterChipAdapter(characters)
         charactersRecycler.adapter = characterAdapter
@@ -93,6 +96,10 @@ class ChatProfileActivity : AppCompatActivity() {
                     startActivity(intent)
                 }
 
+                reportBtn.setOnClickListener {
+                    showReportDialog(chatProfile)
+                }
+
                 // Load characters
                 loadCharacterChips(chatProfile.characterIds)
             }
@@ -115,6 +122,55 @@ class ChatProfileActivity : AppCompatActivity() {
                         characterAdapter.notifyDataSetChanged()
                     }
                 }
+        }
+    }
+
+    private fun showReportDialog(profile: ChatProfile) {
+        val reasons = arrayOf(
+            "Prohibited Content",
+            "Unmarked NSFW",
+            "Spam / Low Quality",
+            "Other"
+        )
+
+        androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle("Report Chat")
+            .setSingleChoiceItems(reasons, -1) { dialog, which ->
+                val reason = reasons[which]
+                sendChatReport(profile, reason)
+                dialog.dismiss()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun sendChatReport(profile: ChatProfile, reason: String) {
+        val reporterId = FirebaseAuth.getInstance().currentUser?.uid ?: "Anonymous"
+
+        val reportBody = """
+        CHAT REPORT
+        ----------------
+        Reason: $reason
+        Reporter ID: $reporterId
+        
+        OFFENDING CONTENT:
+        Chat ID: ${profile.id}
+        Title: ${profile.title}
+        Author ID: ${profile.author}
+        Description: ${profile.description}
+    """.trimIndent()
+
+        val emailIntent = Intent(Intent.ACTION_SEND).apply {
+            type = "message/rfc822"
+            putExtra(Intent.EXTRA_EMAIL, arrayOf("realmsai.report@gmail.com"))
+            putExtra(Intent.EXTRA_SUBJECT, "CHAT REPORT: ${profile.title}")
+            putExtra(Intent.EXTRA_TEXT, reportBody)
+        }
+
+        try {
+            startActivity(Intent.createChooser(emailIntent, "Send Report..."))
+        } catch (e: Exception) {
+            Toast.makeText(this, "No email client found.", Toast.LENGTH_SHORT).show()
         }
     }
 }

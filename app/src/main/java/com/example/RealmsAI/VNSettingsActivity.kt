@@ -138,7 +138,14 @@ class VNSettingsActivity : AppCompatActivity() {
                 .setPositiveButton("OK", null)
                 .show()
         }
-
+        val infoButtonvnSettings: ImageButton = findViewById(R.id.infoButtonvnsettings)
+        infoButtonvnSettings.setOnClickListener {
+            AlertDialog.Builder(this@VNSettingsActivity)
+                .setTitle("Main Character Mode")
+                .setMessage("Click on a character to open the relationship levels.\n Sets how the character acts with and around other characters.")
+                .setPositiveButton("OK", null)
+                .show()
+        }
         // Save logic
         saveButton.setOnClickListener {
             vnSettings.monogamyEnabled = monogamyCheck.isChecked

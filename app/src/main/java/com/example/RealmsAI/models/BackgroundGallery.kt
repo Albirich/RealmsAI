@@ -7,7 +7,8 @@ data class LocationSlot(
     val id: String = UUID.randomUUID().toString(),
     var name: String = "",
     var uri: String? = null,
-    var characters: MutableList<String> = mutableListOf()
+    var characters: MutableList<String> = mutableListOf(),
+    var description: String = ""
 )
 
 data class Area(

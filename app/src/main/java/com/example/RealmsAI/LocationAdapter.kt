@@ -50,8 +50,15 @@ class LocationAdapter(
             holder.imageView.setImageResource(R.drawable.placeholder_background)
         }
 
-        holder.pickImageBtn.visibility = if (readonly) View.GONE else View.VISIBLE
-        holder.pickImageBtn.setOnClickListener { onPickImage(location) }
-        holder.imageView.setOnClickListener { if (!readonly) onPickImage(location) }
+        if (readonly) {
+            holder.imageView.isClickable = false
+            holder.imageView.setOnClickListener(null)
+            // Optional: Remove the "button" look if it's just an image
+            holder.imageView.background = null
+        } else {
+            holder.imageView.isClickable = true
+            holder.imageView.setOnClickListener { onPickImage(location) }
+            // Restore button look if needed (from XML)
+        }
     }
 }

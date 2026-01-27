@@ -1,6 +1,7 @@
 package com.example.RealmsAI.ai
 
 
+import com.example.RealmsAI.models.Area
 import com.example.RealmsAI.models.AvatarMapEntry
 import com.example.RealmsAI.models.ModeSettings
 import com.example.RealmsAI.models.RPGAct
@@ -388,127 +389,161 @@ object PromptBuilder {
 
     fun buildRoleplayPrompt(
         slotProfile: SlotProfile,
+        sessionProfile: SessionProfile,
         modeSettings: Map<String, Any>,
         sessionSummary: String,
         sceneSlotIds: List<String>,
         condensedCharacterInfo: Map<String, Map<String, Any?>>,
         chatHistory: String,
         memories: Map<String, List<TaggedMemory>>,
-        poses: List<String>
+        poses: List<String>,
+        locationDescription: String
     ): String {
+        val location = "${slotProfile.lastActiveArea ?: "Unknown"} - ${slotProfile.lastActiveLocation ?: "Unknown"}"
         val relevantMemories = memories[slotProfile.slotId].orEmpty()
+
+        // 1. Extract just the names of the outfits to save tokens
+        val availableOutfits = slotProfile.outfits?.map { it.name }?.joinToString(", ") ?: "Default"
+
         val memoriesPromptSection =
             if (relevantMemories.isEmpty()) "None"
             else relevantMemories.joinToString("\n") { m -> "- [${m.id}] (${m.tags.joinToString(", ")}) ${m.text}" }
 
-        return """
-            You are now roleplaying as the following character. Stay fully in character. Speak and narrate **only as this character**—never as other characters or as yourself.
-            
-            # ROLEPLAY RULES:
-                - All replies MUST be fully in-character for **${slotProfile.name}**.
-                - Advance the story, relationship, or your character's goals—never stall or repeat.
-                - Write brief, natural dialogue (100 tokens), showing feelings and personality.
-                    - Describe actions/expressions between asterisks (*like this*).
-                    - Put spoken dialogue in quotation marks ("like this").
-                    - Combine the action and dialogue into a SINGLE message. Do NOT split them.
-                - Use vivid narration for **only your own** actions, emotions, or perceptions (never for other characters).
-                - Use immersive sensory description (sight, sound, smell, etc) to make the world feel alive.
-                - Always continue naturally from the chat history.
-                - Adapt your tone and mood to match the player: be playful, flirty, serious, etc, as appropriate.
-                - If the scene is slow, inject a twist (emotional, narrative, or environmental) but always keep it relevant.
-                - Never break character or output system messages.  
-                - For every message, output a pose for every nearby character (by slotId), including the sender.
-                    - Each slotId can have only one pose at a time.
-                    - Always use poses, even during narrator messages.
-                    - Choose poses ONLY from the list of AVAILABLE POSES FOR NEARBY CHARACTERS.
-                    - You can change a character’s pose if it makes sense for the scene or message.
-                    - To clear or remove a character’s pose, set it to "clear", "none", or "" (empty string).
-                    
-                - If the message is important add a new memory:
-                    - Only add a memory for truly important, *novel* events, major relationship shifts, or facts not already captured in memories above.
-                    - If nothing important happened, reply: {"new_memory": null}
-                    - Tags should describe, in a word or two, what the memory is about: people, place, event, feeling
-                        - example tags: a persons name (naruto), where it happened (leaf_village), what its about (trauma), an event (hokages_death), what the character is feeling (sad)
-                    - Add up to 5 tags for each memory, it can be any combination of the types of tags (example: [Sasuke, Sakura, Training, combo]) 
-            
-            # OUTPUT FORMAT (STRICT JSON ONLY)
-            Respond with a single valid JSON object. Do not use markdown, tool calls, or explanations. DO NOT mark it as json. ALWAYS use this format:
-            
-            {
-              "messages": [
-                {
-                  "senderId": "${slotProfile.slotId}",
-                  "text": "<Limit to 300 characters>",
-                  "pose": {
-                    "slotId", "pose",
-                    "slotId", "pose",
-                    "slotId", "pose",
-                  }
-                }
-                // 1–3 message objects max
-              ],
-              "new_memory": {
-                    "tags": ["relevant", "tags"],
-                    "text": "Concise memory of the event.",
-                    "nsfw": true/false
-              }
-              {{EXTRA_FIELDS}}
-            }
-            
-            CHARACTER PROFILE:
-                - Name: ${slotProfile.name}
-                - SlotId: ${slotProfile.slotId}
-                - Age: ${slotProfile.age}
-                - Height: ${slotProfile.height}
-                - Eye/Hair Color: ${slotProfile.eyeColor} ${slotProfile.hairColor}
-                - Pronouns: ${slotProfile.gender}
-                - Condensed Summary: ${slotProfile.summary}
-                - Personality: ${slotProfile.personality}
-                - Secret Description: ${slotProfile.privateDescription}
-                - Appearance: ${slotProfile.physicalDescription}
-                - Abilities: ${slotProfile.abilities}
-                - Poses: $poses
-                - Relationships: ${
-                 slotProfile.relationships.joinToString(separator = "\n") { rel ->
-                        "[ID: ${rel.id}] ${rel.toName} is your ${rel.type}: ${rel.description}"
-                    }
-                }
-                - More info: ${slotProfile.moreInfo}
+        val examples = slotProfile.exampleDialogue
+        val dialogueBlock = if (examples.isNotEmpty()) {
+            "EXAMPLE DIALOGUE (Mimic this style):\n" +
+                    examples.joinToString("\n") { "User: ${it.prompt}\n${slotProfile.name}: ${it.response}" }
+        } else ""
 
-            SESSION SUMMARY:            
-            $sessionSummary
-            
-            IMPORTANT CHARACTER MEMORIES:            
-            $memoriesPromptSection
-            
-            LOCATION:
-            - Area: ${slotProfile.lastActiveArea ?: "unknown"}
-            - Location: ${slotProfile.lastActiveLocation ?: "unknown"}
-            
-            NEARBY CHARACTERS:
-            ${
-                if (sceneSlotIds.isEmpty()) "None"
-                else sceneSlotIds.joinToString(", ")
-            }
+        val globalInstStr = if (sessionProfile.globalInstructions.isNotEmpty()) {
+            "GLOBAL INSTRUCTIONS:\n" + sessionProfile.globalInstructions.joinToString("\n") { "- ${it.text}" }
+        } else ""
+
+        // 2. Format Character Instructions
+        val charInstStr = if (slotProfile.instructions.isNotEmpty()) {
+            "CHARACTER INSTRUCTIONS (HIGHEST PRIORITY):\n" + slotProfile.instructions.joinToString("\n") { "- ${it.text}" }
+        } else ""
+
+        return """
+        You are now roleplaying as the following character. Stay fully in character. Speak and narrate **only as this character**—never as other characters or as yourself.
         
-            CONDENSED INFO FOR NEARBY CHARACTERS:
-            $condensedCharacterInfo
-             - NEVER make up new poses
-             - NEVER use neutral unless it is on the list.
-             - Only set a pose for characters whose available_poses list is not empty.
-             - If available_poses is empty for a character, do not include them in the pose map at all.
-             - NEVER make up new poses or use "neutral" unless it is explicitly in their list.
-             - NEVER add a pose for ${
+        # ROLEPLAY RULES:
+            - All replies MUST be fully in-character for **${slotProfile.name}**.
+            - Advance the story, relationship, or your character's goals—never stall or repeat.
+            - Write brief, natural dialogue (100 tokens), showing feelings and personality.
+                - Describe actions/expressions between asterisks (*like this*).
+                - Put spoken dialogue in quotation marks ("like this").
+                - Combine the action and dialogue into a SINGLE message. Do NOT split them.
+            - Use vivid narration for **only your own** actions, emotions, or perceptions (never for other characters).
+            - Use immersive sensory description (sight, sound, smell, etc) to make the world feel alive.
+            - Always continue naturally from the chat history.
+            - Adapt your tone and mood to match the player: be playful, flirty, serious, etc, as appropriate.
+            - If the scene is slow, inject a twist (emotional, narrative, or environmental) but always keep it relevant.
+            - Never break character or output system messages.  
+            - Keep your reply under 500 characters.
+            
+            - **OUTFIT CHANGES:**
+                - You can change your character's outfit if the context demands it (e.g., putting on "Swimwear" at the beach, or "Sleepwear" at night).
+                - To change, set the "outfit" field in your JSON response.
+                - You MUST choose an outfit name exactly as it appears in the "Available Outfits" list below.
+                - If you are NOT changing outfits, omit the field or leave it null.
+
+            - **POSING:**
+                - For every message, output a pose for every nearby character (by slotId), including the sender.
+                - Each slotId can have only one pose at a time.
+                - Always use poses, even during narrator messages.
+                - Choose poses ONLY from the list of AVAILABLE POSES FOR NEARBY CHARACTERS.
+                - You can change a character’s pose if it makes sense for the scene or message.
+                - To clear or remove a character’s pose, set it to "clear", "none", or "" (empty string).
+                
+            - **MEMORIES:**
+                - If the message is important add a new memory:
+                - Only add a memory for truly important, *novel* events, major relationship shifts, or facts not already captured in memories above.
+                - If nothing important happened, reply: {"new_memory": null}
+                - Tags should describe, in a word or two, what the memory is about: people, place, event, feeling
+                - Add up to 5 tags for each memory.
+        
+        # OUTPUT FORMAT (STRICT JSON ONLY)
+        Respond with a single valid JSON object. Do not use markdown, tool calls, or explanations. DO NOT mark it as json. ALWAYS use this format:
+        
+        {
+          "messages": [
+            {
+              "senderId": "${slotProfile.slotId}",
+              "text": "<Limit to 500 characters>",
+              "outfit": "NameOfOutfit", 
+              "pose": {
+                 "slotId_of_sender": "angry",
+                 "slotId_of_nearby_char": "fear"
+              }
+            }
+          ],
+          "new_memory": {
+                "tags": ["relevant", "tags"],
+                "text": "Concise memory of the event.",
+                "nsfw": false
+          }
+          {{EXTRA_FIELDS}}
+        }
+        
+        $globalInstStr
+        
+        $charInstStr
+        
+        CHARACTER PROFILE:
+            - Name: ${slotProfile.name}
+            - SlotId: ${slotProfile.slotId}
+            - Age: ${slotProfile.age}
+            - Height: ${slotProfile.height}
+            - Eye/Hair Color: ${slotProfile.eyeColor} ${slotProfile.hairColor}
+            - Pronouns: ${slotProfile.gender}
+            - Condensed Summary: ${slotProfile.summary}
+            - Personality: ${slotProfile.personality}
+            - Secret Description: ${slotProfile.privateDescription}
+            - Appearance: ${slotProfile.physicalDescription}
+            - Abilities: ${slotProfile.abilities}
+            - Current Outfit: ${slotProfile.currentOutfit}
+            - Available Outfits: $availableOutfits
+            - Poses (Current Outfit Only): $poses
+            - Relationships: ${
+            slotProfile.relationships.joinToString(separator = "\n") { rel ->
+                "[ID: ${rel.id}] ${rel.toName} is your ${rel.type}: ${rel.description}"
+            }
+        }
+            - More info: ${slotProfile.moreInfo}
+
+        SESSION SUMMARY:            
+        $sessionSummary
+        
+        IMPORTANT CHARACTER MEMORIES:            
+        $memoriesPromptSection
+        
+        $dialogueBlock
+        
+        LOCATION:
+        - Current: $location
+        - Description: $locationDescription
+        
+        NEARBY CHARACTERS:
+        ${
+            if (sceneSlotIds.isEmpty()) "None"
+            else sceneSlotIds.joinToString(", ")
+        }
+    
+        CONDENSED INFO FOR NEARBY CHARACTERS:
+        $condensedCharacterInfo
+         - NEVER make up new poses or use "neutral" unless it is explicitly in their list.
+         - NEVER add a pose for ${
             if (sceneSlotIds.isEmpty()) "None"
             else sceneSlotIds.filter { slotProfile.profileType=="player" }.joinToString(" $, ")
         }
-                
-            ---
-            RECENT CHAT HISTORY:
-            $chatHistory
             
-            Begin your response. Do not include any extra text, explanations, or system notes—**JSON only**.
-        """.trimIndent()
+        ---
+        RECENT CHAT HISTORY:
+        $chatHistory
+        
+        Begin your response. Do not include any extra text, explanations, or system notes—**JSON only**.
+    """.trimIndent()
     }
 
     fun buildGMPrompt(
@@ -684,23 +719,20 @@ object PromptBuilder {
     """.trimIndent()
     }
 
-    // Optional: add Act info (only for non-murder flow).
     fun buildActAddon(act: RPGAct?): String {
         if (act == null) return ""
         return """
-            ACT NOTES:
-            Summary: ${act.summary}
-            Goal: ${act.goal}
-            
-        If the party completes the Act's goal, include "advance_act" in the extra fields section of your output: 
-        { 
-            "advance_act": true 
-        }    
-        - Only move to the next Act if the party has completed the Act’s goal.
-        """.trimIndent()
+        ### CURRENT ACT: ${act.actNumber}
+        SUMMARY: ${act.summary}
+        GOAL: ${act.goal}
+        
+        INSTRUCTION:
+        If the party has completed the Act's GOAL in this turn, you MUST trigger the next act.
+        Add this action to your output:
+        { "type": "advance_act" }
+    """.trimIndent()
     }
 
-    // Optional: add Murder block (scene/weapon/clues + rules).
     fun buildMurderAddon(ms: ModeSettings.MurderSettings?): String {
         if (ms == null || !ms.enabled) return ""
         fun String.clean(max: Int) = trim().replace("\n{3,}".toRegex(), "\n\n").take(max)
@@ -731,7 +763,6 @@ object PromptBuilder {
         """.trimIndent().lines().filter { it.isNotBlank() }.joinToString("\n")
     }
 
-
     fun buildDiceRoll(): String {
         return """
         - Whenever your character attempts an action that may have a chance of success or failure (e.g. fighting, sneaking, persuading, leaping, dodging), you must roll dice to determine the outcome.
@@ -745,6 +776,82 @@ object PromptBuilder {
           ]
         }
         """.trimIndent()
+    }
+
+    fun buildNPCGeneration(areas: List<Area>): String {
+        // We give the AI the list of areas so it puts the NPC somewhere valid
+        val locationMenu = areas.joinToString("\n") { area ->
+            val locNames = area.locations.joinToString(", ") { it.name }
+            "- Area: \"${area.name}\" (Locations: $locNames)"
+        }
+
+        return """
+    ### NPC GENERATION RULES
+    - If the story requires a NEW character to appear (who is not in the list), you must generate them.
+    - To generate a character, add a "new_npc" action to your JSON output.
+    - You must place them in one of the following valid locations:
+    $locationMenu
+    - If there is a new character, add them to a "new_npcs" array in your JSON output, with all following fields: slotId, name, profileType, summary, lastActiveArea, lastActiveLocation, memories, age, abilities, bubbleColor, textColor, gender, height, weight, eyeColor, hairColor, physicalDescription, personality, privateDescripton, sfwOnly 
+            - Each should have profileType: "npc", a unique slotId, and valid area/location.
+            - Create a character with a personality and description needed for the character.
+            - Summary should be a short description of who they are.
+            - memories has multiple parts:
+                "tags": ["relevant", "tags"],
+                "text": "Concise memory of the event.",
+                "nsfw": true/false
+            - abilities are skills/abilities/powers/magic that the character has. keep it short about 100 characters
+            - bubbleColor choose from the following:
+                #2196F3
+                #4CAF50
+                #FF9800
+                #e86cbe
+                #c778f5
+                #FFFFFF
+                #FFEB3B
+            - textColor choose from the following:
+                #000000
+                #213af3
+                #098217
+                #cd6a00
+                #E91E63
+                #A200FF
+                #ce0202
+                #cdd54b
+            - gender list their prounouns
+            - physical description is be about 100 characters worth describing what the character looks like, include their race if its a fantasy setting. DO NOT include eye color, hair color, height, weight, or age
+            - personality is be 1000 characters explaining how they act and speak.
+            - privateDescription is 400 characters of their secrets, desires, kinks, goals
+            - sfwOnly should be true ONLY if the character is under 18 years old.
+    
+    At the end of each message, if you need a new NPC add "actions" into the extra fields section of your output:
+    {
+        "actions": [
+           {
+               "type": "new_npc",
+               "npc": {
+                   "name": "Barkeep Genta",
+                   "profileType": "npc",
+                   "summary": "Gruff but kind-hearted barkeep.",
+                   "lastActiveArea": "Tavern",
+                   "lastActiveLocation": "Bar",
+                   "age": 56,
+                   "abilities": "Expert chef, minor cleaning magic",
+                   "bubbleColor": "#FFFFFF",
+                   "textColor": "#CD6A00",
+                   "gender": "He/Him",
+                   "height": "5'8",
+                   "weight": "145 lbs",
+                   "eyeColor": "Green",
+                   "hairColor": "Gray",
+                   "physicalDescription": "Rough hands, kind eyes, wears a stained apron.",
+                   "personality": "Wise, deliberate, slow to anger but quick to defend his tavern.",
+                   "privateDescription": "Secretly a retired adventurer with a guilt-ridden past.",
+                   "sfwOnly": false
+               }
+           }
+        ]
+    }
+    """.trimIndent()
     }
 
     fun buildVNPrompt(
@@ -794,7 +901,6 @@ object PromptBuilder {
     """.trimIndent()
     }
 
-
     fun buildMurderSeedingPrompt(
         slots: List<SlotProfile>,
         rpgSettings: ModeSettings.RPGSettings,
@@ -841,7 +947,6 @@ object PromptBuilder {
         }
     """.trimIndent()
     }
-
 
      fun buildMysteryTimelineTextPrompt(
          slots: List<SlotProfile>,

@@ -27,10 +27,11 @@
         android:layout_width="0dp"
         android:layout_height="0dp"
         app:layout_constraintTop_toTopOf="@id/freelisttitle"
-        app:layout_constraintBottom_toBottomOf="@id/freelist"
+        app:layout_constraintBottom_toBottomOf="@id/Paidoutline"
         app:layout_constraintStart_toStartOf="@id/freelist"
         app:layout_constraintEnd_toEndOf="@id/freelist"
         android:src="@drawable/outline"
+        android:layout_marginStart="-15dp"
         android:scaleType="fitXY"/>
     <ImageView
         android:id="@+id/Paidoutline"
@@ -42,7 +43,8 @@
         app:layout_constraintEnd_toEndOf="@id/paidlist"
         android:src="@drawable/outline"
         android:scaleType="fitXY"
-        android:layout_marginStart="-5dp"/>
+        android:layout_marginStart="-5dp"
+        android:layout_marginEnd="-15dp"/>
 
     <TextView
         android:id="@+id/upgradeTitle"
@@ -50,7 +52,7 @@
         android:layout_height="wrap_content"
         android:textSize="35dp"
         android:layout_margin="16dp"
-        android:layout_marginTop="20dp"
+        android:paddingBottom="8dp"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
@@ -66,11 +68,65 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/upgradeTitle"
         app:layout_constraintHorizontal_weight="1"
-        android:layout_marginStart="20dp"
+        android:paddingTop="15dp"
+        android:layout_marginStart="10dp"
         android:textColor="@color/white"
         android:textSize="25dp"
         android:text="  FREE"
         android:textAlignment="center"/>
+
+    <TextView
+        android:id="@+id/paidlisttitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        app:layout_constraintStart_toEndOf="@id/freelisttitle"
+        app:layout_constraintTop_toBottomOf="@id/upgradeTitle"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_weight="1"
+        android:paddingTop="15dp"
+        android:textColor="@color/white"
+        android:textSize="25dp"
+        android:text="PAID"
+        android:textAlignment="center"/>
+
+    <TextView
+        android:id="@+id/priceText"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="$19.99"
+        app:layout_constraintBottom_toBottomOf="@id/paidlisttitle"
+        app:layout_constraintStart_toEndOf="@id/paidlisttitle"
+        android:textColor="#A0A0A0"
+        android:textSize="14sp"
+        android:layout_marginStart="8dp"
+        android:layout_marginEnd="6dp"
+        android:layout_marginBottom="2dp"/>
+
+    <TextView
+        android:id="@+id/discountPriceText"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        app:layout_constraintTop_toTopOf="@id/paidlisttitle"
+        app:layout_constraintStart_toEndOf="@id/priceText"
+        android:paddingTop="8dp"
+        android:layout_marginStart="8dp"
+        android:text="$14.99"
+        android:textColor="#FFD700"
+        android:textSize="20sp"
+        android:textStyle="bold"/>
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="FOUNDER'S \nDISCOUNT"
+        app:layout_constraintTop_toBottomOf="@id/discountPriceText"
+        app:layout_constraintStart_toStartOf="@id/discountPriceText"
+        app:layout_constraintEnd_toEndOf="@id/discountPriceText"
+        android:textColor="#FFD700"
+        android:textSize="10sp"
+        android:textStyle="bold"
+        android:letterSpacing="0.1"/>
+
     <TextView
         android:id="@+id/freelist"
         android:layout_width="0dp"
@@ -78,23 +134,13 @@
         app:layout_constraintTop_toBottomOf="@id/freelisttitle"
         app:layout_constraintStart_toStartOf="@id/freelisttitle"
         android:paddingEnd="-25dp"
+        android:paddingBottom="15dp"
         android:text="
         \n- 70 daily messages
-        \n\n- up to20 characters per chat
-        \n- "/>
-
-    <TextView
-        android:id="@+id/paidlisttitle"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        app:layout_constraintStart_toEndOf="@id/freelisttitle"
-        app:layout_constraintTop_toBottomOf="@id/upgradeTitle"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintHorizontal_weight="1"
-        android:textColor="@color/white"
-        android:textSize="25dp"
-        android:text="PAID"
-        android:textAlignment="center"/>
+        \n\n- up to 10 characters per chat
+        \n\n- 5 private characters
+        \n 5 private chats
+        \n\n- 3 outfits per character"/>
 
     <TextView
         android:id="@+id/paidlist"
@@ -103,17 +149,23 @@
         app:layout_constraintTop_toBottomOf="@id/paidlisttitle"
         app:layout_constraintStart_toEndOf="@id/freelist"
         app:layout_constraintEnd_toEndOf="parent"
-        android:layout_marginEnd="16dp"
+        android:layout_marginEnd="10dp"
+        android:paddingBottom="15dp"
+        android:paddingStart="10dp"
         android:text="
         \n- unlimited daily messages
-        \n\n- up to 50 characters per chat
-        \n- "/>
+        \n\n- up to 20 characters per chat
+        \n\n- unlimited private characters
+        \n unlimited private chats
+        \n\n- 10 outfits per character
+        \n\n- RPG, VN, MurderMystery modes
+        \n\n- copy chats and characters to your collection"/>
 
     <Button
         android:id="@+id/confirm_upgrade_button"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        app:layout_constraintTop_toBottomOf="@id/freelist"
+        app:layout_constraintTop_toBottomOf="@id/paidlist"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         android:textAlignment="center"

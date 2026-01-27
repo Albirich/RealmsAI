@@ -7,6 +7,7 @@ import android.util.Log
 import android.view.View
 import android.widget.ImageButton
 import android.widget.ImageView
+import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
@@ -23,6 +24,7 @@ import com.example.RealmsAI.models.MessageType
 import com.example.RealmsAI.models.UserProfile
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldPath
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.gson.Gson
 
@@ -39,6 +41,9 @@ class DisplayProfileActivity : BaseActivity() {
     private lateinit var charactersRecycler: RecyclerView
     private lateinit var chatsRecycler: RecyclerView
 
+    private var targetUserId: String = ""
+    private var targetUserProfile: UserProfile? = null
+
     private val db = FirebaseFirestore.getInstance()
     private val currentUserId: String? get() = FirebaseAuth.getInstance().currentUser?.uid
 
@@ -53,6 +58,9 @@ class DisplayProfileActivity : BaseActivity() {
             finish()
             return
         }
+
+        targetUserId = intent.getStringExtra("userId") ?: return finish()
+        val myId = FirebaseAuth.getInstance().currentUser?.uid ?: ""
 
         // 2. Bind views
         avatarView = findViewById(R.id.displayProfileAvatar)
@@ -92,9 +100,15 @@ class DisplayProfileActivity : BaseActivity() {
             sendFriendRequest(fromId, toId)
         }
 
+        // Setup Buttons
+        reportButton.setOnClickListener {
+            showBlockOptionsDialog(myId)
+        }
+
         // 4. Load profile data
         loadProfile(profileUserId)
     }
+
 
     private fun loadProfile(userId: String) {
         db.collection("users").document(userId).get()
@@ -115,7 +129,8 @@ class DisplayProfileActivity : BaseActivity() {
                 } else {
                     avatarView.setImageResource(R.drawable.placeholder_avatar)
                 }
-
+                // Load badges
+                loadBadges(profile)
 
                 // Load user's public characters
                 loadUserCharacters(userId)
@@ -128,6 +143,44 @@ class DisplayProfileActivity : BaseActivity() {
                 finish()
             }
     }
+
+    private fun loadBadges(profile: UserProfile) {
+        val badgesContainer = findViewById<LinearLayout>(R.id.badgesContainer)
+        badgesContainer.removeAllViews() // Clear previous
+
+        val badgeList = profile.badges.toMutableList()
+
+        // Auto-add Premium badge if boolean is true
+        if (profile.isPremium && !badgeList.contains("premium")) {
+            badgeList.add(0, "premium")
+        }
+
+        badgeList.forEach { badgeType ->
+            val badgeIcon = ImageView(this)
+            val params = LinearLayout.LayoutParams(60, 60) // Size in pixels (~24dp)
+            params.setMargins(4, 0, 4, 0)
+            badgeIcon.layoutParams = params
+
+            // Map string -> Drawable Resource
+            val drawableId = when (badgeType.lowercase()) {
+                "founder" -> R.drawable.badge_founder  // You need this icon
+                "beta"    -> R.drawable.badge_beta     // You need this icon
+                "premium" -> R.drawable.badge_premium  // You need this icon
+                "verified"-> R.drawable.badge_verified    // Standard checkmark
+                else -> R.drawable.ic_star             // Fallback
+            }
+
+            badgeIcon.setImageResource(drawableId)
+
+            // Optional: Click to see what the badge is
+            badgeIcon.setOnClickListener {
+                Toast.makeText(this, "${badgeType.capitalize()} Badge", Toast.LENGTH_SHORT).show()
+            }
+
+            badgesContainer.addView(badgeIcon)
+        }
+    }
+
 
     private fun sendFriendRequest(fromId: String, toId: String) {
         val usersRef = db.collection("users")
@@ -186,6 +239,86 @@ class DisplayProfileActivity : BaseActivity() {
                     .addOnFailureListener { e ->
                         Toast.makeText(this, "Failed to notify user: ${e.message}", Toast.LENGTH_SHORT).show()
                     }
+            }
+    }
+
+    private fun showBlockOptionsDialog(myId: String) {
+        val options = arrayOf("Block User", "Report & Block")
+
+        AlertDialog.Builder(this)
+            .setTitle("Block ${targetUserProfile?.handle ?: "User"}?")
+            .setItems(options) { dialog, which ->
+                when (which) {
+                    0 -> {
+                        // Option A: Just Block
+                        blockUser(myId)
+                        Toast.makeText(this, "User blocked.", Toast.LENGTH_SHORT).show()
+                        finish() // Close profile immediately
+                    }
+                    1 -> {
+                        // Option B: Report + Block
+                        showReportDialog(myId)
+                    }
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun showReportDialog(myId: String) {
+        val reasons = arrayOf("Inappropriate Content", "Harassment", "Spam / Bot", "Other")
+
+        AlertDialog.Builder(this)
+            .setTitle("Report & Block User")
+            .setSingleChoiceItems(reasons, -1) { dialog, which ->
+                val reason = reasons[which]
+                sendReport(myId, reason)
+                blockUser(myId)
+                dialog.dismiss()
+                Toast.makeText(this, "User reported and blocked.", Toast.LENGTH_LONG).show()
+                finish() // Close profile after blocking
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun sendReport(myId: String, reason: String) {
+        val reportBody = """
+            REPORT FILED
+            ----------------
+            Reporter ID: $myId
+            Reported User ID: $targetUserId
+            Reason: $reason
+            Date: ${java.util.Date()}
+            
+            REPORTED PROFILE DATA:
+            Handle: ${targetUserProfile?.handle}
+            Name: ${targetUserProfile?.name}
+            Bio: ${targetUserProfile?.bio}
+        """.trimIndent()
+
+        val emailIntent = Intent(Intent.ACTION_SEND).apply {
+            type = "message/rfc822"
+            putExtra(Intent.EXTRA_EMAIL, arrayOf("realmsai.report@gmail.com"))
+            putExtra(Intent.EXTRA_SUBJECT, "USER REPORT: $reason")
+            putExtra(Intent.EXTRA_TEXT, reportBody)
+        }
+
+        try {
+            startActivity(Intent.createChooser(emailIntent, "Send Report..."))
+        } catch (e: Exception) {
+            Toast.makeText(this, "No email client found.", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun blockUser(myId: String) {
+        // Add targetUserId to my 'blockedUsers' list
+        FirebaseFirestore.getInstance().collection("users").document(myId)
+            .update("blockedUsers", FieldValue.arrayUnion(targetUserId))
+            .addOnFailureListener {
+                // Fallback if field doesn't exist yet
+                FirebaseFirestore.getInstance().collection("users").document(myId)
+                    .update("blockedUsers", listOf(targetUserId))
             }
     }
 
@@ -357,3 +490,5 @@ class DisplayProfileActivity : BaseActivity() {
 
 
 }
+
+

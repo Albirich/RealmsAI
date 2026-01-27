@@ -77,12 +77,36 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content" />
 
+    <LinearLayout
+        android:id="@+id/tosContainer"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:padding="8dp">
+
+        <CheckBox
+            android:id="@+id/tosCheckbox"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="I agree to the "
+            android:textColor="#FFFFFF"/>
+
+        <TextView
+            android:id="@+id/viewTosButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="EULA &amp; ToS"
+            android:textColor="#448AFF"
+            android:textStyle="bold"
+            android:background="?attr/selectableItemBackground"/>
+    </LinearLayout>
+
     <Button
         android:id="@+id/signupButton"
         android:text="Sign Up"
         android:textColor="#00AEEF"
         android:backgroundTint="#1C1F24"
-        android:layout_marginTop="12dp"
         android:layout_width="match_parent"
         android:layout_height="wrap_content" />
 

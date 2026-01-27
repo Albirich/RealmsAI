@@ -66,10 +66,25 @@
         android:maxLines="1"
         app:layout_constraintTop_toBottomOf="@id/characterProfileAuthor"
         app:layout_constraintStart_toEndOf="@id/characterProfileSessionButton"
+        app:layout_constraintEnd_toStartOf="@id/characterProfileReportButton"
         android:layout_marginStart="10dp"
         android:minWidth="100dp"
         android:backgroundTint="#3974D3"
         android:textColor="#FFF"/>
+
+
+
+        <ImageButton
+            android:id="@+id/characterProfileReportButton"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/ic_report"
+            android:scaleType="fitXY"
+            app:layout_constraintTop_toTopOf="@id/characterProfileSaveButton"
+            app:layout_constraintEnd_toEndOf="parent"
+            android:layout_marginEnd="24dp"
+            android:contentDescription="Report user"/>
 
     <!-- Character Name -->
     <TextView
@@ -99,6 +114,45 @@
         app:layout_constraintStart_toStartOf="@id/characterProfileName"
         android:layout_marginTop="4dp"/>
 
+    <LinearLayout
+        android:id="@+id/ratingContainer"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        app:layout_constraintTop_toBottomOf="@id/characterProfileSessionButton"
+        app:layout_constraintStart_toStartOf="parent"
+        android:layout_marginTop="8dp"
+        android:layout_marginStart="16dp">
+
+        <RatingBar
+            android:id="@+id/userRatingBar"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:numStars="5"
+            android:stepSize="1.0"
+            style="?android:attr/ratingBarStyleSmall"
+            android:theme="@style/Widget.AppCompat.RatingBar.Indicator"/>
+
+        <TextView
+            android:id="@+id/ratingStatsText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="(0)"
+            android:textColor="#888888"
+            android:textSize="12sp"
+            android:layout_marginStart="4dp"/>
+
+        <Button
+            android:id="@+id/rateButton"
+            android:layout_width="60dp"
+            android:layout_height="35dp"
+            android:text="Rate"
+            android:textSize="10sp"
+            android:layout_marginStart="12dp"
+            android:backgroundTint="#444444"/>
+    </LinearLayout>
+
     <!-- Personality -->
     <TextView
         android:id="@+id/characterProfilePersonality"
@@ -106,7 +160,7 @@
         android:layout_height="wrap_content"
         android:text="Personality: ..."
         android:textSize="16sp"
-        app:layout_constraintTop_toBottomOf="@id/characterProfileAvatar"
+        app:layout_constraintTop_toBottomOf="@id/ratingContainer"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         android:layout_marginTop="16dp"

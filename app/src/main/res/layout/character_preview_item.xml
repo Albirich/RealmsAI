@@ -80,7 +80,7 @@
         android:textColor="#666" />
     <!-- 5) Rating -->
     <TextView
-        android:id="@+id/chatRating"
+        android:id="@+id/charRating"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginStart="10dp"

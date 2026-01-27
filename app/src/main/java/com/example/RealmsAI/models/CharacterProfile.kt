@@ -9,9 +9,11 @@ data class CharacterProfile(
     val personality        : String              = "",
     val privateDescription : String              = "",
     val backstory          : String              = "",
+    val soloScenario       : String              = "",
     val greeting           : String              = "",
     val author             : String              = "",
     val tags               : List<String>        = emptyList(),
+    val universe: String = "",
     val emotionTags        : Map<String, String> = emptyMap(),
     val avatarResId        : Int?                = null,
     @SerializedName("avatarUri")
@@ -36,7 +38,10 @@ data class CharacterProfile(
     val sfwOnly            : Boolean = true,
     val private            : Boolean = false,
     val linkedToMap        : Map<String, List<CharacterLink>> = emptyMap(),
-    val profileType        : String = "bot"
+    val profileType        : String = "bot",
+    val ratingCount: Int = 0,
+    val ratingSum: Double = 0.0,
+    val exampleDialogue: List<DialogueExample> = emptyList()
 )
 
 data class CharacterLink(

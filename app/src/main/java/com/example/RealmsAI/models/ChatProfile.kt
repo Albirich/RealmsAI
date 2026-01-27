@@ -23,9 +23,12 @@ data class ChatProfile(
     val timestamp: Timestamp? = null,
     val author: String = "",
     val tags: List<String> = emptyList(),
+    val universe: String = "",
     val areas: List<Area> = emptyList(),
     val sfwOnly: Boolean = true,
     val private: Boolean = false,
+    val ratingCount: Int = 0,
+    val ratingSum: Double = 0.0
 
 ) {
     constructor() : this(

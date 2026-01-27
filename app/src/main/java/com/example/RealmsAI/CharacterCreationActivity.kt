@@ -24,6 +24,7 @@ import com.bumptech.glide.Glide
 import com.example.RealmsAI.MainActivity
 import com.example.RealmsAI.models.Area
 import com.example.RealmsAI.models.CharacterProfile
+import com.example.RealmsAI.models.DialogueExample
 import com.example.RealmsAI.models.Outfit
 import com.example.RealmsAI.models.Relationship
 import com.google.android.material.button.MaterialButton
@@ -45,6 +46,7 @@ class CharacterCreationActivity : AppCompatActivity() {
     private lateinit var bubbleColorSpinner: Spinner
     private lateinit var textColorSpinner: Spinner
     private lateinit var submitBtn: MaterialButton
+    private lateinit var addAreaButton: Button
 
 
     // EditTexts
@@ -62,7 +64,7 @@ class CharacterCreationActivity : AppCompatActivity() {
     private lateinit var backstoryEt: EditText
     private lateinit var abilitiesEt: EditText
     private lateinit var greetingEt: EditText
-
+    private lateinit var scenarioEt: EditText
     // State
     private var progressDialog: AlertDialog? = null
     private var avatarUri: Uri? = null             // Only local uri if user picks new
@@ -93,6 +95,43 @@ class CharacterCreationActivity : AppCompatActivity() {
     // Launcher
     private lateinit var wardrobeLauncher: ActivityResultLauncher<Intent>
     private lateinit var avatarPicker: ActivityResultLauncher<String>
+
+    private lateinit var universeEt: EditText
+    private lateinit var selectTagsBtn: Button
+    private lateinit var selectedTagsTv: TextView
+
+    private val availableTags = arrayOf(
+        "Fantasy", "Sci-Fi", "Modern", "Male", "Female",
+        "Non-Binary", "Monster", "Hero", "Villain", "OC",
+        "Canon", "Tsundere", "Yandere", "Kuudere", "Dandere"
+    )
+    // Track selection state
+    private val checkedTags = BooleanArray(availableTags.size)
+    private val currentTags = mutableListOf<String>()
+
+    private lateinit var dialogueContainer: LinearLayout
+    private lateinit var generateDialogueBtn: Button
+    private lateinit var addRowBtn: Button
+
+    // The Scenario Bank
+    private val scenarioPrompts = listOf(
+        "You are accused of a crime you didn't commit.",
+        "A stranger offers you a rare flower.",
+        "You trip and fall in front of your crush.",
+        "Someone insults your outfit.",
+        "You find a lost child in the market.",
+        "You are cornered by an enemy in an alley.",
+        "A merchant tries to overcharge you significantly.",
+        "You wake up in a strange place with no memory.",
+        "Your best friend betrays you.",
+        "You are asked to lead a dangerous mission.",
+        "You discover a hidden treasure chest.",
+        "Someone confesses their love to you.",
+        "You are challenged to a duel.",
+        "You see someone stealing bread to survive.",
+        "A mysterious figure hands you a sealed letter."
+    )
+
     private lateinit var sfwSwitch: Switch
     private lateinit var privateSwitch: Switch
     companion object {
@@ -131,10 +170,17 @@ class CharacterCreationActivity : AppCompatActivity() {
         abilitiesEt = findViewById(R.id.abilitiesInput)
         genderEt = findViewById(R.id.genderEditText)
         backstoryEt = findViewById(R.id.backstoryEditText)
+        scenarioEt = findViewById(R.id.characterScenarioInput)
         greetingEt = findViewById(R.id.characterGreetingInput)
         sfwSwitch = findViewById(R.id.sfwSwitch)
         privateSwitch = findViewById(R.id.privateSwitch)
-        val addAreaButton = findViewById<MaterialButton>(R.id.addAreaButton)
+        addAreaButton = findViewById<MaterialButton>(R.id.addAreaButton)
+        universeEt = findViewById(R.id.universeEditText)
+        selectTagsBtn = findViewById(R.id.selectTagsButton)
+        selectedTagsTv = findViewById(R.id.selectedTagsText)
+        dialogueContainer = findViewById(R.id.dialogueContainer)
+        generateDialogueBtn = findViewById(R.id.generateDialogueButton)
+        addRowBtn = findViewById(R.id.addDialogueRowButton)
 
 
         // Color spinners show names but store hex
@@ -157,6 +203,21 @@ class CharacterCreationActivity : AppCompatActivity() {
             }
         }
         avatarView.setOnClickListener { avatarPicker.launch("image/*") }
+
+        // Generate Random Scenarios
+        generateDialogueBtn.setOnClickListener {
+            // Pick 3 random prompts
+            val randomPrompts = scenarioPrompts.shuffled().take(3)
+            randomPrompts.forEach { prompt ->
+                addDialogueRow(prompt, "")
+            }
+            Toast.makeText(this, "Added 3 scenarios. Fill in the responses!", Toast.LENGTH_SHORT).show()
+        }
+
+        // Add Empty Row
+        addRowBtn.setOnClickListener {
+            addDialogueRow("", "")
+        }
 
         // Wardrobe Launcher
         wardrobeLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
@@ -276,9 +337,16 @@ class CharacterCreationActivity : AppCompatActivity() {
 
         }
 
+        selectTagsBtn.setOnClickListener {
+            showTagSelectionDialog()
+        }
+
 
         // Submit
+        // Inside onCreate...
+
         submitBtn.setOnClickListener {
+            // 1. Capture all inputs
             val name = nameEt.text.toString().trim()
             val bio = bioEt.text.toString().trim()
             val personality = personalityEt.text.toString().trim()
@@ -291,26 +359,43 @@ class CharacterCreationActivity : AppCompatActivity() {
             val hairColor = hairColorEt.text.toString().trim()
             val physicalDesc = physicalDescEt.text.toString().trim()
             val gender = genderEt.text.toString().trim()
+            val soloScenario = scenarioEt.text.toString().trim()
             val greeting = greetingEt.text.toString().trim()
             val bubbleColor = bubblecolorOptions[bubbleColorSpinner.selectedItemPosition].second
             val textColor = textcolorOptions[textColorSpinner.selectedItemPosition].second
             val abilities = abilitiesEt.text.toString().trim()
-            makeEditTextScrollable(findViewById(R.id.characterPersonalityInput))
-            makeEditTextScrollable(findViewById(R.id.characterGreetingInput))
-            makeEditTextScrollable(findViewById(R.id.abilitiesInput))
-            makeEditTextScrollable(findViewById(R.id.backstoryEditText))
-            makeEditTextScrollable(findViewById(R.id.characterprivateDescriptionInput))
+            val universe = universeEt.text.toString().trim()
 
+            // 2. Basic Validation
             if (name.isEmpty()) return@setOnClickListener toast("Name required")
             if (originalAvatarUrl.isNullOrBlank() && !avatarChanged) return@setOnClickListener toast("Pick an avatar")
 
-            showProgressDialog()
-            saveCharacterAndReturnToHub(
-                editCharId,
-                name, bio, personality, privateDesc, backstory, greeting,
-                age, height, weight, eyeColor, hairColor, physicalDesc, abilities, gender,
-                bubbleColor, textColor
-            )
+            // 3. Define the actual save action (to be called after checks pass)
+            val performSave = { isPrivateOverride: Boolean? ->
+                // If user chose "Save as Public" in dialog, force switch off
+                if (isPrivateOverride == false) {
+                    privateSwitch.isChecked = false
+                }
+
+                showProgressDialog()
+                saveCharacterAndReturnToHub(
+                    editCharId,
+                    name, bio, personality, privateDesc, backstory, soloScenario, greeting,
+                    age, height, weight, eyeColor, hairColor, physicalDesc, abilities, gender,
+                    bubbleColor, textColor, universe
+                )
+            }
+
+            // 4. Run the Logic Check
+            val isPrivate = privateSwitch.isChecked
+
+            if (!isPrivate) {
+                // Public characters are always free/unlimited
+                performSave(null)
+            } else {
+                // It's Private - Check Limits
+                attemptSaveLogic(editCharId, performSave)
+            }
         }
     }
 
@@ -348,6 +433,122 @@ class CharacterCreationActivity : AppCompatActivity() {
         return null
     }
 
+    private fun addDialogueRow(prompt: String, response: String) {
+        if (dialogueContainer.childCount >= 5) {
+            Toast.makeText(this, "Maximum of 5 dialogue examples allowed.", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val view = layoutInflater.inflate(R.layout.item_dialogue_row, dialogueContainer, false)
+        val promptEt = view.findViewById<EditText>(R.id.promptInput)
+        val responseEt = view.findViewById<EditText>(R.id.responseInput)
+        val removeBtn = view.findViewById<Button>(R.id.removeRowBtn)
+
+        promptEt.setText(prompt)
+        responseEt.setText(response)
+
+        removeBtn.setOnClickListener {
+            dialogueContainer.removeView(view)
+        }
+
+        dialogueContainer.addView(view)
+    }
+
+    private fun showTagSelectionDialog() {
+        AlertDialog.Builder(this)
+            .setTitle("Select Tags")
+            .setMultiChoiceItems(availableTags, checkedTags) { _, which, isChecked ->
+                checkedTags[which] = isChecked
+            }
+            .setPositiveButton("OK") { _, _ ->
+                updateTagsDisplay()
+            }
+            .setNeutralButton("Clear All") { _, _ ->
+                checkedTags.fill(false)
+                updateTagsDisplay()
+            }
+            .show()
+    }
+
+    private fun updateTagsDisplay() {
+        currentTags.clear()
+        availableTags.forEachIndexed { index, tag ->
+            if (checkedTags[index]) currentTags.add(tag)
+        }
+        selectedTagsTv.text = if (currentTags.isEmpty()) "None selected" else currentTags.joinToString(", ")
+    }
+
+    private fun attemptSaveLogic(editCharId: String?, onPermissionGranted: (Boolean?) -> Unit) {
+        val userId = FirebaseAuth.getInstance().currentUser?.uid ?: return
+        val db = FirebaseFirestore.getInstance()
+        val PRIVATE_LIMIT = 5 // Set your limit for free users here
+
+        showProgressDialog() // Show loading while checking DB
+
+        // 1. Check if User is Premium
+        db.collection("users").document(userId).get()
+            .addOnSuccessListener { userDoc ->
+                val isPremium = userDoc.getBoolean("isPremium") ?: false
+
+                if (isPremium) {
+                    // Premium users have no limits
+                    dismissProgressDialog()
+                    onPermissionGranted(null)
+                } else {
+                    // 2. User is Free - Count their PRIVATE characters
+                    db.collection("characters")
+                        .whereEqualTo("author", userId)
+                        .whereEqualTo("private", true)
+                        .get()
+                        .addOnSuccessListener { snapshot ->
+                            dismissProgressDialog()
+
+                            // Calculate count
+                            // Edge Case: If we are EDITING an existing private character,
+                            // it shouldn't count as a "New" slot usage.
+                            val isEditingExistingPrivate = editCharId != null &&
+                                    snapshot.documents.any { it.id == editCharId }
+
+                            // If editing existing, we subtract 1 from the count for comparison logic
+                            // or just allow it if found.
+                            val effectiveCount = if (isEditingExistingPrivate) snapshot.size() - 1 else snapshot.size()
+
+                            if (effectiveCount >= PRIVATE_LIMIT) {
+                                // Limit Reached
+                                showPremiumLimitDialog(PRIVATE_LIMIT, onPermissionGranted)
+                            } else {
+                                // Within limits
+                                onPermissionGranted(null)
+                            }
+                        }
+                        .addOnFailureListener {
+                            dismissProgressDialog()
+                            toast("Failed to check limits. Try again.")
+                        }
+                }
+            }
+            .addOnFailureListener {
+                dismissProgressDialog()
+                toast("Connection error.")
+            }
+    }
+
+    private fun showPremiumLimitDialog(limit: Int, onSaveCallback: (Boolean?) -> Unit) {
+        AlertDialog.Builder(this)
+            .setTitle("Private Character Limit Reached")
+            .setMessage("Free users can create up to $limit private characters.\n\nYou can Upgrade to Premium for unlimited storage, or save this character as Public for free.")
+            .setPositiveButton("Upgrade") { _, _ ->
+                // Launch Upgrade Activity
+                startActivity(Intent(this, UpgradeActivity::class.java))
+            }
+            .setNeutralButton("Save as Public") { _, _ ->
+                // Callback with 'false' to indicate forcing private=false
+                onSaveCallback(false)
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
     private fun saveCharacterAndReturnToHub(
         editCharId: String?,
         name: String,
@@ -355,6 +556,7 @@ class CharacterCreationActivity : AppCompatActivity() {
         personality: String,
         privateDescription: String,
         backstory: String,
+        soloScenario: String,
         greeting: String,
         age: Float,
         height: String,
@@ -365,7 +567,9 @@ class CharacterCreationActivity : AppCompatActivity() {
         abilities: String,
         gender: String,
         bubbleColor: String,
-        textColor: String
+        textColor: String,
+        universe: String
+
     ) {
         val charId = editCharId ?: System.currentTimeMillis().toString()
         val currentUserId = FirebaseAuth.getInstance().currentUser?.uid ?: ""
@@ -400,6 +604,17 @@ class CharacterCreationActivity : AppCompatActivity() {
                         }.toMutableList()
                         outfit.copy(poseSlots = updatedPoseSlots)
                     }
+                    val dialogueList = mutableListOf<DialogueExample>()
+                    for (i in 0 until dialogueContainer.childCount) {
+                        val view = dialogueContainer.getChildAt(i)
+                        val p = view.findViewById<EditText>(R.id.promptInput).text.toString().trim()
+                        val r = view.findViewById<EditText>(R.id.responseInput).text.toString().trim()
+
+                        // Only save if meaningful
+                        if (p.isNotEmpty() && r.isNotEmpty()) {
+                            dialogueList.add(DialogueExample(p, r))
+                        }
+                    }
                     val isSfwOnly = if (age < 18) true else sfwSwitch.isChecked
                     val isEdit = editCharId != null
                     val commonFields: Map<String, Any?> = mapOf(
@@ -408,6 +623,7 @@ class CharacterCreationActivity : AppCompatActivity() {
                         "summary" to summary,
                         "personality" to personality,
                         "privateDescription" to privateDescription,
+                        "soloScenario" to soloScenario,
                         "greeting" to greeting,
                         "backstory" to backstory,
                         "age" to age,
@@ -416,12 +632,14 @@ class CharacterCreationActivity : AppCompatActivity() {
                         "gender" to gender,
                         "physicalDescription" to physicalDescription,
                         "abilities" to abilities,
+                        "exampleDialogue" to dialogueList,
                         "eyeColor" to eyeColor,
                         "hairColor" to hairColor,
                         "bubbleColor" to bubbleColor,
                         "textColor" to textColor,
                         "author" to currentUserId,
-                        "tags" to emptyList<String>(),
+                        "tags" to currentTags,
+                        "universe" to universe,
                         "avatarUri" to avatarUrl,
                         "areas" to characterAreas.map { area ->
                             mapOf(
@@ -437,7 +655,7 @@ class CharacterCreationActivity : AppCompatActivity() {
                         "relationships" to relationships.map { it.copy(fromId = charId) },
                         "sfwOnly" to isSfwOnly,
                         "private" to privateSwitch.isChecked,
-                        "outfits" to updatedOutfits // will save as a list of outfits, each with poseSlots (name+uri)
+                        "outfits" to updatedOutfits
                     )
                     val createFields = commonFields + mapOf(
                         // only set createdAt when creating
@@ -623,7 +841,30 @@ class CharacterCreationActivity : AppCompatActivity() {
         abilitiesEt.setText(profile.abilities)
         genderEt.setText(profile.gender)
         backstoryEt.setText(profile.backstory)
+        scenarioEt.setText(profile.soloScenario)
         greetingEt.setText(profile.greeting)
+
+        // Load Dialogue
+        dialogueContainer.removeAllViews()
+        profile.exampleDialogue.forEach { ex ->
+            addDialogueRow(ex.prompt, ex.response)
+        }
+
+        // --- Universe ---
+        universeEt.setText(profile.universe)
+
+        // --- Restore Tags ---
+        // Reset checks first
+        checkedTags.fill(false)
+        profile.tags.forEach { savedTag ->
+            val index = availableTags.indexOfFirst { it.equals(savedTag, ignoreCase = true) }
+            if (index >= 0) {
+                checkedTags[index] = true
+            }
+        }
+        updateTagsDisplay() // Helper function from previous step to update the TextView
+
+        // ... (Existing Logic) ...
         outfitsList = profile.outfits ?: emptyList()
         if (!profile.avatarUri.isNullOrBlank()) {
             avatarUri = Uri.parse(profile.avatarUri)
@@ -650,5 +891,6 @@ class CharacterCreationActivity : AppCompatActivity() {
             v.parent.requestDisallowInterceptTouchEvent(true)
             false
         }
+
     }
 }

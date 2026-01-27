@@ -114,31 +114,88 @@ class CreatedListActivity : BaseActivity() {
         return JSONObject(json).optString("avatarUri", null)
     }
 
+    /**
+     * Queries Firestore to see if a session already exists for this User + Chat/Character.
+     */
+    private fun findSessionForUser(
+        targetId: String,
+        userId: String,
+        onResult: (String) -> Unit,
+        onNoneFound: () -> Unit
+    ) {
+        val db = FirebaseFirestore.getInstance()
+
+        // We check if 'chatId' (which stores the CharacterID or ScenarioID) matches
+        // AND if the user is a participant.
+        db.collection("sessions")
+            .whereEqualTo("chatId", targetId)
+            .whereArrayContains("userList", userId)
+            .limit(1) // We only need to know if ONE exists
+            .get()
+            .addOnSuccessListener { documents ->
+                if (!documents.isEmpty) {
+                    // Found an existing session! Return its ID.
+                    onResult(documents.documents[0].id)
+                } else {
+                    // No session found.
+                    onNoneFound()
+                }
+            }
+            .addOnFailureListener { e ->
+                android.util.Log.e("SessionCheck", "Error checking for existing session", e)
+                onNoneFound() // Default to new session on error
+            }
+    }
+
     private fun showChats(rv: RecyclerView) {
         rv.layoutManager = GridLayoutManager(this, 2)
         val adapter = ChatPreviewAdapter(
             context = this,
             chatList = emptyList(),
             onClick = { preview ->
-                val userId = currentUserId
+                val userId = FirebaseAuth.getInstance().currentUser?.uid
                 if (userId == null) {
-                    Toast.makeText(this, "You must be signed in to continue.", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this, "You must be signed in to continue.", Toast.LENGTH_SHORT)
+                        .show()
                     return@ChatPreviewAdapter
                 }
+
+                // Logic to start a FRESH session (goes to Landing Page setup)
+                val startNewSession = {
+                    val intent = Intent(this, SessionLandingActivity::class.java).apply {
+                        putExtra("CHAT_ID", preview.id)
+                        putExtra("CHAT_PROFILE_JSON", preview.rawJson)
+                    }
+                    startActivity(intent)
+                }
+
+                // Perform the check
                 findSessionForUser(
-                    chatId = preview.id,
+                    targetId = preview.id,
                     userId = userId,
-                    onResult = { sessionId ->
-                        startActivity(Intent(this, SessionLandingActivity::class.java).apply {
-                            putExtra("CHAT_ID", preview.id)
-                            putExtra("CHAT_PROFILE_JSON", preview.rawJson)
-                        })
+                    onResult = { existingSessionId ->
+                        // FOUND: Show Resume Dialog
+                        AlertDialog.Builder(this)
+                            .setTitle("Resume Session?")
+                            .setMessage("You have an active session for this character/chat. Would you like to pick up where you left off?")
+                            .setPositiveButton("Resume") { _, _ ->
+                                // Resume: Skip Landing Page, go straight to Chat
+                                val intent = Intent(this, MainActivity::class.java).apply {
+                                    putExtra("SESSION_ID", existingSessionId)
+                                    putExtra("CHAT_ID", preview.id)
+                                }
+                                startActivity(intent)
+                            }
+                            .setNegativeButton("Start New") { _, _ ->
+                                // New: Go to Landing Page
+                                startNewSession()
+                            }
+                            .setNeutralButton("Cancel", null)
+                            .show()
                     },
-                    onError = {
-                        startActivity(Intent(this, SessionLandingActivity::class.java).apply {
-                            putExtra("CHAT_ID", preview.id)
-                            putExtra("CHAT_PROFILE_JSON", preview.rawJson)
-                        })
+                    onNoneFound = {
+                        // NOT FOUND: Start New immediately
+                        startNewSession()
                     }
                 )
             },
@@ -293,17 +350,51 @@ class CreatedListActivity : BaseActivity() {
                     this,
                     previews,
                     onClick = { preview ->
-                        // Get user ID
                         val userId = currentUserId
                         if (userId == null) {
                             Toast.makeText(this, "You must be signed in to continue.", Toast.LENGTH_SHORT).show()
                             return@CharacterPreviewAdapter
                         }
-                        startActivity(Intent(this, SessionLandingActivity::class.java).apply {
-                            Log.d("Characterhubactivity", "it has an id of: ${preview.id}")
-                            putExtra("CHARACTER_ID", preview.id)
-                            putExtra("CHARACTER_PROFILES_JSON", preview.rawJson)
-                        })
+
+                        // 1. Define the "Start New" Logic (Preserving your specific extras)
+                        val startNewSession = {
+                            startActivity(Intent(this, SessionLandingActivity::class.java).apply {
+                                Log.d("Characterhubactivity", "it has an id of: ${preview.id}")
+                                // Note: Keeping your specific keys for Characters
+                                putExtra("CHARACTER_ID", preview.id)
+                                putExtra("CHARACTER_PROFILES_JSON", preview.rawJson)
+                            })
+                        }
+
+                        // 2. Check for Existing Session
+                        findSessionForUser(
+                            targetId = preview.id,
+                            userId = userId,
+                            onResult = { existingSessionId ->
+                                // FOUND: Show Resume Dialog
+                                AlertDialog.Builder(this)
+                                    .setTitle("Resume Session?")
+                                    .setMessage("You have an active session for this character. Would you like to pick up where you left off?")
+                                    .setPositiveButton("Resume") { _, _ ->
+                                        // Resume: Go straight to MainActivity with the Session ID
+                                        val intent = Intent(this, MainActivity::class.java).apply {
+                                            putExtra("SESSION_ID", existingSessionId)
+                                            // Pass ID for context/logging if needed
+                                            putExtra("CHAT_ID", preview.id)
+                                        }
+                                        startActivity(intent)
+                                    }
+                                    .setNegativeButton("Start New") { _, _ ->
+                                        startNewSession()
+                                    }
+                                    .setNeutralButton("Cancel", null)
+                                    .show()
+                            },
+                            onNoneFound = {
+                                // NOT FOUND: Start New immediately
+                                startNewSession()
+                            }
+                        )
                     },
                     itemLayoutRes = R.layout.character_preview_item,
                     onLongClick = { preview ->

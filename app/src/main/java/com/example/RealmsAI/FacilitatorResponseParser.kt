@@ -2,6 +2,8 @@ package com.example.RealmsAI
 
 
 import android.util.Log
+import com.example.RealmsAI.ai.PromptBuilder
+import com.example.RealmsAI.ai.PromptBuilder.buildVNPrompt
 import com.example.RealmsAI.models.ChatMessage
 import com.example.RealmsAI.models.ModeSettings
 import com.example.RealmsAI.models.ModeSettings.VNRelationship
@@ -229,11 +231,33 @@ object FacilitatorResponseParser {
         val delta: Int
     )
 
+    data class NewNPCData(
+        val name: String = "Unknown",
+        val profileType: String = "npc",
+        val summary: String = "",
+        val lastActiveArea: String? = null,
+        val lastActiveLocation: String? = null,
+        val age: Int = 25,
+        val abilities: String = "",
+        val bubbleColor: String = "#FFFFFF",
+        val textColor: String = "#000000",
+        val gender: String = "",
+        val height: String = "",
+        val weight: String = "",
+        val eyeColor: String = "",
+        val hairColor: String = "",
+        val physicalDescription: String = "",
+        val personality: String = "",
+        val privateDescription: String = "",
+        val sfwOnly: Boolean = true
+    )
+
     data class Action(
         val type: String,
         val slot: String,
         val stat: String,
-        val mod: Int
+        val mod: Int,
+        val npc: NewNPCData? = null
     )
 
     data class ParsedRoleplayResult(

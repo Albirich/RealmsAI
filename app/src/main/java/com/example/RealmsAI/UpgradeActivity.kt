@@ -3,6 +3,7 @@ package com.example.RealmsAI
 import android.os.Bundle
 import android.util.Log
 import android.widget.Button
+import android.widget.TextView
 import android.widget.Toast
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
@@ -20,6 +21,8 @@ class UpgradeActivity : BaseActivity() {
         // --- BIND UI ELEMENTS ---
         val btnCancel = findViewById<Button>(R.id.cancel_button)
         val btnConfirm = findViewById<Button>(R.id.confirm_upgrade_button)
+        val oldPrice = findViewById<TextView>(R.id.priceText)
+        oldPrice.paintFlags = oldPrice.paintFlags or android.graphics.Paint.STRIKE_THRU_TEXT_FLAG
 
         // (We don't need to manually bind navHome/navAccount etc here
         // because setupBottomNav() usually handles that for you!)
@@ -51,18 +54,33 @@ class UpgradeActivity : BaseActivity() {
         val db = FirebaseFirestore.getInstance()
         val userRef = db.collection("users").document(user.uid)
 
-        // Set isPremium = true
-        userRef.set(mapOf("isPremium" to true), SetOptions.merge())
+        // PREPARE UPDATES
+        // 1. Set Premium to true
+        // 2. Add all 3 badges to the 'badges' array
+        val updates = mapOf(
+            "isPremium" to true,
+            "badges" to com.google.firebase.firestore.FieldValue.arrayUnion("founder", "beta", "premium")
+        )
+
+        userRef.update(updates)
             .addOnSuccessListener {
-                Log.d("UpgradeActivity", "User ${user.uid} upgraded to premium.")
-                Toast.makeText(this, "Upgrade Successful! You are now Premium.", Toast.LENGTH_LONG).show()
+                Log.d("UpgradeActivity", "User ${user.uid} upgraded with badges.")
+                Toast.makeText(this, "Welcome, Founder! Badges added.", Toast.LENGTH_LONG).show()
                 finish()
             }
             .addOnFailureListener { e ->
-                Log.e("UpgradeActivity", "Upgrade failed", e)
-                Toast.makeText(this, "Upgrade failed: ${e.message}", Toast.LENGTH_SHORT).show()
-                btnConfirm.isEnabled = true
-                btnConfirm.text = "Confirm Upgrade"
+                // Fallback: If the user doc doesn't exist yet (rare), create it with set()
+                userRef.set(updates, com.google.firebase.firestore.SetOptions.merge())
+                    .addOnSuccessListener {
+                        Toast.makeText(this, "Welcome, Founder! Badges added.", Toast.LENGTH_LONG).show()
+                        finish()
+                    }
+                    .addOnFailureListener { retryEx ->
+                        Log.e("UpgradeActivity", "Upgrade failed", retryEx)
+                        Toast.makeText(this, "Upgrade failed: ${retryEx.message}", Toast.LENGTH_SHORT).show()
+                        btnConfirm.isEnabled = true
+                        btnConfirm.text = "Confirm Upgrade"
+                    }
             }
     }
 

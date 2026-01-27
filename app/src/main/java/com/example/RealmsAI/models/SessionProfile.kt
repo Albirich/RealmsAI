@@ -29,6 +29,7 @@ data class SessionProfile(
     val areas: List<Area> = emptyList(),
 
     val history: List<ChatMessage> = emptyList(),
+    val globalInstructions: List<Instruction> = emptyList(),
 
     val started: Boolean = false,
     val isBuilding: Boolean = false,
@@ -40,7 +41,6 @@ data class SessionProfile(
     val currentAct: Int = 0,
     var enabledModes: MutableList<String> = mutableListOf(),
     var modeSettings: MutableMap<String, Any> = mutableMapOf()
-
 )
 
 // ----------------------
@@ -83,6 +83,7 @@ data class SlotProfile(
     val gender: String = "",
     val physicalDescription: String = "",
     val relationships: List<Relationship> = emptyList(),
+    val exampleDialogue: List<DialogueExample> = emptyList(),
     // -- CHAT/AI/SESSION --
     val bubbleColor: String = "#FFFFFF",
     val textColor: String = "#000000",
@@ -95,6 +96,7 @@ data class SlotProfile(
     val pose: String? = null,
     val typing: Boolean = false,
     var moreInfo: String? = null,
+    val instructions: List<Instruction> = emptyList(),
     // -- RPG STUFF --
     var hiddenRoles: String? = "",
     val rpgClass: String = "",
@@ -112,7 +114,8 @@ data class TaggedMemory(
     var tags: List<String> = emptyList(),
     var text: String = "",
     var nsfw: Boolean = false,
-    var messageIds: List<String> = emptyList()
+    var messageIds: List<String> = emptyList(),
+    val embedding: List<Double> = emptyList()
 )
 data class AvatarMapEntry(
     var slotId: String? = null,

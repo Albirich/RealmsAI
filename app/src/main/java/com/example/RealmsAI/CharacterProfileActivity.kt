@@ -4,6 +4,7 @@ import android.content.Intent
 import android.os.Bundle
 import android.view.View
 import android.widget.*
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -26,6 +27,10 @@ class CharacterProfileActivity : AppCompatActivity() {
     private lateinit var outfitsRecycler: RecyclerView
     private lateinit var sessionButton: Button
     private lateinit var saveButton: Button
+    private lateinit var reportBtn: ImageButton
+    private lateinit var ratingBar: RatingBar
+    private lateinit var ratingStats: TextView
+    private lateinit var rateButton: Button
 
     private val db = FirebaseFirestore.getInstance()
 
@@ -33,13 +38,13 @@ class CharacterProfileActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.character_profile)
 
+
         // 1. Get Character ID (pass as intent extra)
         val charId = intent.getStringExtra("characterId") ?: run {
             Toast.makeText(this, "No character specified!", Toast.LENGTH_SHORT).show()
             finish()
             return
         }
-
         // 2. Find Views
         avatarView = findViewById(R.id.characterProfileAvatar)
         nameView = findViewById(R.id.characterProfileName)
@@ -51,6 +56,11 @@ class CharacterProfileActivity : AppCompatActivity() {
         outfitsRecycler = findViewById(R.id.characterProfileOutfitsRecycler)
         sessionButton = findViewById(R.id.characterProfileSessionButton)
         saveButton = findViewById(R.id.characterProfileSaveButton)
+        reportBtn = findViewById<ImageButton>(R.id.characterProfileReportButton)
+        ratingBar = findViewById(R.id.userRatingBar)
+        ratingStats = findViewById(R.id.ratingStatsText)
+        rateButton = findViewById(R.id.rateButton)
+
 
         // 3. Load Character Data
         loadCharacterProfile(charId)
@@ -220,10 +230,146 @@ class CharacterProfileActivity : AppCompatActivity() {
                         saveCharacterAsUser(profile)
                     }
                 }
+                reportBtn.setOnClickListener {
+                    showReportDialog(profile)
+                }
+
+                val avg = if (profile.ratingCount > 0) profile.ratingSum / profile.ratingCount else 0.0
+                ratingBar.rating = avg.toFloat()
+                ratingStats.text = "(${profile.ratingCount})"
+
+                // CHECK IF I ALREADY RATED
+                val myId = FirebaseAuth.getInstance().currentUser?.uid
+                if (myId != null) {
+                    val ratingDocId = "${myId}_${profile.id}"
+                    db.collection("ratings").document(ratingDocId).get()
+                        .addOnSuccessListener { doc ->
+                            if (doc.exists()) {
+                                val myRating = doc.getDouble("rating")?.toFloat() ?: 0f
+                                rateButton.text = "Edit ${myRating.toInt()}★"
+                            }
+                        }
+                }
+
+                rateButton.setOnClickListener {
+                    showRatingDialog(profile.id, "characters")
+                }
             }
             .addOnFailureListener {
                 Toast.makeText(this, "Failed to load character.", Toast.LENGTH_SHORT).show()
                 finish()
             }
+    }
+    private fun showRatingDialog(itemId: String, collectionName: String) {
+        val dialogView = layoutInflater.inflate(R.layout.dialog_rate_item, null) // See XML below
+        val dialogRating = dialogView.findViewById<RatingBar>(R.id.dialogRatingBar)
+
+        AlertDialog.Builder(this)
+            .setTitle("Rate this Content")
+            .setView(dialogView)
+            .setPositiveButton("Submit") { _, _ ->
+                val stars = dialogRating.rating
+                if (stars > 0) {
+                    submitRating(itemId, collectionName, stars.toDouble())
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun submitRating(itemId: String, collectionName: String, newStars: Double) {
+        val userId = FirebaseAuth.getInstance().currentUser?.uid ?: return
+        val ratingRef = db.collection("ratings").document("${userId}_${itemId}")
+        val itemRef = db.collection(collectionName).document(itemId)
+
+        db.runTransaction { transaction ->
+            val ratingDoc = transaction.get(ratingRef)
+            val itemDoc = transaction.get(itemRef)
+
+            // Get current stats from the item
+            val currentCount = itemDoc.getLong("ratingCount") ?: 0L
+            val currentSum = itemDoc.getDouble("ratingSum") ?: 0.0
+
+            if (ratingDoc.exists()) {
+                // UPDATE EXISTING RATING
+                val oldStars = ratingDoc.getDouble("rating") ?: 0.0
+                val diff = newStars - oldStars
+
+                transaction.update(itemRef, "ratingSum", currentSum + diff)
+                transaction.update(ratingRef, "rating", newStars)
+
+            } else {
+                // NEW RATING
+                transaction.update(itemRef, "ratingCount", currentCount + 1)
+                transaction.update(itemRef, "ratingSum", currentSum + newStars)
+
+                val data = hashMapOf(
+                    "userId" to userId,
+                    "itemId" to itemId,
+                    "collection" to collectionName,
+                    "rating" to newStars,
+                    "timestamp" to com.google.firebase.Timestamp.now()
+                )
+                transaction.set(ratingRef, data)
+            }
+        }.addOnSuccessListener {
+            Toast.makeText(this, "Rating saved!", Toast.LENGTH_SHORT).show()
+            // Reload profile to see new stats
+            loadCharacterProfile(itemId)
+        }.addOnFailureListener { e ->
+            Toast.makeText(this, "Failed to rate: ${e.message}", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+
+    private fun showReportDialog(profile: CharacterProfile) {
+        val reasons = arrayOf(
+            "Prohibited Content (Underage/Illegal)",
+            "Unmarked NSFW",
+            "Spam / Low Quality",
+            "Harassment / Hate Speech",
+            "Other"
+        )
+
+        androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle("Report Character")
+            .setSingleChoiceItems(reasons, -1) { dialog, which ->
+                val reason = reasons[which]
+                sendCharacterReport(profile, reason)
+                dialog.dismiss()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun sendCharacterReport(profile: CharacterProfile, reason: String) {
+        val reporterId = FirebaseAuth.getInstance().currentUser?.uid ?: "Anonymous"
+
+        val reportBody = """
+        CHARACTER REPORT
+        ----------------
+        Reason: $reason
+        Reporter ID: $reporterId
+        Date: ${java.util.Date()}
+        
+        OFFENDING CONTENT:
+        Character ID: ${profile.id}
+        Name: ${profile.name}
+        Author ID: ${profile.author}
+        Summary: ${profile.summary}
+    """.trimIndent()
+
+        val emailIntent = Intent(Intent.ACTION_SEND).apply {
+            type = "message/rfc822"
+            putExtra(Intent.EXTRA_EMAIL, arrayOf("realmsai.report@gmail.com"))
+            putExtra(Intent.EXTRA_SUBJECT, "CHARACTER REPORT: ${profile.name}")
+            putExtra(Intent.EXTRA_TEXT, reportBody)
+        }
+
+        try {
+            startActivity(Intent.createChooser(emailIntent, "Send Report..."))
+        } catch (e: Exception) {
+            Toast.makeText(this, "No email client found.", Toast.LENGTH_SHORT).show()
+        }
     }
 }

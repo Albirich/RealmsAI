@@ -94,10 +94,31 @@ class ChatMapActivity : AppCompatActivity() {
         areaRecycler.adapter = AreaAdapter(
             areas = loadedAreas,
             areaColors = areaColors,
-            onPickImage = { _, _ -> },
-            readonly = true
-        )
+            onManageLocation = { _, _, _ -> },
+            readonly = true,
+            onRemoveArea = { areaToRemove ->
+                // 1. Find index
+                val index = loadedAreas.indexOf(areaToRemove)
+                if (index != -1) {
+                    // 2. Remove from lists
+                    loadedAreas.removeAt(index)
+                    areaColors.remove(areaToRemove.id)
 
+                    // 3. CLEANUP: Remove assignments for characters in this area
+                    val charsToReset = characterToAreaMap.filterValues { it == areaToRemove.id }.keys
+                    charsToReset.forEach { charId ->
+                        characterToAreaMap.remove(charId)
+                        characterToLocationMap.remove(charId)
+                    }
+
+                    // 4. Notify Adapters
+                    areaRecycler.adapter?.notifyItemRemoved(index)
+                    characterRecycler.adapter?.notifyDataSetChanged() // Refreshes border colors
+
+                    Toast.makeText(this, "Area removed", Toast.LENGTH_SHORT).show()
+                }
+            }
+        )
 
         addAreaButton.setOnClickListener {
             loadAreasForPicker { userAreas, defaultAreas ->
@@ -105,6 +126,9 @@ class ChatMapActivity : AppCompatActivity() {
                     // Prevent duplicate areas by name or ID
                     if (loadedAreas.any { it.name == pickedArea.name }) {
                         Toast.makeText(this, "Area already added.", Toast.LENGTH_SHORT).show()
+                    } else
+                    if (loadedAreas.size >= 8) {
+                        Toast.makeText(this, "Max 8 Areas allowed per Chat.", Toast.LENGTH_SHORT).show()
                     } else {
                         val newArea = pickedArea.copy(
                             id = java.util.UUID.randomUUID().toString(),

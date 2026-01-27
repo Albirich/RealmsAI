@@ -1,18 +1,19 @@
 package com.example.RealmsAI
 
-import android.app.Activity
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.view.View
 import android.widget.*
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AlertDialog
 import com.bumptech.glide.Glide
 import com.example.RealmsAI.models.MessageStatus
 import com.example.RealmsAI.models.UserProfile
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.storage.FirebaseStorage
+import com.google.firebase.firestore.WriteBatch
 
 class ProfileActivity : BaseActivity() {
 
@@ -26,6 +27,9 @@ class ProfileActivity : BaseActivity() {
     private lateinit var logoutBtn: Button
     private lateinit var viewProfileButton: Button
     private lateinit var messageButton: Button
+    private lateinit var deleteAccountBtn: Button
+    private lateinit var verifyEmailBtn: Button
+    private lateinit var statsTv: TextView
 
     private var iconUri: Uri? = null
     private var currentIconUrl: String? = null
@@ -56,6 +60,30 @@ class ProfileActivity : BaseActivity() {
         saveHandleButton = findViewById(R.id.saveHandleButton)
         logoutBtn = findViewById(R.id.logoutButton)
         viewProfileButton = findViewById(R.id.viewProfileButton)
+        messageButton = findViewById<Button>(R.id.messageButton)
+        verifyEmailBtn = findViewById(R.id.verifyEmailButton)
+        statsTv = findViewById(R.id.profileMessageStats)
+
+        // In ProfileActivity.kt or DisplayProfileActivity.kt
+
+        val upgradeBtn = findViewById<Button>(R.id.upgradeButton)
+
+        // 1. Hide the button if they are ALREADY Premium (Optional polish)
+        if (userProfile?.isPremium == true) {
+            upgradeBtn.visibility = View.GONE
+        } else {
+            upgradeBtn.visibility = View.VISIBLE
+            upgradeBtn.setOnClickListener {
+                startActivity(Intent(this, UpgradeActivity::class.java))
+            }
+        }
+
+        verifyEmailBtn.setOnClickListener {
+            sendVerificationEmail()
+        }
+
+        // Check status immediately
+        checkVerificationStatus()
 
         iconView.setOnClickListener {
             pickIcon.launch("image/*")
@@ -77,6 +105,10 @@ class ProfileActivity : BaseActivity() {
             saveProfile()
         }
 
+        deleteAccountBtn = findViewById(R.id.deleteAccountButton)
+        deleteAccountBtn.setOnClickListener {
+            showDeleteConfirmation()
+        }
         val userId = FirebaseAuth.getInstance().currentUser?.uid ?: return
         val db = FirebaseFirestore.getInstance()
 
@@ -99,7 +131,6 @@ class ProfileActivity : BaseActivity() {
                 showMessagesBadge(false)
             }
 
-        val messageButton = findViewById<Button>(R.id.messageButton)
         messageButton.setOnClickListener {
             startActivity(Intent(this, MessagesActivity::class.java))
         }
@@ -130,6 +161,22 @@ class ProfileActivity : BaseActivity() {
                     nameEt.setText(profile.name)
                     bioEt.setText(profile.bio)
                     currentIconUrl = profile.iconUrl
+
+                    val count = doc.getLong("dailyMessageCount") ?: 0
+                    val isPremium = doc.getBoolean("isPremium") ?: false
+
+                    if (isPremium) {
+                        statsTv.text = ""
+                        statsTv.setTextColor(android.graphics.Color.parseColor("#FFD700")) // Gold
+                    } else {
+                        statsTv.text = "Messages Today:\n $count / 70"
+                        // Turn red if they are close to the limit
+                        if (count >= 50) {
+                            statsTv.setTextColor(android.graphics.Color.RED)
+                        } else {
+                            statsTv.setTextColor(android.graphics.Color.WHITE)
+                        }
+                    }
 
                     if (profile.handle.isNullOrBlank()) {
                         handleEditContainer.visibility = View.VISIBLE
@@ -234,6 +281,138 @@ class ProfileActivity : BaseActivity() {
                 }
         } else {
             updateProfileInFirestore(null)
+        }
+    }
+    private fun showDeleteConfirmation() {
+        AlertDialog.Builder(this)
+            .setTitle("Delete Account?")
+            .setMessage("This action is PERMANENT. All your characters, chats, and data will be wiped.\n\nAre you sure?")
+            .setPositiveButton("DELETE EVERYTHING") { _, _ ->
+                performFullAccountDeletion()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun performFullAccountDeletion() {
+        val user = FirebaseAuth.getInstance().currentUser ?: return
+        val uid = user.uid
+        val db = FirebaseFirestore.getInstance()
+        val storage = FirebaseStorage.getInstance()
+
+        // Disable UI so they can't click twice
+        deleteAccountBtn.isEnabled = false
+        deleteAccountBtn.text = "Deleting..."
+
+        // We use tasks to chain these operations
+        // 1. QUERY CONTENT TO DELETE
+        val batch = db.batch()
+
+        // A. Find Characters
+        db.collection("characters").whereEqualTo("author", uid).get()
+            .addOnSuccessListener { charSnap ->
+                for (doc in charSnap) {
+                    batch.delete(doc.reference)
+                }
+
+                // B. Find Chats
+                db.collection("chats").whereEqualTo("author", uid).get()
+                    .addOnSuccessListener { chatSnap ->
+                        for (doc in chatSnap) {
+                            batch.delete(doc.reference)
+                        }
+
+                        // C. Delete User Profile
+                        batch.delete(db.collection("users").document(uid))
+
+                        // D. COMMIT FIRESTORE DELETES
+                        batch.commit().addOnCompleteListener { batchTask ->
+                            if (batchTask.isSuccessful) {
+                                // E. DELETE STORAGE (Icon)
+                                val iconRef = storage.reference.child("users/$uid/icon.png")
+                                iconRef.delete().addOnCompleteListener {
+                                    // (Ignore error if file doesn't exist)
+
+                                    // F. DELETE AUTH ACCOUNT
+                                    user.delete()
+                                        .addOnSuccessListener {
+                                            Toast.makeText(this, "Account deleted.", Toast.LENGTH_LONG).show()
+                                            // Redirect to Login
+                                            val intent = Intent(this, LoginActivity::class.java)
+                                            intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                                            startActivity(intent)
+                                            finish()
+                                        }
+                                        .addOnFailureListener { e ->
+                                            // If it fails (e.g., requires re-login), tell them
+                                            Toast.makeText(this, "Security Error: Please Log Out and Log In again, then try deleting.", Toast.LENGTH_LONG).show()
+                                            deleteAccountBtn.isEnabled = true
+                                            deleteAccountBtn.text = "Delete Account"
+                                        }
+                                }
+                            } else {
+                                Toast.makeText(this, "Failed to delete data. Try again.", Toast.LENGTH_SHORT).show()
+                                deleteAccountBtn.isEnabled = true
+                            }
+                        }
+                    }
+            }
+            .addOnFailureListener {
+                Toast.makeText(this, "Error finding data.", Toast.LENGTH_SHORT).show()
+                deleteAccountBtn.isEnabled = true
+            }
+    }
+    private fun checkVerificationStatus() {
+        val user = FirebaseAuth.getInstance().currentUser ?: return
+
+        // 1. Reload Auth User (Vital: Firebase caches this, we need fresh data)
+        user.reload().addOnSuccessListener {
+            if (user.isEmailVerified) {
+                // They are verified!
+                verifyEmailBtn.visibility = View.GONE
+
+                // 2. Ensure they have the badge in Firestore
+                grantVerifiedBadge(user.uid)
+            } else {
+                // Not verified yet
+                verifyEmailBtn.visibility = View.VISIBLE
+            }
+        }
+    }
+
+    private fun sendVerificationEmail() {
+        val user = FirebaseAuth.getInstance().currentUser ?: return
+
+        verifyEmailBtn.isEnabled = false
+        verifyEmailBtn.text = "Sending..."
+
+        user.sendEmailVerification()
+            .addOnSuccessListener {
+                Toast.makeText(this, "Verification email sent! Check your inbox.", Toast.LENGTH_LONG).show()
+                verifyEmailBtn.text = "Email Sent"
+            }
+            .addOnFailureListener { e ->
+                Toast.makeText(this, "Failed to send: ${e.message}", Toast.LENGTH_SHORT).show()
+                verifyEmailBtn.isEnabled = true
+                verifyEmailBtn.text = "Verify Email"
+            }
+    }
+
+    private fun grantVerifiedBadge(userId: String) {
+        val userRef = db.collection("users").document(userId)
+
+        userRef.get().addOnSuccessListener { doc ->
+            val currentBadges = doc.get("badges") as? List<String> ?: emptyList()
+
+            // Only write if they don't have it yet (Save a database write)
+            if (!currentBadges.contains("verified")) {
+                userRef.update("badges", com.google.firebase.firestore.FieldValue.arrayUnion("verified"))
+                    .addOnSuccessListener {
+                        Toast.makeText(this, "You earned the Verified Badge!", Toast.LENGTH_SHORT).show()
+                        // Reload profile to show the new icon
+                        loadProfile()
+                    }
+            }
         }
     }
 }

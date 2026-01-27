@@ -12,5 +12,7 @@ data class UserProfile(
     val recentChats: List<String> = emptyList(),
     val isPremium: Boolean = false,
     val dailyMessageCount: Int = 0,
-    val lastMessageDate: String? = null
+    val blockedUsers: List<String> = emptyList(),
+    val lastMessageDate: String? = null,
+    val badges: List<String> = emptyList()
 )

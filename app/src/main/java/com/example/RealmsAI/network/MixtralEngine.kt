@@ -10,10 +10,11 @@ class MixtralEngine(
     suspend fun getBotOutput(prompt: String): String {
         val req = MixtralChatRequest(
             // nsfw bots here mistralai/devstral-medium, mistralai/mistral-small-3.1-24b-instruct
-            model    = "mistralai/mistral-small-3.1-24b-instruct",
+            model    = "x-ai/grok-3-mini",
             messages = listOf(
                 Message(role = "system", content = prompt)
-            )
+            ),
+            temperature = 0.7
         )
         val resp = mixtral.getBotResponses(req)
         return resp.choices

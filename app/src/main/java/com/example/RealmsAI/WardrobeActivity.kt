@@ -6,6 +6,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.util.Log
 import android.widget.ImageButton
+import android.widget.Toast
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
@@ -15,6 +16,8 @@ import androidx.recyclerview.widget.RecyclerView
 import com.example.RealmsAI.models.Outfit
 import com.example.RealmsAI.models.PoseSlot
 import com.google.android.material.button.MaterialButton
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
 import com.google.gson.Gson
 
 
@@ -27,6 +30,7 @@ class WardrobeActivity : AppCompatActivity() {
     private val outfits = mutableListOf<Outfit>()
     private lateinit var outfitAdapter: OutfitAdapter
     private lateinit var imagePicker: ActivityResultLauncher<String>
+    private lateinit var outfitRecycler: RecyclerView
 
     private var currentOutfitIdx = 0
     private var currentPoseIdx = 0
@@ -116,13 +120,24 @@ class WardrobeActivity : AppCompatActivity() {
                 imagePicker.launch("image/*")
             },
             onAddPose = { outfitIdx ->
-                outfits[outfitIdx].poseSlots.add(PoseSlot(name = ""))
-                outfitAdapter.notifyItemChanged(outfitIdx)
-                Log.d("WardrobeDebug", "Current outfits:")
-                for ((outfitIdx, outfit) in outfits.withIndex()) {
-                    Log.d("WardrobeDebug", "[$outfitIdx] Outfit: '${outfit.name}'")
-                    for ((poseIdx, pose) in outfit.poseSlots.withIndex()) {
-                        Log.d("WardrobeDebug", "    [$poseIdx] Pose: '${pose.name}' -> '${pose.uri}'")
+                // 1. Get current list
+                val currentPoses = outfits[outfitIdx].poseSlots
+
+                // 2. CHECK LIMIT: Max 20
+                if (currentPoses.size >= 20) {
+                    Toast.makeText(this, "Maximum 20 poses per outfit allowed.", Toast.LENGTH_SHORT).show()
+                } else {
+                    // 3. Add if under limit
+                    currentPoses.add(PoseSlot(name = ""))
+                    outfitAdapter.notifyItemChanged(outfitIdx)
+
+                    // Debug logs
+                    Log.d("WardrobeDebug", "Current outfits:")
+                    for ((oIdx, outfit) in outfits.withIndex()) {
+                        Log.d("WardrobeDebug", "[$oIdx] Outfit: '${outfit.name}'")
+                        for ((pIdx, pose) in outfit.poseSlots.withIndex()) {
+                            Log.d("WardrobeDebug", "    [$pIdx] Pose: '${pose.name}' -> '${pose.uri}'")
+                        }
                     }
                 }
             },
@@ -180,16 +195,50 @@ class WardrobeActivity : AppCompatActivity() {
             }
         )
 
-
         outfitRecycler.layoutManager = LinearLayoutManager(this)
         outfitRecycler.adapter = outfitAdapter
 
         // 4. Add Outfit Button
         addOutfitBtn.setOnClickListener {
-            outfits.add(Outfit(name = "", poseSlots = mutableListOf()))
-            outfitAdapter.notifyItemInserted(outfits.size - 1)
+            val currentCount = outfits.size
 
+            // 1. ABSOLUTE LIMIT (10) - Stops everyone
+            if (currentCount >= 10) {
+                Toast.makeText(this, "You have reached the maximum of 10 outfits.", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+
+            // 2. CHECK FREE LIMIT (3)
+            if (currentCount >= 3) {
+                val userId = FirebaseAuth.getInstance().currentUser?.uid ?: return@setOnClickListener
+
+                FirebaseFirestore.getInstance().collection("users").document(userId).get()
+                    .addOnSuccessListener { doc ->
+                        val isPremium = doc.getBoolean("isPremium") ?: false
+
+                        if (isPremium) {
+                            // User is Premium and under 10 -> Allow
+                            addOutfitRow()
+                        } else {
+                            // User is Free and hit 3 -> Upsell
+                            AlertDialog.Builder(this)
+                                .setTitle("Wardrobe Limit Reached")
+                                .setMessage("Free users can create up to 3 outfits.\n\nUpgrade to Premium to unlock up to 10 outfits!")
+                                .setPositiveButton("Upgrade") { _, _ ->
+                                    startActivity(Intent(this, UpgradeActivity::class.java))
+                                }
+                                .setNegativeButton("Cancel", null)
+                                .show()
+                        }
+                    }
+                return@setOnClickListener
+            }
+
+            // 3. UNDER 3 -> Allow immediately (No DB call needed)
+            addOutfitRow()
         }
+
+
         // 5. Save All Outfits
         saveBtn.setOnClickListener {
             val cleanedOutfits = deduplicateAndCleanOutfits(outfits)
@@ -207,7 +256,17 @@ class WardrobeActivity : AppCompatActivity() {
             setResult(Activity.RESULT_OK, resultIntent)
             finish()
         }
+
     }
+
+    private fun addOutfitRow() {
+        outfits.add(Outfit(name = "", poseSlots = mutableListOf()))
+        outfitAdapter.notifyItemInserted(outfits.size - 1)
+        // Scroll to the new item
+        outfitRecycler.scrollToPosition(outfits.size - 1)
+    }
+
+
     // Call this right before saving or sending back to CharacterCreationActivity
     fun deduplicateAndCleanOutfits(outfits: List<Outfit>): List<Outfit> {
         return outfits
@@ -226,3 +285,4 @@ class WardrobeActivity : AppCompatActivity() {
     }
 
 }
+

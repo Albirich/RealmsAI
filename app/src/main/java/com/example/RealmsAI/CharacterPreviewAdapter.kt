@@ -24,6 +24,7 @@ class CharacterPreviewAdapter(
         private val avatar  : ImageView = view.findViewById(R.id.charAvatar1)
         private val title   : TextView  = view.findViewById(R.id.charTitle)
         private val summary : TextView  = view.findViewById(R.id.charPreview)
+        private val ratingTv: TextView? = view.findViewById(R.id.charRating)
 
         fun bind(preview: CharacterPreview) {
             // 1) Name
@@ -49,6 +50,13 @@ class CharacterPreviewAdapter(
                 else -> {
                     avatar.setImageResource(R.drawable.icon_01)
                 }
+            }
+            // SHOW RATING
+            if (preview.rating > 0) {
+                ratingTv?.visibility = View.VISIBLE
+                ratingTv?.text = "★ %.1f".format(preview.rating)
+            } else {
+                ratingTv?.visibility = View.GONE
             }
 
             // 4) Click & long‑click

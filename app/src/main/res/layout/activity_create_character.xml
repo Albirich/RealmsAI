@@ -143,6 +143,30 @@
                 android:inputType="textMultiLine" />
         </com.google.android.material.textfield.TextInputLayout>
 
+        <!-- Scenario Input-->
+        <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/charScenario"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:padding="8dp"
+            app:counterEnabled="true"
+            app:counterMaxLength="1000"
+            app:layout_constraintTop_toBottomOf="@id/charBackground"
+            app:layout_constraintStart_toStartOf="parent"
+            app:helperText="This is the main meat, telling the AI how to roleplay the character.">
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/characterScenarioInput"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:maxHeight="200dp"
+                android:scrollbars="vertical"
+                android:maxLines="5"
+                android:overScrollMode="always"
+                android:gravity="top|start"
+                android:hint="Enter a Description for One on One chats"
+                android:inputType="textMultiLine"/>
+        </com.google.android.material.textfield.TextInputLayout>
+
         <!-- Greeting Input-->
         <com.google.android.material.textfield.TextInputLayout
             android:id="@+id/charGreeting"
@@ -151,7 +175,7 @@
             android:padding="8dp"
             app:counterEnabled="true"
             app:counterMaxLength="200"
-            app:layout_constraintTop_toBottomOf="@id/charBackground"
+            app:layout_constraintTop_toBottomOf="@id/charScenario"
             app:layout_constraintStart_toStartOf="parent"
             app:helperText="Tell the AI what its first message should be. Talk to it like you're speaking to the characters as a director.">
             >
@@ -195,17 +219,6 @@
         </com.google.android.material.textfield.TextInputLayout>
 
 
-        <!-- Tags Input -->
-        <EditText
-            android:id="@+id/characterTagsInput"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:hint="Enter tags"
-            android:padding="16dp"
-            android:textSize="16sp"
-            app:layout_constraintTop_toBottomOf="@id/charAbilities"
-            app:layout_constraintStart_toStartOf="parent"/>
-
 
         <!-- Images -->
         <TextView
@@ -215,7 +228,7 @@
             android:layout_marginTop="12dp"
             android:text="Avatar"
             android:layout_gravity="center_horizontal"
-            app:layout_constraintTop_toBottomOf="@id/characterTagsInput"
+            app:layout_constraintTop_toBottomOf="@id/charAbilities"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
             android:textStyle="bold" />
@@ -402,16 +415,121 @@
             android:id="@+id/textColorSpinner"
             android:layout_width="match_parent"
             app:layout_constraintTop_toBottomOf="@id/textTitle"
-            app:layout_constraintBottom_toTopOf="@id/sfwSwitch"
+            app:layout_constraintBottom_toTopOf="@id/universeTitle"
             app:layout_constraintStart_toStartOf="parent"
             android:layout_height="wrap_content"/>
+
+        <TextView
+            android:id="@+id/dialogueTitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Example Dialogue"
+            android:textColor="#AAAAAA"
+            android:layout_marginTop="24dp"
+            app:layout_constraintTop_toBottomOf="@id/textColorSpinner"
+            app:layout_constraintStart_toStartOf="parent"/>
+
+        <TextView
+            android:id="@+id/dialogueHelper"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:text="Crucial for AI quality! Click 'Auto-Generate' to get scenarios, then write how your character responds."
+            android:textColor="#888888"
+            android:textSize="12sp"
+            app:layout_constraintTop_toBottomOf="@id/dialogueTitle"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"/>
+
+        <LinearLayout
+            android:id="@+id/dialogueContainer"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_marginTop="12dp"
+            app:layout_constraintTop_toBottomOf="@id/dialogueHelper"
+            app:layout_constraintStart_toStartOf="parent"/>
+
+        <LinearLayout
+            android:id="@+id/dialogueButtons"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:weightSum="2"
+            app:layout_constraintTop_toBottomOf="@id/dialogueContainer">
+
+            <Button
+                android:id="@+id/generateDialogueButton"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Auto-Generate (3)"
+                android:layout_marginEnd="4dp"
+                android:backgroundTint="#444444"/>
+
+            <Button
+                android:id="@+id/addDialogueRowButton"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="+ Add Custom"
+                android:layout_marginStart="4dp"
+                android:backgroundTint="#222222"/>
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/universeTitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Universe / Fandom"
+            android:textColor="#AAAAAA"
+            app:layout_constraintTop_toBottomOf="@id/dialogueButtons"
+            app:layout_constraintStart_toStartOf="parent"/>
+
+        <EditText
+            android:id="@+id/universeEditText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="e.g. Marvel, Star Wars, Original"
+            android:textColor="@color/white"
+            app:layout_constraintTop_toBottomOf="@id/universeTitle"/>
+
+        <TextView
+            android:id="@+id/tagsTitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Tags"
+            android:textColor="#AAAAAA"
+            android:layout_marginTop="16dp"
+            app:layout_constraintTop_toBottomOf="@id/universeEditText"
+            app:layout_constraintStart_toStartOf="parent"/>
+
+        <Button
+            android:id="@+id/selectTagsButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Select Tags"
+            android:backgroundTint="#444444"
+            app:layout_constraintTop_toBottomOf="@id/tagsTitle"
+            app:layout_constraintStart_toStartOf="parent"/>
+
+        <TextView
+            android:id="@+id/selectedTagsText"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:text="None selected"
+            android:textColor="#FFFFFF"
+            android:layout_marginStart="8dp"
+            app:layout_constraintStart_toEndOf="@id/selectTagsButton"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintBottom_toBottomOf="@id/selectTagsButton"
+            app:layout_constraintTop_toTopOf="@id/selectTagsButton"/>
 
         <Switch
             android:id="@+id/sfwSwitch"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Safe For Work (SFW only)"
-            app:layout_constraintTop_toBottomOf="@id/textColorSpinner"
+            app:layout_constraintTop_toBottomOf="@id/selectedTagsText"
             app:layout_constraintBottom_toTopOf="@id/privateSwitch"
             app:layout_constraintStart_toStartOf="parent"
             android:checked="true"

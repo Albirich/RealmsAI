@@ -1,17 +1,22 @@
 package com.example.RealmsAI
 
-import android.app.Activity
-import android.content.Intent
+import android.app.AlertDialog
 import android.net.Uri
 import android.os.Bundle
 import android.util.Log
+import android.view.LayoutInflater
+import android.view.View
+import android.widget.Button
+import android.widget.EditText
+import android.widget.ImageView
+import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.bumptech.glide.Glide
 import com.example.RealmsAI.models.Area
 import com.example.RealmsAI.models.LocationSlot
 import com.google.android.gms.tasks.Task
@@ -19,9 +24,7 @@ import com.google.android.gms.tasks.Tasks
 import com.google.android.material.button.MaterialButton
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.WriteBatch
 import com.google.firebase.storage.FirebaseStorage
-import com.google.firebase.storage.ktx.storage
 import com.google.gson.Gson
 import java.util.*
 
@@ -35,22 +38,34 @@ class BackgroundGalleryActivity : AppCompatActivity() {
     private lateinit var areaAdapter: AreaAdapter
 
     private lateinit var imagePicker: ActivityResultLauncher<String>
+
     private var currentArea: Area? = null
     private var currentLocation: LocationSlot? = null
-    private var progressDialog: AlertDialog? = null
+    private var progressDialog: androidx.appcompat.app.AlertDialog? = null
+    // Temp state for the dialog being edited
+    private var editingLocation: LocationSlot? = null
+    private var dialogImageView: ImageView? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_background_gallery)
 
-        // RecyclerView setup
+        // Image Picker Setup
+        imagePicker = registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
+            uri?.let {
+                if (editingLocation != null && dialogImageView != null) {
+                    editingLocation!!.uri = it.toString()
+                    Glide.with(this).load(it).into(dialogImageView!!)
+                }
+            }
+        }
+
+        // Recycler Setup
         val recycler = findViewById<RecyclerView>(R.id.areaRecycler)
         areaAdapter = AreaAdapter(
             areas = areas,
-            onPickImage = { area, location ->
-                currentArea = area
-                currentLocation = location
-                imagePicker.launch("image/*")
+            onManageLocation = { area, location, adapter ->
+                showLocationDialog(area, location, adapter)
             },
             readonly = false
         )
@@ -72,7 +87,7 @@ class BackgroundGalleryActivity : AppCompatActivity() {
                     id = UUID.randomUUID().toString(),
                     creatorId = FirebaseAuth.getInstance().currentUser?.uid ?: "",
                     name = "",
-                    locations = mutableListOf(LocationSlot())
+                    locations = mutableListOf() // Start empty
                 )
             )
             areaAdapter.notifyItemInserted(areas.size - 1)
@@ -109,25 +124,90 @@ class BackgroundGalleryActivity : AppCompatActivity() {
         findViewById<MaterialButton>(R.id.submitGalleryButton).setOnClickListener {
             saveAllAreas()
         }
+    }
 
-        // Load passed-in areas
-        val areasJson = intent.getStringExtra(EXTRA_AREAS_JSON)
-        if (!areasJson.isNullOrBlank()) {
-            val loaded = Gson().fromJson(areasJson, Array<Area>::class.java).toList()
-            areas.clear()
-            areas.addAll(loaded)
-            areaAdapter.notifyDataSetChanged()
-        } else {
-            areas.add(
-                Area(
-                    id = UUID.randomUUID().toString(),
-                    creatorId = FirebaseAuth.getInstance().currentUser?.uid ?: "",
-                    name = "",
-                    locations = mutableListOf(LocationSlot())
-                )
-            )
-            areaAdapter.notifyItemInserted(areas.size - 1)
+    private fun showLocationDialog(area: Area, existingLocation: LocationSlot?, adapter: RecyclerView.Adapter<*>) {
+        val isNew = (existingLocation == null)
+        // Work on a copy (or new instance) so we don't mutate list until Save
+        val tempLocation = existingLocation?.copy() ?: LocationSlot(name = "", description = "")
+
+        // Track for image picker
+        editingLocation = tempLocation
+
+        val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_location_editor, null)
+        val titleView = dialogView.findViewById<TextView>(R.id.dialogTitle)
+        val imgView = dialogView.findViewById<ImageView>(R.id.dialogLocationImage)
+        val nameInput = dialogView.findViewById<EditText>(R.id.dialogNameInput)
+        val descInput = dialogView.findViewById<EditText>(R.id.dialogDescInput)
+        val saveBtn = dialogView.findViewById<Button>(R.id.dialogSaveBtn)
+        val deleteBtn = dialogView.findViewById<Button>(R.id.dialogDeleteBtn)
+        val cancelBtn = dialogView.findViewById<Button>(R.id.dialogCancelBtn)
+
+        // Store ref for image picker update
+        dialogImageView = imgView
+
+        // Populate Fields
+        titleView.text = if (isNew) "Add Location" else "Edit Location"
+        nameInput.setText(tempLocation.name)
+        descInput.setText(tempLocation.description)
+
+        if (!tempLocation.uri.isNullOrBlank()) {
+            Glide.with(this).load(tempLocation.uri).into(imgView)
         }
+
+        // Bind Actions
+        imgView.setOnClickListener {
+            imagePicker.launch("image/*")
+        }
+
+        val dialog = AlertDialog.Builder(this)
+            .setView(dialogView)
+            .setCancelable(false)
+            .create()
+
+        if (isNew) deleteBtn.visibility = View.GONE
+
+        deleteBtn.setOnClickListener {
+            if (!isNew) {
+                val index = area.locations.indexOfFirst { it.id == existingLocation?.id }
+                if (index != -1) {
+                    area.locations.removeAt(index)
+                    adapter.notifyItemRemoved(index)
+                }
+            }
+            dialog.dismiss()
+        }
+
+
+        saveBtn.setOnClickListener {
+            val newName = nameInput.text.toString().trim()
+            if (newName.isBlank()) {
+                Toast.makeText(this, "Name is required", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+
+            // Update the temp object
+            tempLocation.name = newName
+            tempLocation.description = descInput.text.toString().trim()
+
+            if (isNew) {
+                // Add to list
+                area.locations.add(tempLocation)
+                adapter.notifyItemInserted(area.locations.size - 1)
+            } else {
+                // Update existing in list
+                val index = area.locations.indexOfFirst { it.id == existingLocation?.id }
+                if (index != -1) {
+                    area.locations[index] = tempLocation
+                    adapter.notifyItemChanged(index)
+                }
+            }
+            dialog.dismiss()
+        }
+
+        cancelBtn.setOnClickListener { dialog.dismiss() }
+
+        dialog.show()
     }
 
     // --- Main Save Logic ---
@@ -167,7 +247,6 @@ class BackgroundGalleryActivity : AppCompatActivity() {
                     tasks.add(uploadTask)
                 }
             }
-
             Tasks.whenAllComplete(tasks).addOnSuccessListener {
                 area.creatorId = userId
                 val saveDocId = "${userId}_${safeAreaName}"
@@ -284,7 +363,7 @@ class BackgroundGalleryActivity : AppCompatActivity() {
             .setTitle("Saving Backgrounds")
             .setMessage("Please don’t close the app. Your backgrounds are being saved and uploaded. This can take a while for large images or slow connections…")
             .setCancelable(false)
-            .show()
+            .show() as androidx.appcompat.app.AlertDialog?
     }
 
     private fun dismissProgressDialog() {

@@ -72,6 +72,7 @@ class SessionLandingActivity : AppCompatActivity() {
     private var sessionListener: ListenerRegistration? = null
     private var buildDialogShown = false
     private var lastSlotRoster: List<SlotProfile>? = null
+    private var lobbyListener: ListenerRegistration? = null
 
     private var progressDialog: AlertDialog? = null
     private var progressTextView: TextView? = null
@@ -131,43 +132,87 @@ class SessionLandingActivity : AppCompatActivity() {
             showFriendInviteDialog()
         }
 
-        // --- Get intents from previous screens ---
-        val sessionProfileJson = intent.getStringExtra("SESSION_PROFILE_JSON")
-        val chatProfileJson = intent.getStringExtra("CHAT_PROFILE_JSON")
-        val characterProfilesJson = intent.getStringExtra("CHARACTER_PROFILES_JSON")
-        val inviteProfilesJson = intent.getStringExtra("INVITE_PROFILE_JSON")
-        var enteredFrom = ""
-        // --- Load state depending on navigation ---
-        when {
-            // Editing/resuming
-            sessionProfileJson != null -> {
-                sessionProfile = Gson().fromJson(sessionProfileJson, SessionProfile::class.java)
-                val local = Gson().fromJson(sessionProfileJson, SessionProfile::class.java)
-                lobbySessionId = sessionProfile!!.sessionId
-                chatProfile = null
-                relationships = sessionProfile?.slotRoster?.flatMap { it.relationships }?.toMutableList() ?: mutableListOf()
-                displaySession(sessionProfile!!)
-                FirebaseFirestore.getInstance()
-                    .collection("sessions")
-                    .document(lobbySessionId!!)
-                    .get()
-                    .addOnSuccessListener { snap ->
-                        val live = snap.toObject(SessionProfile::class.java)
-                        // Prefer live values if present; fall back to local
-                        val merged = (live ?: local).also { sp ->
-                            // keep anything you already displayed if live is missing it
-                            if (live == null) Log.w("Session", "Live session missing, using local cache")
+
+            // --- Get intents ---
+            val sessionProfileJson = intent.getStringExtra("SESSION_PROFILE_JSON")
+            val chatProfileJson = intent.getStringExtra("CHAT_PROFILE_JSON")
+            val characterProfilesJson = intent.getStringExtra("CHARACTER_PROFILES_JSON")
+            val inviteProfilesJson = intent.getStringExtra("INVITE_PROFILE_JSON")
+
+            // NEW: Grab the ID directly
+            val intentSessionId = intent.getStringExtra("SESSION_ID")
+
+            var enteredFrom = ""
+
+            when {
+                // 1. NEW CASE: ID is present, but JSON is missing (Fix for TransactionTooLarge)
+                intentSessionId != null && sessionProfileJson == null -> {
+                    lobbySessionId = intentSessionId
+                    val db = FirebaseFirestore.getInstance()
+
+                    // Optional: show a loading spinner
+                    // progressBar?.visibility = View.VISIBLE
+
+                    db.collection("sessions").document(intentSessionId).get()
+                        .addOnSuccessListener { doc ->
+                            if (!doc.exists()) {
+                                Toast.makeText(this, "Session not found", Toast.LENGTH_LONG).show()
+                                finish()
+                                return@addOnSuccessListener
+                            }
+
+                            val loadedProfile = doc.toObject(SessionProfile::class.java)
+                            if (loadedProfile != null) {
+                                sessionProfile = loadedProfile
+                                chatProfile = null
+
+                                // Re-build relationships list
+                                relationships = sessionProfile?.slotRoster?.flatMap { it.relationships }?.toMutableList() ?: mutableListOf()
+
+                                // Populate UI
+                                displaySession(sessionProfile!!)
+                                bindModeJumpButtons(lobbySessionId!!, sessionProfile)
+                                checkForCharacterUpdates()
+
+                                enteredFrom = "Sessionhub"
+                            } else {
+                                Toast.makeText(this, "Failed to parse session data.", Toast.LENGTH_SHORT).show()
+                                finish()
+                            }
                         }
-                        sessionProfile = merged
-                        bindModeJumpButtons(lobbySessionId!!, merged)
-                        checkForCharacterUpdates()
-                    }
-                    .addOnFailureListener { e ->
-                        Log.e("Session", "Failed to fetch live session; using local cache", e)
-                        bindModeJumpButtons(lobbySessionId!!, local)
-                    }
-                enteredFrom = "Sessionhub"
-            }
+                        .addOnFailureListener { e ->
+                            Toast.makeText(this, "Error loading session: ${e.message}", Toast.LENGTH_SHORT).show()
+                            finish()
+                        }
+                }
+
+                // 2. OLD CASE: Editing/resuming with JSON (Legacy or internal intents)
+                sessionProfileJson != null -> {
+                    sessionProfile = Gson().fromJson(sessionProfileJson, SessionProfile::class.java)
+                    val local = Gson().fromJson(sessionProfileJson, SessionProfile::class.java)
+                    lobbySessionId = sessionProfile!!.sessionId
+                    chatProfile = null
+                    relationships = sessionProfile?.slotRoster?.flatMap { it.relationships }?.toMutableList() ?: mutableListOf()
+                    displaySession(sessionProfile!!)
+
+                    // Still try to fetch live updates, but we have local data to show immediately
+                    FirebaseFirestore.getInstance()
+                        .collection("sessions")
+                        .document(lobbySessionId!!)
+                        .get()
+                        .addOnSuccessListener { snap ->
+                            val live = snap.toObject(SessionProfile::class.java)
+                            val merged = (live ?: local)
+                            sessionProfile = merged
+                            bindModeJumpButtons(lobbySessionId!!, merged)
+                            checkForCharacterUpdates()
+                        }
+                        .addOnFailureListener { e ->
+                            Log.e("Session", "Failed to fetch live session; using local cache", e)
+                            bindModeJumpButtons(lobbySessionId!!, local)
+                        }
+                    enteredFrom = "Sessionhub"
+                }
             inviteProfilesJson != null -> {
                 inviteProfile = Gson().fromJson(inviteProfilesJson, InviteProfile::class.java)
                 Log.d("InviteDebug", "InviteProfile.title = ${inviteProfile?.title}")
@@ -351,11 +396,8 @@ class SessionLandingActivity : AppCompatActivity() {
                         sessionId = sessionId,
                         chatId = "", // No chatProfile, so probably blank
                         title = characterProfiles.firstOrNull()?.name ?: "Session",
-                        sessionDescription = characterProfiles.firstOrNull()?.backstory ?: "",
-                        secretDescription = characterProfiles
-                            .mapNotNull { it.privateDescription }
-                            .filter { it.isNotBlank() }
-                            .joinToString(separator = "\n---\n"),
+                        sessionDescription = characterProfiles.firstOrNull()?.soloScenario ?: "",
+                        secretDescription = "",
                         chatMode = chatMode,
                         startedAt = com.google.firebase.Timestamp.now(),
                         sfwOnly = characterProfiles.firstOrNull()?.sfwOnly ?: true,
@@ -395,11 +437,6 @@ class SessionLandingActivity : AppCompatActivity() {
             }
         }
 
-        fun isHost(): Boolean {
-            val myId = FirebaseAuth.getInstance().currentUser?.uid
-            return inviteProfile?.userList?.getOrNull(0) == myId
-        }
-
         if (!lobbySessionId.isNullOrBlank() && enteredFrom == "Invite"){
             val sessionId = lobbySessionId!!
             FirebaseFirestore.getInstance().collection("sessions")
@@ -433,7 +470,7 @@ class SessionLandingActivity : AppCompatActivity() {
                                     if (sessionProfile != null) {
                                         dismissCharacterProgressDialog()
                                         val intent = Intent(this@SessionLandingActivity, MainActivity::class.java)
-                                        intent.putExtra("SESSION_PROFILE_JSON", Gson().toJson(sessionProfile))
+                                        // intent.putExtra("SESSION_PROFILE_JSON", Gson().toJson(fixedProfile)) // REMOVED to prevent crash
                                         intent.putExtra("SESSION_ID", sessionProfile.sessionId)
                                         intent.putExtra("ENTRY_MODE", "GUEST")
                                         Log.d("loading_in_sessionlanding", "checking what guest is sending. ${sessionProfile.multiplayer}")
@@ -546,235 +583,367 @@ class SessionLandingActivity : AppCompatActivity() {
             if (enteredFrom == "Sessionhub" && sessionProfile != null) {
                 // Just launch MainActivity immediately!
                 val intent = Intent(this, MainActivity::class.java)
-                intent.putExtra("SESSION_PROFILE_JSON", Gson().toJson(sessionProfile))
+                // intent.putExtra("SESSION_PROFILE_JSON", Gson().toJson(sessionProfile))
                 intent.putExtra("SESSION_ID", sessionProfile?.sessionId)
                 intent.putExtra("ENTRY_MODE", "LOAD")
                 startActivity(intent)
                 finish()
                 return@setOnClickListener
+            }else{
+                checkPermissions()
             }
-            showCharacterProgressDialog(sessionProfile?.slotRoster!!.size)
-            buildDialogShown = true
-            lifecycleScope.launch {
-                try {
-                    Log.d("saving", "starting session as Create")
+        }
+    }
 
-                    val userId = FirebaseAuth.getInstance().currentUser!!.uid
-                    val sessionId = lobbySessionId ?: error("Session ID must be set before starting session!")
-                    lobbySessionId = sessionId
+    private fun checkPermissions() {
+        val rosterCount = sessionProfile?.slotRoster?.size ?: 0
+        val userList = sessionProfile?.userList ?: listOf(FirebaseAuth.getInstance().currentUser!!.uid)
 
-                    // Build persona profile lookup
-                    val personaProfilesMap = personaProfiles.associateBy { it.id }
-                    // Prepare relationships with placeholder substitution
+        // Show a temporary loading indicator while we check permissions
+        val loadingDialog = AlertDialog.Builder(this)
+            .setMessage("Checking party permissions...")
+            .setCancelable(false)
+            .create()
+        loadingDialog.show()
 
-                    // Set Firestore "isBuilding" to true (show build dialog to everyone)
-                    val db = FirebaseFirestore.getInstance()
-                    db.collection("sessions")
-                        .document(sessionId)
-                        .update("isBuilding", true)
+        lifecycleScope.launch {
+            try {
+                val db = FirebaseFirestore.getInstance()
 
-                    val gson = Gson()
+                // 1. Fetch ALL users in the lobby to check Premium status
+                // (Firestore 'whereIn' is limited to 10, assuming lobby size <= 10. If >10, you'd need chunking)
+                val usersSnap = db.collection("users")
+                    .whereIn(FieldPath.documentId(), userList.take(10))
+                    .get()
+                    .await()
 
-                    // Pull settings from the *chatProfile* (you’re creating a session from that)
-                    val rpgSettingsJson = chatProfile?.modeSettings?.get("rpg") as? String
-                    val murderSettingsJson = chatProfile?.modeSettings?.get("murder") as? String
+                val freeUsers = usersSnap.documents.filter {
+                    it.getBoolean("isPremium") != true
+                }.map { it.getString("name") ?: "Unknown User" }
 
-                    var rpgSettings: ModeSettings.RPGSettings? = rpgSettingsJson?.let {
-                        try { gson.fromJson(it, ModeSettings.RPGSettings::class.java) } catch (_: Exception) { null }
-                    }
-                    var murderSettings: ModeSettings.MurderSettings? = murderSettingsJson?.let {
-                        try { gson.fromJson(it, ModeSettings.MurderSettings::class.java) } catch (_: Exception) { null }
-                    }
-                    if (murderSettings?.enabled == true) {
-                        // 1) Randomize only if requested
-                        if (murderSettings?.randomizeKillers == true) {
-                            val (rpgUpd, murderUpd) = generateMurderSetup(
-                                slots = sessionProfile?.slotRoster ?: emptyList(),
-                                rpgSettingsIn = rpgSettings,
-                                murderIn = murderSettings,
-                                sessionProfile = sessionProfile!!
-                            )
-                            rpgSettings = rpgUpd
-                            murderSettings = murderUpd
-                            Log.d("ai_response", "seeded: $murderSettings")
-                        } else {
-                            Log.d("ai_response", "randomizeKillers disabled; using creator roles")
+                val anyoneIsFree = freeUsers.isNotEmpty()
+                val currentUserIsFree = freeUsers.contains(usersSnap.documents.find { it.id == FirebaseAuth.getInstance().currentUser!!.uid }?.getString("name"))
+
+                // 2. Check for Active Modes
+                // Check both sessionProfile and chatProfile to be safe
+                val currentModes = (sessionProfile?.enabledModes ?: mutableListOf()) +
+                        (chatProfile?.enabledModes ?: mutableListOf())
+                val hasSpecialModes = currentModes.any { it == "rpg" || it == "visual_novel" || it == "god_mode" }
+
+                loadingDialog.dismiss() // Check complete
+
+                // --- CHECK 1: CHARACTER LIMITS (Existing Logic) ---
+                // We base the limit on the HOST (Current User/Creator) or the Lowest Common Denominator?
+                // Usually, the Host's limit defines the session capacity.
+                val hostIsPremium = !currentUserIsFree // Assuming 'you' are the host starting it
+                val charLimit = if (hostIsPremium) 20 else 10
+
+                if (rosterCount > charLimit) {
+                    AlertDialog.Builder(this@SessionLandingActivity)
+                        .setTitle("Character Limit Exceeded")
+                        .setMessage("You have $rosterCount characters, but the limit is $charLimit.\n\nReduce characters or Upgrade to Premium.")
+                        .setPositiveButton("Upgrade") { _, _ ->
+                            startActivity(Intent(this@SessionLandingActivity, UpgradeActivity::class.java))
                         }
+                        .setNegativeButton("Cancel", null)
+                        .show()
+                    return@launch
+                }
 
-                        // 2) Build timelines (single AI call → per-character map)
-                        mysteryMoreInfoByCharId = generateMysteryTimelineStrings(
+                // --- CHECK 2: SPECIAL MODES (New Logic) ---
+                if (anyoneIsFree && hasSpecialModes) {
+                    // We must pause and ask
+                    withContext(Dispatchers.Main) {
+                        AlertDialog.Builder(this@SessionLandingActivity)
+                            .setTitle("Premium Features Detected")
+                            .setMessage(
+                                "This session uses Special Modes (RPG, VN, etc.) which require all players to be Premium.\n\n" +
+                                        "The following users are on the Free plan:\n${freeUsers.joinToString(", ")}\n\n" +
+                                        "You can have them Upgrade and reinvite them or start a Standard Session (Sandbox) without special modes."
+                            )
+                            .setPositiveButton("Start Standard Session") { _, _ ->
+                                // PROCEED: Strip modes and continue
+                                startNewSession(stripModes = true)
+                            }
+                            .setNegativeButton("Cancel", null)
+                            .show()
+                    }
+                    return@launch // Stop here, wait for dialog choice
+                }
+
+                // If we get here, everyone is Premium OR no special modes are active.
+                startNewSession(stripModes = false)
+
+            } catch (e: Exception) {
+                loadingDialog.dismiss()
+                Log.e("SessionStart", "Error checking permissions", e)
+                Toast.makeText(this@SessionLandingActivity, "Error starting session. Check connection.", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private fun startNewSession(stripModes: Boolean){
+        val rosterCount = sessionProfile?.slotRoster?.size ?: 0
+
+        showCharacterProgressDialog(sessionProfile?.slotRoster!!.size)
+        buildDialogShown = true
+        lifecycleScope.launch {
+            try {
+                val userId = FirebaseAuth.getInstance().currentUser!!.uid
+
+                // Fetch "isPremium" directly from Firestore to prevent cheating
+                val userDoc = FirebaseFirestore.getInstance().collection("users").document(userId).get().await()
+                val isPremium = userDoc.getBoolean("isPremium") ?: false
+
+                // DEFINE LIMITS
+                val charLimit = if (isPremium) 20 else 10 // Tweak these numbers as needed
+
+                if (rosterCount > charLimit) {
+                    // Creating the popup
+                    AlertDialog.Builder(this@SessionLandingActivity)
+                        .setTitle("Character Limit Exceeded")
+                        .setMessage("You have $rosterCount characters, but your plan limit is $charLimit.\n\nPlease remove some characters or upgrade to Premium.")
+                        .setPositiveButton("Upgrade") { _, _ ->
+                            // showPaywallDialog() // Uncomment when you have the paywall function here
+                        }
+                        .setNegativeButton("OK", null)
+                        .show()
+                    return@launch // STOP EXECUTION
+                }
+
+                // --- 4. START THE BUILD PROCESS ---
+                showCharacterProgressDialog(sessionProfile?.slotRoster!!.size)
+                buildDialogShown = true
+                Log.d("saving", "starting session as Create")
+                val sessionId = lobbySessionId ?: error("Session ID must be set before starting session!")
+                lobbySessionId = sessionId
+
+                // Build persona profile lookup
+                val personaProfilesMap = personaProfiles.associateBy { it.id }
+                // Prepare relationships with placeholder substitution
+
+                // Set Firestore "isBuilding" to true (show build dialog to everyone)
+                val db = FirebaseFirestore.getInstance()
+                db.collection("sessions")
+                    .document(sessionId)
+                    .update("isBuilding", true)
+
+                val gson = Gson()
+
+                // Pull settings from the *chatProfile* (you’re creating a session from that)
+                val rpgSettingsJson = chatProfile?.modeSettings?.get("rpg") as? String
+                val murderSettingsJson = chatProfile?.modeSettings?.get("murder") as? String
+
+                var rpgSettings: ModeSettings.RPGSettings? = rpgSettingsJson?.let {
+                    try { gson.fromJson(it, ModeSettings.RPGSettings::class.java) } catch (_: Exception) { null }
+                }
+                var murderSettings: ModeSettings.MurderSettings? = murderSettingsJson?.let {
+                    try { gson.fromJson(it, ModeSettings.MurderSettings::class.java) } catch (_: Exception) { null }
+                }
+                if (murderSettings?.enabled == true) {
+                    // 1) Randomize only if requested
+                    if (murderSettings?.randomizeKillers == true) {
+                        val (rpgUpd, murderUpd) = generateMurderSetup(
                             slots = sessionProfile?.slotRoster ?: emptyList(),
-                            rpgSettings = rpgSettings,
-                            murderSettings = murderSettings,
+                            rpgSettingsIn = rpgSettings,
+                            murderIn = murderSettings,
                             sessionProfile = sessionProfile!!
                         )
+                        rpgSettings = rpgUpd
+                        murderSettings = murderUpd
+                        Log.d("ai_response", "seeded: $murderSettings")
                     } else {
-                        mysteryMoreInfoByCharId = emptyMap()
+                        Log.d("ai_response", "randomizeKillers disabled; using creator roles")
                     }
-                    // ==== Harmonize all slots ====
-                    val slots = sessionProfile?.slotRoster?.toMutableList() ?: mutableListOf()
 
-                    val harmonizedSlots = mutableListOf<SlotProfile>()
-                    for ((i, slot) in slots.withIndex()) {
-                        val slotKey = ModeSettings.SlotKeys.fromPosition(i)
-                        val idKey = slot.baseCharacterId ?: slot.slotId
-                        val timelineText = mysteryMoreInfoByCharId[idKey].orEmpty()
-                        val areaMap = chatProfile?.characterToArea ?: emptyMap()
-                        val locMap = chatProfile?.characterToLocation ?: emptyMap()
-                        val h = harmonizeAndCondenseSlot(
-                            slot.toCharacterProfile(),
-                            relationships,
-                            rpgSettings,
-                            murderSettings,
-                            currentSlotKey = slotKey,
-                            moreInfo = timelineText,
-                            allAreas = loadedAreas,
-                            charToAreaMap = areaMap,
-                            charToLocationMap = locMap
-
-                        )
-                        harmonizedSlots.add(h)
-
-                        updateCharacterProgress(i + 1, slots.size)
-                        db.collection("sessions").document(sessionId).update("readyCount", i + 1)
-                    }
-                    Log.d("ai_response", "final harmonizedSlots size=${harmonizedSlots.size}")
-                    // After the harmonize loop:
-                    val baseToSlot: Map<String, String> = harmonizedSlots
-                        .filter { !it.baseCharacterId.isNullOrBlank() }
-                        .associate { it.baseCharacterId!! to it.slotId }
-
-                    val targetBaseId = rpgSettings?.characters
-                        ?.firstOrNull { it.role == ModeSettings.CharacterRole.TARGET }
-                        ?.characterId
-
-                    val victimSlotIdResolved = targetBaseId?.let { baseToSlot[it] }
-
-                    val killerSlotIdsSet: MutableSet<String> = rpgSettings?.characters
-                        ?.filter { it.role == ModeSettings.CharacterRole.VILLAIN }
-                        ?.mapNotNull { baseToSlot[it.characterId] }
-                        ?.toMutableSet() ?: mutableSetOf()
-
-                    murderSettings = murderSettings?.copy(
-                        victimSlotId = victimSlotIdResolved,
-                        killerSlotIds = killerSlotIdsSet
+                    // 2) Build timelines (single AI call → per-character map)
+                    mysteryMoreInfoByCharId = generateMysteryTimelineStrings(
+                        slots = sessionProfile?.slotRoster ?: emptyList(),
+                        rpgSettings = rpgSettings,
+                        murderSettings = murderSettings,
+                        sessionProfile = sessionProfile!!
                     )
-
-                    Log.d("mystery", "victimSlotId=$victimSlotIdResolved killers=$killerSlotIdsSet")
-
-
-                    // Build current user and player lists
-                    val userlist = lastUserList ?: sessionProfile?.userList ?: listOf(userId)
-                    val usernames = fetchUsernamesForIds(userlist)
-
-                    // === Build userMap ===
-                    val userMap = userlist.associateWith { uid ->
-                        // Find slotId for this user
-                        val slotIdx = userlist.indexOf(uid)
-                        val mySlotId = "player${slotIdx + 1}"
-                        val personaId = userAssignments[mySlotId]
-                        val personaProfile = personaProfilesMap[personaId]
-                        val personaSlot = slots.find { it.baseCharacterId == personaId && it.profileType == "player" && it.slotId == mySlotId }
-                        val resolvedActiveSlotId = personaSlot?.slotId
-
-                        SessionUser(
-                            userId = uid,
-                            username = usernames[uid] ?: "Player",
-                            personaIds = listOfNotNull(personaId),
-                            activeSlotId = resolvedActiveSlotId,
-                            bubbleColor = personaProfile?.bubbleColor ?: "#CCCCCC",
-                            textColor = personaProfile?.textColor ?: "#000000"
-                        )
-                    }
-
-
-
-                    // Now build fixedProfile with updated modeSettings
-                    val modeSettingsMap: MutableMap<String, Any> = mutableMapOf<String, Any>().apply {
-                        chatProfile?.modeSettings?.forEach { (k, v) -> this[k] = v }
-                    }
-                    // keep existing values, overwrite/insert the ones we just computed
-                    rpgSettings?.let { modeSettingsMap["rpg"] = gson.toJson(it) }
-                    murderSettings?.let { modeSettingsMap["murder"] = gson.toJson(it) }
-
-                    // Build the session profile
-                    val startedAt = sessionProfile?.startedAt ?: com.google.firebase.Timestamp.now()
-                    val currentIsMultiplayer = sessionProfile?.multiplayer ?: false
-                    val parsedActs = rpgSettings?.acts?.mapIndexed { index, act ->
-                        RPGAct(
-                            actNumber = index,
-                            summary = act.summary,
-                            goal = act.goal,
-                            areaId = act.areaId
-                        )
-                    } ?: emptyList()
-
-                    val cleanedAssignments = sessionProfile?.slotRoster!!.mapIndexed { idx, slot ->
-                        "character${idx + 1}" to slot.name // or whatever placeholder syntax you use
-                    }.toMap()
-
-                    val cleaned = cleanSessionDescriptionsAndRelationships(sessionProfile!!, cleanedAssignments)
-                    val currentAct = rpgSettings?.currentAct ?: 0
-                    val fixedProfile = SessionProfile(
-                        sessionId = sessionId,
-                        chatId = chatProfile?.id ?: "",
-                        title = titleView.text.toString(),
-                        sessionDescription = cleaned.cleanedDescription,
-                        secretDescription = cleaned.cleanedSecretDescription,
-                        chatMode = chatMode,
-                        startedAt = startedAt,
-                        sfwOnly = sfwToggle.isChecked,
-                        sessionSummary = sessionSummary,
-                        userMap = userMap,
-                        userList = userlist,
-                        userAssignments = userAssignments,
-                        slotRoster = harmonizedSlots,
-                        areas = loadedAreas,
-                        history = emptyList(),
-                        currentAreaId = null,
-                        relationships = cleanedRelationships,
-                        multiplayer = currentIsMultiplayer,
-                        acts = parsedActs,
-                        currentAct = currentAct,
-                        enabledModes = chatProfile?.enabledModes?.toMutableList() ?: mutableListOf(),
-                        modeSettings = modeSettingsMap
-                    )
-
-                    // Save session and update Firestore
-                    saveSessionProfile(fixedProfile, sessionId)
-                    db.collection("sessions").document(sessionId)
-                        .update(mapOf("isBuilding" to FieldValue.delete(), "started" to true, "readyCount" to FieldValue.delete()))
-
-                    // Clean up dialog and launch MainActivity
-                    dismissCharacterProgressDialog()
-                    buildDialogShown = false
-
-                    val intent = Intent(this@SessionLandingActivity, MainActivity::class.java)
-                    intent.putExtra("SESSION_PROFILE_JSON", Gson().toJson(fixedProfile))
-                    intent.putExtra("SESSION_ID", sessionId)
-                    intent.putExtra("ENTRY_MODE", "CREATE")
-
-                    val localChatProfile = chatProfile
-                    val greeting = if (localChatProfile != null) {
-                        localChatProfile.firstmessage ?: ""
-                    } else {
-                        fixedProfile.slotRoster.firstOrNull()?.greeting ?: ""
-                    }
-                    val cleanedGreeting = substitutePlaceholders(greeting, cleanedAssignments)
-                    intent.putExtra("GREETING", cleanedGreeting)
-
-                    startActivity(intent)
-                    finish()
-                } catch (e: Exception) {
-                    Log.e("SessionLanding", "Failed to create session", e)
-                    dismissCharacterProgressDialog()
-                    buildDialogShown = false
-                    Toast.makeText(
-                        this@SessionLandingActivity,
-                        "Error: Unable to create session.",
-                        Toast.LENGTH_LONG
-                    ).show()
+                } else {
+                    mysteryMoreInfoByCharId = emptyMap()
                 }
+                // ==== Harmonize all slots ====
+                val slots = sessionProfile?.slotRoster?.toMutableList() ?: mutableListOf()
+
+                val harmonizedSlots = mutableListOf<SlotProfile>()
+                for ((i, slot) in slots.withIndex()) {
+                    val slotKey = ModeSettings.SlotKeys.fromPosition(i)
+                    val idKey = slot.baseCharacterId ?: slot.slotId
+                    val timelineText = mysteryMoreInfoByCharId[idKey].orEmpty()
+                    val areaMap = chatProfile?.characterToArea ?: emptyMap()
+                    val locMap = chatProfile?.characterToLocation ?: emptyMap()
+                    val h = harmonizeAndCondenseSlot(
+                        slot.toCharacterProfile(),
+                        relationships,
+                        rpgSettings,
+                        murderSettings,
+                        currentSlotKey = slotKey,
+                        moreInfo = timelineText,
+                        allAreas = loadedAreas,
+                        charToAreaMap = areaMap,
+                        charToLocationMap = locMap
+
+                    )
+                    harmonizedSlots.add(h)
+
+                    updateCharacterProgress(i + 1, slots.size)
+                    db.collection("sessions").document(sessionId).update("readyCount", i + 1)
+                }
+                Log.d("ai_response", "final harmonizedSlots size=${harmonizedSlots.size}")
+                // After the harmonize loop:
+                val baseToSlot: Map<String, String> = harmonizedSlots
+                    .filter { !it.baseCharacterId.isNullOrBlank() }
+                    .associate { it.baseCharacterId!! to it.slotId }
+
+                val targetBaseId = rpgSettings?.characters
+                    ?.firstOrNull { it.role == ModeSettings.CharacterRole.TARGET }
+                    ?.characterId
+
+                val victimSlotIdResolved = targetBaseId?.let { baseToSlot[it] }
+
+                val killerSlotIdsSet: MutableSet<String> = rpgSettings?.characters
+                    ?.filter { it.role == ModeSettings.CharacterRole.VILLAIN }
+                    ?.mapNotNull { baseToSlot[it.characterId] }
+                    ?.toMutableSet() ?: mutableSetOf()
+
+                murderSettings = murderSettings?.copy(
+                    victimSlotId = victimSlotIdResolved,
+                    killerSlotIds = killerSlotIdsSet
+                )
+
+                Log.d("mystery", "victimSlotId=$victimSlotIdResolved killers=$killerSlotIdsSet")
+
+
+                // Build current user and player lists
+                val userlist = lastUserList ?: sessionProfile?.userList ?: listOf(userId)
+                val usernames = fetchUsernamesForIds(userlist)
+
+                // === Build userMap ===
+                val userMap = userlist.associateWith { uid ->
+                    // Find slotId for this user
+                    val slotIdx = userlist.indexOf(uid)
+                    val mySlotId = "player${slotIdx + 1}"
+                    val personaId = userAssignments[mySlotId]
+                    val personaProfile = personaProfilesMap[personaId]
+                    val personaSlot = slots.find { it.baseCharacterId == personaId && it.profileType == "player" && it.slotId == mySlotId }
+                    val resolvedActiveSlotId = personaSlot?.slotId
+
+                    SessionUser(
+                        userId = uid,
+                        username = usernames[uid] ?: "Player",
+                        personaIds = listOfNotNull(personaId),
+                        activeSlotId = resolvedActiveSlotId,
+                        bubbleColor = personaProfile?.bubbleColor ?: "#CCCCCC",
+                        textColor = personaProfile?.textColor ?: "#000000"
+                    )
+                }
+
+
+
+                // Now build fixedProfile with updated modeSettings
+                val finalEnabledModes = if (stripModes) mutableListOf()
+                else (chatProfile?.enabledModes?.toMutableList() ?: mutableListOf())
+
+                // 2. Build Mode Settings Map
+                val modeSettingsMap = if (stripModes) {
+                    // STRIP MODE: Send empty map. MainActivity will see no settings and default to Sandbox.
+                    mutableMapOf<String, Any>()
+                } else {
+                    // NORMAL MODE: Populate from profile
+                    mutableMapOf<String, Any>().apply {
+                        chatProfile?.modeSettings?.forEach { (k, v) -> this[k] = v }
+                        // Add calculated RPG/Murder settings if they exist
+                        rpgSettings?.let { this["rpg"] = gson.toJson(it) }
+                        murderSettings?.let { this["murder"] = gson.toJson(it) }
+                    }
+                }
+
+                // 3. Construct Profile
+                val currentAct = if (stripModes) 0 else (rpgSettings?.currentAct ?: 0)
+                // keep existing values, overwrite/insert the ones we just computed
+                rpgSettings?.let { modeSettingsMap["rpg"] = gson.toJson(it) }
+                murderSettings?.let { modeSettingsMap["murder"] = gson.toJson(it) }
+
+                // Build the session profile
+                val startedAt = sessionProfile?.startedAt ?: com.google.firebase.Timestamp.now()
+                val currentIsMultiplayer = sessionProfile?.multiplayer ?: false
+                val parsedActs = rpgSettings?.acts?.mapIndexed { index, act ->
+                    RPGAct(
+                        actNumber = index,
+                        summary = act.summary,
+                        goal = act.goal,
+                        areaId = act.areaId
+                    )
+                } ?: emptyList()
+
+                val cleanedAssignments = sessionProfile?.slotRoster!!.mapIndexed { idx, slot ->
+                    "character${idx + 1}" to slot.name // or whatever placeholder syntax you use
+                }.toMap()
+
+                val cleaned = cleanSessionDescriptionsAndRelationships(sessionProfile!!, cleanedAssignments)
+                val fixedProfile = SessionProfile(
+                    sessionId = sessionId,
+                    chatId = chatProfile?.id ?: "",
+                    title = titleView.text.toString(),
+                    sessionDescription = cleaned.cleanedDescription,
+                    secretDescription = cleaned.cleanedSecretDescription,
+                    chatMode = chatMode,
+                    startedAt = startedAt,
+                    sfwOnly = sfwToggle.isChecked,
+                    sessionSummary = sessionSummary,
+                    userMap = userMap,
+                    userList = userlist,
+                    userAssignments = userAssignments,
+                    slotRoster = harmonizedSlots,
+                    areas = loadedAreas,
+                    history = emptyList(),
+                    currentAreaId = null,
+                    relationships = cleanedRelationships,
+                    multiplayer = currentIsMultiplayer,
+                    acts = parsedActs,
+                    currentAct = currentAct,
+                    enabledModes = finalEnabledModes,
+                    modeSettings = modeSettingsMap
+                )
+
+                // Save session and update Firestore
+                saveSessionProfile(fixedProfile, sessionId)
+                db.collection("sessions").document(sessionId)
+                    .update(mapOf("isBuilding" to FieldValue.delete(), "started" to true, "readyCount" to FieldValue.delete()))
+
+                // Clean up dialog and launch MainActivity
+                dismissCharacterProgressDialog()
+                buildDialogShown = false
+
+                val intent = Intent(this@SessionLandingActivity, MainActivity::class.java)
+                // intent.putExtra("SESSION_PROFILE_JSON", Gson().toJson(fixedProfile)) // REMOVED to prevent crash
+                intent.putExtra("SESSION_ID", sessionId)
+                intent.putExtra("ENTRY_MODE", "CREATE")
+
+                val localChatProfile = chatProfile
+                val greeting = if (localChatProfile != null) {
+                    localChatProfile.firstmessage ?: ""
+                } else {
+                    fixedProfile.slotRoster.firstOrNull()?.greeting ?: ""
+                }
+                val cleanedGreeting = substitutePlaceholders(greeting, cleanedAssignments)
+                intent.putExtra("GREETING", cleanedGreeting)
+
+                startActivity(intent)
+                finish()
+            } catch (e: Exception) {
+                Log.e("SessionLanding", "Failed to create session", e)
+                dismissCharacterProgressDialog()
+                buildDialogShown = false
+                Toast.makeText(
+                    this@SessionLandingActivity,
+                    "Error: Unable to create session.",
+                    Toast.LENGTH_LONG
+                ).show()
             }
         }
     }
@@ -947,48 +1116,67 @@ class SessionLandingActivity : AppCompatActivity() {
             ?.firstOrNull { it.characterId == profile.id }
             ?.role
 
-        val murderContext = if (murder?.enabled == true) """
-        MURDER MYSTERY CONTEXT:
-        - Scene: ${murder.sceneDescription}
-        - Weapon: ${murder.weapon}
-        - Clues:
-        ${murder.clues.joinToString("\n") { "- ${it.title}: ${it.description}" }}
-
-        YOUR ROLE: ${roleForThisChar ?: ModeSettings.CharacterRole.HERO}
-        Knowledge rules:
-        - TARGET: is dead in the present; only appears in flashbacks/memories. No present-tense actions.
-        - VILLAIN: never confess; you know how the murder was done and may plant misdirections.
-        - HERO/OTHERS: you do not know the culprit; you can recall relevant memories and surface non-spoiler clues.
-    """.trimIndent() else ""
-        val sessionRelationships = relationships.filter { it.fromId == profile.id }
-        val aiPrompt = """
-        You are an expert RPG character profile editor and summarizer.
-            $murderContext
-        Given the following:
-        - The character's full profile (name, summary, personality, private description, physical description, abilities, backstory, etc.).
-        - The full, correct list of this character's session relationships (by toName, type, etc.).
-        Your job:
-        1. Rewrite the character's backstory as a series of short memories, each with 2-4 descriptive tags (characters, themes, events, etc).
-        2. Write a condensed summary (1–2 vivid sentences, <100 tokens) combining their summary, background, moreinfo, personality, and privateDescription.
-        Return only a single JSON object with these fields:
-        {
-          "memories": [
-            { "tags": ["sasuke", "childhood"], "text": "Naruto met Sasuke in the academy and they became rivals." },
-            { "tags": ["teamwork", "sakura", "sasuke"], "text": "The three learned to work together on their first mission." }
-          ],
-          "condensed_summary": "<short vivid summary>"
+        // --- 1. Format Available Locations for the AI ---
+        val availableLocationsStr = allAreas.joinToString("\n") { area ->
+            "- Area: \"${area.name}\" (Contains: ${area.locations.joinToString { "\"${it.name}\"" }})"
         }
-        CHARACTER PROFILE:
-        Name: ${profile.name}
-        Summary: ${profile.summary}
-        Personality: ${profile.personality}
-        Private Description: ${profile.privateDescription}
-        Physical Description: ${profile.physicalDescription}
-        Abilities: ${profile.abilities}
-        Backstory: ${profile.backstory}
-        RELATIONSHIPS (current session only):
-        ${sessionRelationships.joinToString(separator = "\n") { "- ${it.type} to ${it.toName}" }}
-    """.trimIndent()
+
+        val murderContext = if (murder?.enabled == true) """
+    MURDER MYSTERY CONTEXT:
+    - Scene: ${murder.sceneDescription}
+    - Weapon: ${murder.weapon}
+    - Clues:
+    ${murder.clues.joinToString("\n") { "- ${it.title}: ${it.description}" }}
+
+    YOUR ROLE: ${roleForThisChar ?: ModeSettings.CharacterRole.HERO}
+    Knowledge rules:
+    - TARGET: is dead in the present; only appears in flashbacks/memories. No present-tense actions.
+    - VILLAIN: never confess; you know how the murder was done and may plant misdirections.
+    - HERO/OTHERS: you do not know the culprit; you can recall relevant memories and surface non-spoiler clues.
+""".trimIndent() else ""
+        val sessionRelationships = relationships.filter { it.fromId == profile.id }
+
+        // --- 2. Update Prompt with Location Instructions ---
+        val aiPrompt = """
+    You are an expert RPG character profile editor and summarizer.
+    $murderContext
+    
+    AVAILABLE LOCATIONS:
+    $availableLocationsStr
+
+    Given the following:
+    - The character's full profile (name, summary, personality, private description, physical description, abilities, backstory, etc.).
+    - The full, correct list of this character's session relationships (by toName, type, etc.).
+    
+    Your job:
+    1. Rewrite the character's backstory as a series of short memories, each with 2-4 descriptive tags (characters, themes, events, etc).
+    2. Write a condensed summary (1–2 vivid sentences, <100 tokens) combining their summary, background, moreinfo, personality, and privateDescription.
+    3. If the character fits logically into one of the AVAILABLE LOCATIONS provided above, assign them that "area" and "location". 
+       - Choose based on their job, personality, or role (e.g., a Maid goes to the Kitchen, a Guard goes to the Gate).
+       - You MUST pick exact names from the list provided.
+    
+    Return only a single JSON object with these fields:
+    {
+      "memories": [
+        { "tags": ["sasuke", "childhood"], "text": "Naruto met Sasuke in the academy and they became rivals." },
+        { "tags": ["teamwork", "sakura", "sasuke"], "text": "The three learned to work together on their first mission." }
+      ],
+      "condensed_summary": "<short vivid summary>",
+      "assigned_area": "Area Name From List",
+      "assigned_location": "Location Name From List"
+    }
+    
+    CHARACTER PROFILE:
+    Name: ${profile.name}
+    Summary: ${profile.summary}
+    Personality: ${profile.personality}
+    Private Description: ${profile.privateDescription}
+    Physical Description: ${profile.physicalDescription}
+    Abilities: ${profile.abilities}
+    Backstory: ${profile.backstory}
+    RELATIONSHIPS (current session only):
+    ${sessionRelationships.joinToString(separator = "\n") { "- ${it.type} to ${it.toName}" }}
+""".trimIndent()
 
         val aiResponse = Facilitator.callOpenAiApi(
             prompt = aiPrompt,
@@ -996,9 +1184,12 @@ class SessionLandingActivity : AppCompatActivity() {
         )
         Log.d("ai_response", "${profile.name} has been harmonized")
 
+        // --- 3. Update Result Class to capture location ---
         data class HCResult(
             val memories: List<TaggedMemory>,
-            val condensed_summary: String
+            val condensed_summary: String,
+            val assigned_area: String?,
+            val assigned_location: String?
         )
 
         val jsonStart = aiResponse.indexOf('{')
@@ -1019,22 +1210,28 @@ class SessionLandingActivity : AppCompatActivity() {
         val outfits = profile.outfits ?: emptyList()
         val defaultOutfit = outfits.firstOrNull()?.name ?: ""
         val actualCurrentOutfit = if (profile.currentOutfit.isNullOrBlank()) defaultOutfit else profile.currentOutfit
+
+        // --- 4. Resolve Location Logic ---
+        // A. Check for manually assigned location from Map
         val assignedAreaId = charToAreaMap[profile.id]
         val assignedLocationId = charToLocationMap[profile.id]
 
-        // Find the actual objects so we can get their human-readable names
         val areaObj = allAreas.find { it.id == assignedAreaId }
         val locationObj = areaObj?.locations?.find { it.id == assignedLocationId }
 
-        // Use the found name, or null if not assigned
-        val startArea = areaObj?.name
-        val startLocation = locationObj?.name
+        val manualAreaName = areaObj?.name
+        val manualLocationName = locationObj?.name
+
+        // B. Fallback: If manual is missing, use AI suggestion
+        // We check if the AI result is blank/null just in case
+        val finalArea = if (!manualAreaName.isNullOrBlank()) manualAreaName else result.assigned_area?.trim()
+        val finalLocation = if (!manualLocationName.isNullOrBlank()) manualLocationName else result.assigned_location?.trim()
+
         val slotId = UUID.randomUUID().toString()
 
         val matchingRpgCharacter = rpgSettings?.characters?.find { it.characterId == profile.id }
 
         fun calcHp(stats: Map<String, Int>, rpgClass: String): Int {
-            // Simple example, tweak as you like
             val base = 10
             val bonus = (stats["resolve"] ?: 0) + (stats["strength"] ?: 0)
             return base + bonus
@@ -1042,7 +1239,6 @@ class SessionLandingActivity : AppCompatActivity() {
         fun calcMaxHp(stats: Map<String, Int>, rpgClass: String): Int = calcHp(stats, rpgClass)
 
         fun calcDefense(stats: Map<String, Int>, rpgClass: String): Int {
-            // Example: defense = strength/2 + resolve/2
             val str = (stats["strength"] ?: 0)
             val res = (stats["resolve"] ?: 0)
             return (str / 2) + (res / 2) + 8
@@ -1057,7 +1253,6 @@ class SessionLandingActivity : AppCompatActivity() {
             )
         } ?: emptyMap()
 
-        // Calculate hp/defense if not set in RPGCharacter
         val hp = matchingRpgCharacter?.hp
             ?: calcHp(rpgStats, matchingRpgCharacter?.characterClass?.name ?: "")
         val maxHp = matchingRpgCharacter?.maxHp
@@ -1066,18 +1261,15 @@ class SessionLandingActivity : AppCompatActivity() {
             ?: calcDefense(rpgStats, matchingRpgCharacter?.characterClass?.name ?: "")
         val links: List<CharacterLink> = rpgSettings?.linkedToMap?.get(profile.id) ?: emptyList()
 
-        // 1) Pull VN settings JSON
         val vnSettingsJson = sessionProfile?.modeSettings?.get("vn") as? String
         val vnSettings = if (!vnSettingsJson.isNullOrBlank())
             Gson().fromJson(vnSettingsJson, VNSettings::class.java)
         else null
 
-        // 2) Build the vnRelationships map for THIS slot (slot-keyed!)
         val vnRelMap = mutableMapOf<String, ModeSettings.VNRelationship>()
         vnSettings?.characterBoards
-            ?.get(currentSlotKey)           // <-- use "characterN", not baseId
+            ?.get(currentSlotKey)
             ?.forEach { (toSlotKey, rel) ->
-                // make sure the rel itself uses slot keys (defensive copy)
                 if (rel.fromSlotKey != currentSlotKey || rel.toSlotKey != toSlotKey) {
                     vnRelMap[toSlotKey] = rel.copy(fromSlotKey = currentSlotKey, toSlotKey = toSlotKey)
                 } else {
@@ -1085,13 +1277,11 @@ class SessionLandingActivity : AppCompatActivity() {
                 }
             }
 
-        // (optional) write back normalized settings (not required)
         sessionProfile?.modeSettings?.set("vn", Gson().toJson(vnSettings))
 
-        // When building the SlotProfile, set role + hiddenRoles from updated rpgSettings:
         val roleName = matchingRpgCharacter?.role?.name ?: ""
 
-        // Return the full SlotProfile
+        // Return the full SlotProfile with final Area/Location
         SlotProfile(
             slotId = slotId,
             baseCharacterId = profile.id,
@@ -1115,8 +1305,8 @@ class SessionLandingActivity : AppCompatActivity() {
             currentOutfit = actualCurrentOutfit,
             sfwOnly = profile.sfwOnly,
             relationships = sessionRelationships,
-            lastActiveArea = startArea,
-            lastActiveLocation = startLocation,
+            lastActiveArea = finalArea,         // <--- Uses manual if exists, else AI
+            lastActiveLocation = finalLocation, // <--- Uses manual if exists, else AI
             profileType = profile.profileType,
             typing = false,
             memories = backgroundMemories,
@@ -1129,6 +1319,7 @@ class SessionLandingActivity : AppCompatActivity() {
             linkedTo = links,
             vnRelationships = vnRelMap,
             hiddenRoles = roleName,
+            exampleDialogue = profile.exampleDialogue,
             moreInfo = moreInfo.takeIf { it.isNotBlank() }
         )
     }
@@ -1168,7 +1359,7 @@ class SessionLandingActivity : AppCompatActivity() {
                 val context = this
                 AlertDialog.Builder(context)
                     .setTitle(character.name)
-                    .setItems(arrayOf("Profile", "Replace", "Remove", "Save", "Update")) { _, which ->
+                    .setItems(arrayOf("Profile", "Replace", "Remove", "Add to Collection", "Update")) { _, which ->
                         when (which) {
                             0 -> { // Profile
                                 // If it's private, you might want to block here
@@ -1203,12 +1394,14 @@ class SessionLandingActivity : AppCompatActivity() {
                                 removeSlotForCharacter(character.id) // pass the baseCharacterId you're showing
                             }
 
-                            3 -> { // Save
-                                // Copy character, set current user as creator/author, and save as new character
-                                if (character.private == true) {
-                                    Toast.makeText(context, "This character is private.", Toast.LENGTH_SHORT).show()
-                                } else {
-                                    saveCharacterAsUser(character)
+                            3 -> { // "Add to Collection"
+                                checkPremiumStatus {
+                                    // Copy character, set current user as creator/author, and save as new character
+                                    if (character.private == true) {
+                                        Toast.makeText(context, "This character is private.", Toast.LENGTH_SHORT).show()
+                                    } else {
+                                        saveCharacterAsUser(character)
+                                    }
                                 }
                             }
                             4 -> { // Update from base
@@ -1230,6 +1423,25 @@ class SessionLandingActivity : AppCompatActivity() {
 
         titleView.text = session.title
         descriptionView.text = session.sessionDescription
+    }
+
+    private fun checkPremiumStatus(onPremium: () -> Unit) {
+        val userId = FirebaseAuth.getInstance().currentUser?.uid ?: return
+        FirebaseFirestore.getInstance().collection("users").document(userId).get()
+            .addOnSuccessListener { doc ->
+                if (doc.getBoolean("isPremium") == true) {
+                    onPremium()
+                } else {
+                    AlertDialog.Builder(this)
+                        .setTitle("Premium Feature")
+                        .setMessage("Saving characters to your collection allows you to edit and customize them.\n\nThis is a Premium feature.")
+                        .setPositiveButton("Upgrade") { _, _ ->
+                            startActivity(Intent(this, UpgradeActivity::class.java))
+                        }
+                        .setNegativeButton("Cancel", null)
+                        .show()
+                }
+            }
     }
 
     private fun saveCharacterAsUser(character: CharacterProfile) {
@@ -1322,9 +1534,15 @@ class SessionLandingActivity : AppCompatActivity() {
         super.onActivityResult(requestCode, resultCode, data)
         if (resultCode != RESULT_OK || data == null) return
         when (requestCode) {
-            101 -> { // Persona selection result
-                val type = data.getStringExtra("SELECTED_TYPE") // "character" or "persona"
-                val id = data.getStringExtra("SELECTED_ID") ?: return
+            101 -> { // Character/Persona selection result
+                val ids = data.getStringArrayListExtra("selectedCharacterIds")
+                if (ids.isNullOrEmpty()) return
+
+                val rawId = ids[0]
+
+                // Determine type based on prefix (CharacterSelectionActivity adds "persona:" to personas)
+                val type = if (rawId.startsWith("persona:")) "persona" else "character"
+                val id = rawId.removePrefix("persona:")
 
                 if (sessionProfile?.slotRoster?.size ?: 0 < 20) {
                     if (sessionProfile?.slotRoster?.any { it.baseCharacterId == id } == true) {
@@ -1357,7 +1575,7 @@ class SessionLandingActivity : AppCompatActivity() {
                                 .addOnSuccessListener {
                                     sessionProfile?.relationships = updatedRelationships
                                     // Now add the profile to the slot roster
-                                    addProfileToSlotRoster(type ?: "character", id)
+                                    addProfileToSlotRoster(type, id)
                                 }
                         }
                 } else {
@@ -1908,51 +2126,72 @@ class SessionLandingActivity : AppCompatActivity() {
             }
     }
 
-    private fun isHost(): Boolean {
-        val currentUserId = FirebaseAuth.getInstance().currentUser?.uid
-        val hostId = inviteProfile?.userList?.firstOrNull() ?: sessionProfile?.userList?.firstOrNull()
-        return currentUserId != null && currentUserId == hostId
-    }
-
-
     override fun onStart() {
         super.onStart()
 
-        val sessionId = lobbySessionId
-        if (!sessionId.isNullOrBlank()) {
-            sessionListener = FirebaseFirestore.getInstance()
-                .collection("sessions")
-                .document(sessionId)
-                .addSnapshotListener { snapshot, error ->
-                    if (error != null || snapshot == null || !snapshot.exists()) return@addSnapshotListener
+        val db = FirebaseFirestore.getInstance()
+        // Listen to the session document
+        lobbyListener = db.collection("sessions").document(lobbySessionId!!)
+            .addSnapshotListener { snapshot, e ->
+                if (e != null) return@addSnapshotListener
 
-                    val sessionProfile = snapshot.toObject(SessionProfile::class.java) ?: return@addSnapshotListener
+                if (snapshot != null && snapshot.exists()) {
+                    // 1. UPDATE DATA
+                    // We re-save the profile so our local "userList" is fresh
+                    sessionProfile = snapshot.toObject(SessionProfile::class.java)
 
-                    val userListChanged = lastUserList == null || sessionProfile.userList != lastUserList
-                    if (userListChanged) {
-                        Log.d("SessionListener", "User list changed: ${sessionProfile.userList}")
-                        (playerRecycler.adapter as? PlayerSlotAdapter)?.setUserIds(sessionProfile.userList)
-                        lastUserList = sessionProfile.userList
-                        lastUserAssignments = null
+                    // 2. CHECK IF I AM NOW THE HOST
+                    // Since the old host left, userList[0] has changed.
+                    val amIHost = isHost()
+
+                    // 3. UPDATE UI
+                    if (amIHost) {
+                        startSessionBtn.visibility = View.VISIBLE
+                        // Optional: Toast.makeText(this, "You are now the Host", Toast.LENGTH_SHORT).show()
+                    } else {
+                        startSessionBtn.visibility = View.GONE
                     }
 
-                    val slotRosterChanged = lastSlotRoster == null || sessionProfile.slotRoster != lastSlotRoster
-                    if (slotRosterChanged) {
-                        Log.d("SessionListener", "Slot roster changed: ${sessionProfile.slotRoster.map { it.name }}")
-                        displaySession(sessionProfile)
-                        lastSlotRoster = sessionProfile.slotRoster
+                    // Update other UI (Roster counts, etc.)
+                    updateRosterUI()
 
-                        // REBUILD assignments map from sessionProfile
-                        val cleanedAssignments = sessionProfile.slotRoster.mapIndexed { idx, slot ->
-                            "character${idx + 1}" to slot.name // or whatever placeholder syntax you use
-                        }.toMap()
-                        val cleaned = cleanSessionDescriptionsAndRelationships(sessionProfile, cleanedAssignments)
-                        descriptionView.text = cleaned.cleanedDescription
-                    }
+                } else {
+                    // Session was deleted (Host left and was the only one)
+                    Toast.makeText(this, "Session ended.", Toast.LENGTH_SHORT).show()
+                    finish()
                 }
+            }
+    }
+
+    private fun updateRosterUI() {
+        // ... other UI updates ...
+
+        // HOST CHECK
+        // (Assuming userList[0] is always the host)
+        val hostId = sessionProfile?.userList?.firstOrNull()
+        val currentUserId = FirebaseAuth.getInstance().currentUser?.uid
+        val isHost = hostId == currentUserId
+
+        if (isHost) {
+            startSessionBtn.visibility = View.VISIBLE
+            // Optional: Change text based on state? e.g. "Start Session" vs "Resume"
+        } else {
+            startSessionBtn.visibility = View.GONE
+            // Optional: Show a "Waiting for Host..." textview instead
         }
     }
 
+    private fun isHost(): Boolean {
+        val myId = FirebaseAuth.getInstance().currentUser?.uid ?: return false
+        // Always check the current sessionProfile, which handles the "Index 0" logic
+        return sessionProfile?.userList?.firstOrNull() == myId
+    }
+
+    override fun onStop() {
+        super.onStop()
+        // Clean up listener to prevent crashes/leaks
+        lobbyListener?.remove()
+    }
 
     private fun addProfileToSlotRoster(type: String, profileId: String) {
         val db = FirebaseFirestore.getInstance()
@@ -2213,26 +2452,51 @@ class SessionLandingActivity : AppCompatActivity() {
             .get()
             .addOnSuccessListener { doc ->
                 val base = doc.toObject(CharacterProfile::class.java) ?: return@addOnSuccessListener
-                val newLastSynced = Timestamp.now() // <<< fallback
+                val newLastSynced = com.google.firebase.Timestamp.now()
 
                 val newRoster = sessionProfile?.slotRoster?.map { slot ->
+                    // Only update the matching slot
                     if (slot.baseCharacterId != baseCharacterId) return@map slot
+
                     slot.copy(
-                        summary = base.summary ?: slot.summary,
-                        privateDescription = base.privateDescription ?: slot.privateDescription,
+                        // 1. Visuals & Images
+                        avatarUri = base.avatarUri ?: slot.avatarUri,
                         outfits = base.outfits ?: slot.outfits,
-                        currentOutfit = base.currentOutfit ?: slot.currentOutfit,
-                        lastSynced = newLastSynced // <<< will now be non-null
+                        currentOutfit = base.currentOutfit ?: slot.currentOutfit, // Optional: Keep or remove if you want to preserve session outfit choice
+
+                        // 2. Personality & Secrets
+                        summary = base.summary ?: slot.summary,
+                        personality = base.personality ?: slot.personality,
+                        privateDescription = base.privateDescription ?: slot.privateDescription, // "Secret Description"
+
+                        // 3. Physical Attributes
+                        physicalDescription = base.physicalDescription ?: slot.physicalDescription,
+                        eyeColor = base.eyeColor ?: slot.eyeColor,
+                        hairColor = base.hairColor ?: slot.hairColor,
+                        gender = base.gender ?: slot.gender,
+                        height = base.height ?: slot.height,
+                        weight = base.weight ?: slot.weight,
+
+                        // 4. Mechanics
+                        abilities = base.abilities ?: slot.abilities,
+
+                        // 5. Sync Timestamp
+                        lastSynced = newLastSynced
                     )
                 } ?: return@addOnSuccessListener
 
+                // Update Firestore
                 db.collection("sessions")
                     .document(sessionId)
                     .update("slotRoster", newRoster)
                     .addOnSuccessListener {
                         sessionProfile?.slotRoster = newRoster
                         needsUpdateIds.remove(baseCharacterId)
+
+                        // Refresh UI
                         (charRecycler.adapter as? CharacterRowAdapter)?.setHighlightIds(needsUpdateIds)
+                        // Optional: Toast to confirm update
+                        Toast.makeText(this, "${base.name} updated!", Toast.LENGTH_SHORT).show()
                         displaySession(sessionProfile!!)
                     }
             }

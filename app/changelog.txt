@@ -1,0 +1,67 @@
+
+
+----ROADMAP----
+
+🏁 The Realms AI Release Roadmap
+Phase 1: Safety & Compliance (Google Play Requirements)
+[✓✓✓] 1. Report System Logic: Wire up the existing Report buttons in ✓Chat, ✓Character, and ✓User profiles to save a report to Firestore for moderation.
+
+[✓] 2. Blocking System: Allow users to block others so they don't see their content in Hubs.
+
+[✓] 3. EULA & ToS: Add the "I agree to the Terms of Service" checkbox on the Sign-Up screen.
+
+[✓] 4. Account Deletion: Add the "Delete Account" button in Settings (Required by Google).
+
+Phase 2: Economy & Limits (Cost Control)
+[✓✓✓] 5. Hard Limits (Creation): Restrict ✓Dialogue Examples, ✓Character Counts, and ✓Location Counts to save tokens.
+
+[✓] 6. Message Counter UI: Show "X/Y Messages Left" in the Options Menu and Profile.
+
+[ ] 7. Google Play Billing: Implement the actual subscription connection (The Paywall).
+
+Phase 3: Social & Polish (Engagement)
+[✓] 8. Rating System: Allow users to Rate (1-5 stars) Chats and Characters to sort the Hub by "Top Rated."
+
+[✓] 9. Badges: Add logic to display "Beta Tester," "Founder," and "Premium" badges on profiles.
+
+[ ] 10. Tutorial/Info: (You are handling this) Add info tooltips.
+
+✓
+
+### 4.5. The "Crystal" Collectibles (Procedural Art)
+
+* **Concept:** Replace preview cards with generated aesthetic crystals.
+* **The Seed System:** An 8-digit seed (e.g., `00004444`) determines the look.
+* **Quadrants:** 4 sectors, each with random point values/shapes.
+* **Cracks/Flaws:** Overlay textures that can align to form shapes (hearts, skulls, etc.) or just look cool.
+* **Rarity:** "Clean" crystals vs. specific matching patterns.
+
+### 4.75. Extra Options
+* **Model:** choose a model. temperature, top P, top K, etc
+* **Host:** kick user, promote user to host
+* **NPC:** create or delete npc. halt npc generation
+* **Archive:** Delete/archive session.
+
+### 4.78 Syntax Parsing
+* `<Thoughts>`: Visible to user (grey/italics), hidden from other characters.
+* `~Whisper~`: Targeted message parsing so only specific characters hear it.
+
+## 4.83 Linked characters
+
+### 4.875. Node map
+
+* **Area:** a map for areas in the chat creation
+* **location:** a map for locations in the background gallery when making an area.
+
+
+* **Implementation:** A custom View or layered ImageView that constructs the crystal at runtime based on the character's hash or a random ID.
+
+### 5. The Ecosystem (Long Term)
+
+* **AI VTT:** Battlemaps and inventory.
+* **VN Studio:** Asset generation tools.
+* **World Builder:** Map creation logic.
+
+---
+
+We are in a great spot. When you are ready to start **2.5 (Persona & Outfits)** or **4.5 (Crystals)**, just ping me. Good luck with the dev work!

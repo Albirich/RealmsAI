@@ -46,16 +46,51 @@ class SessionHubActivity : BaseActivity() {
             .get()
             .addOnSuccessListener { snap ->
                 Log.d("SessionHub", "Sessions found: ${snap.documents.size}")
-                val previews = snap.documents.mapNotNull { doc ->
-                    val data = doc.data ?: return@mapNotNull null
-                    SessionPreview(
-                        id = doc.id,
-                        title = data["title"] as? String ?: "(Untitled Session)",
-                        chatId = data["chatId"] as? String ?: "",
-                        timestamp = (data["startedAt"] as? Timestamp)?.seconds ?: 0L,
-                        rawJson = gson.toJson(data)
-                    )
+
+                val previews = mutableListOf<SessionPreview>()
+                val batch = db.batch()
+                var cleanupCount = 0
+
+                for (doc in snap.documents) {
+                    val data = doc.data ?: continue
+
+                    // Check if session has actually started
+                    val isStarted = data["started"] as? Boolean ?: false
+
+                    if (isStarted) {
+                        // Valid session -> Add to list
+                        previews.add(
+                            SessionPreview(
+                                id = doc.id,
+                                title = data["title"] as? String ?: "(Untitled Session)",
+                                chatId = data["chatId"] as? String ?: "",
+                                timestamp = (data["startedAt"] as? Timestamp)?.seconds ?: 0L,
+                                rawJson = gson.toJson(data)
+                            )
+                        )
+                    } else {
+                        // Stale/Draft session -> Check ownership
+                        val userList = data["userList"] as? List<String>
+                        val hostId = userList?.firstOrNull()
+
+                        // Only delete if YOU are the host/creator.
+                        // This prevents deleting sessions you were invited to but haven't started yet.
+                        if (hostId == userId) {
+                            Log.d("SessionHub", "Cleaning up abandoned session: ${doc.id}")
+                            batch.delete(doc.reference)
+                            cleanupCount++
+                        }
+                    }
                 }
+
+                // Commit the cleanup batch if needed
+                if (cleanupCount > 0) {
+                    batch.commit().addOnFailureListener { e ->
+                        Log.e("SessionHub", "Cleanup failed", e)
+                    }
+                }
+
+                // Populate adapter with only valid sessions
                 rv.adapter = SessionPreviewAdapter(
                     context = this,
                     sessionList = previews,
@@ -164,7 +199,7 @@ class SessionHubActivity : BaseActivity() {
                     val profile = parseSessionProfile(docSnap.id, data)
                     Log.d("SessionHub", "Parsed SessionProfile: $profile")
                     val intent = Intent(this, SessionLandingActivity::class.java)
-                    intent.putExtra("SESSION_PROFILE_JSON", gson.toJson(profile))
+                    // intent.putExtra("SESSION_PROFILE_JSON", gson.toJson(profile))
                     intent.putExtra("SESSION_ID", preview.id)
                     startActivity(intent)
                 } catch (e: Exception) {

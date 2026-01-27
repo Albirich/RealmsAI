@@ -4,14 +4,18 @@ import android.content.Intent
 import android.os.Bundle
 import android.util.Log
 import android.widget.Button
+import android.widget.CheckBox
 import android.widget.EditText
+import android.widget.TextView
 import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.google.firebase.auth.FirebaseAuth
 
 
 class LoginActivity : AppCompatActivity() {
     private lateinit var auth: FirebaseAuth
+    private lateinit var tosCheckbox: CheckBox
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -24,6 +28,8 @@ class LoginActivity : AppCompatActivity() {
         val passwordInput = findViewById<EditText>(R.id.passwordInput)
         val loginButton   = findViewById<Button>(R.id.loginButton)
         val signupButton  = findViewById<Button>(R.id.signupButton)
+        tosCheckbox       = findViewById(R.id.tosCheckbox) // <--- Bind it
+        val viewTosBtn    = findViewById<TextView>(R.id.viewTosButton)
 
         FirebaseAuth.getInstance().currentUser?.let {
             startActivity(Intent(this, ChatHubActivity::class.java))
@@ -41,9 +47,19 @@ class LoginActivity : AppCompatActivity() {
             }
         }
 
+        viewTosBtn.setOnClickListener {
+            showTosDialog()
+        }
+
         signupButton.setOnClickListener {
             val email = emailInput.text.toString().trim()
             val pass  = passwordInput.text.toString().trim()
+
+            if (!tosCheckbox.isChecked) {
+                Toast.makeText(this, "You must agree to the EULA & ToS to sign up.", Toast.LENGTH_LONG).show()
+                return@setOnClickListener
+            }
+
             if (email.isBlank() || pass.isBlank()) {
                 Toast.makeText(this, "Email and password required", Toast.LENGTH_SHORT).show()
             } else {
@@ -53,6 +69,32 @@ class LoginActivity : AppCompatActivity() {
 
         // (Optional) print your SHA-1 once for your Google-services setup
         printSha1Fingerprint()
+    }
+
+    private fun showTosDialog() {
+        val tosText = """
+            END USER LICENSE AGREEMENT (EULA) & TERMS OF SERVICE
+            
+            1. NO TOLERANCE FOR OBJECTIONABLE CONTENT
+            Realms AI has a zero-tolerance policy for hate speech, harassment, illegal content, or excessively violent/sexual content involving minors.
+            
+            2. USER GENERATED CONTENT (UGC)
+            Users may create and share characters and chats. You are responsible for the content you generate. Content found to violate these terms will be removed, and the user may be banned.
+            
+            3. REPORTING & BLOCKING
+            Realms AI provides tools to report and block objectionable content and users. Reports are reviewed within 72 hours.
+            
+            4. AGE REQUIREMENT
+            You must be at least 18 years old to use this app.
+            
+            By checking the box, you agree to these terms.
+        """.trimIndent()
+
+        AlertDialog.Builder(this)
+            .setTitle("Terms of Service")
+            .setMessage(tosText)
+            .setPositiveButton("I Understand", null)
+            .show()
     }
 
     private fun login(email: String, password: String) {

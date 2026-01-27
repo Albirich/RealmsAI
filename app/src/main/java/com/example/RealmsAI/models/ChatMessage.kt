@@ -8,6 +8,7 @@ data class ChatMessage(
     val displayName: String = "",
     var text: String = "",
     val pose: Map<String, String>? = null,
+    val outfit: String? = null,
     var delay: Int = 0,
     val timestamp: Timestamp? = null,
     var imageUpdates: Map<Int, String?>? = null,
