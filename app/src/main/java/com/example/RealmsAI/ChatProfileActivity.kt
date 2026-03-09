@@ -1,8 +1,10 @@
 package com.example.RealmsAI
 
+import android.R.attr.visible
 import android.content.Intent
 import android.os.Bundle
 import android.view.View
+import android.view.View.VISIBLE
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -19,6 +21,7 @@ class ChatProfileActivity : AppCompatActivity() {
     private lateinit var titleView: TextView
     private lateinit var sfwBadge: ImageView
     private lateinit var authorView: TextView
+    private lateinit var originalAuthorView: TextView
     private lateinit var descriptionView: TextView
     private lateinit var charactersRecycler: RecyclerView
     private lateinit var sessionButton: Button
@@ -35,6 +38,7 @@ class ChatProfileActivity : AppCompatActivity() {
         titleView = findViewById(R.id.chatProfileTitle)
         sfwBadge = findViewById(R.id.chatProfileSfwBadge)
         authorView = findViewById(R.id.chatProfileAuthor)
+        originalAuthorView = findViewById(R.id.chatOriginalProfileAuthor)
         descriptionView = findViewById(R.id.chatProfileDescription)
         charactersRecycler = findViewById(R.id.charactersRecyclerView)
         sessionButton = findViewById(R.id.chatProfileSessionButton)
@@ -87,6 +91,40 @@ class ChatProfileActivity : AppCompatActivity() {
                         authorView.text = "by (unknown)"
                         authorView.setOnClickListener(null)
                     }
+
+                // Find original author
+                if (chatProfile.id != chatProfile.originalId){
+                    db.collection("chats").document(chatProfile.originalId).get()
+                        .addOnSuccessListener { doc ->
+                            val originalChatProfile = doc.toObject(ChatProfile::class.java)
+                            val authorId = originalChatProfile?.author ?: return@addOnSuccessListener
+                            db.collection("users").document(authorId).get()
+                                .addOnSuccessListener { userDoc ->
+                                    val handle = userDoc.getString("handle")
+                                    originalAuthorView.visibility = VISIBLE
+                                    originalAuthorView.text =
+                                        "Original by ${if (!handle.isNullOrBlank()) "@$handle" else "(unknown)"}"
+                                    originalAuthorView.setOnClickListener {
+                                        if (!originalChatProfile.private) {
+                                            val intent = Intent(this, ChatProfileActivity::class.java)
+                                            intent.putExtra("chatId", originalChatProfile.id)
+                                            startActivity(intent)
+                                        } else {
+                                            Toast.makeText(this, "Original chat is set to Private.", Toast.LENGTH_SHORT).show()
+                                            val intent = Intent(this, DisplayProfileActivity::class.java)
+                                            intent.putExtra("userId", originalChatProfile.author)
+                                            startActivity(intent)
+                                        }
+                                    }
+                                }.addOnFailureListener {
+                                    originalAuthorView.text = "Original by (unknown)"
+                                    originalAuthorView.setOnClickListener(null)
+                                }
+                        }.addOnFailureListener {
+                            originalAuthorView.text = "Original chat not found"
+                            originalAuthorView.setOnClickListener(null)
+                        }
+                }
 
                 // Session Button - NOW we have chatProfile, so set it here!
                 sessionButton.setOnClickListener {

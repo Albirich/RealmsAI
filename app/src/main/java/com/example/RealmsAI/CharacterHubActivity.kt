@@ -19,9 +19,11 @@ import com.example.RealmsAI.models.CharacterCollection
 import com.example.RealmsAI.models.CharacterPreview
 import com.example.RealmsAI.models.CharacterProfile
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.DocumentReference
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
 import com.google.gson.Gson
+import java.util.UUID
 
 class CharacterHubActivity : BaseActivity() {
     private lateinit var sortSpinner: Spinner
@@ -122,21 +124,28 @@ class CharacterHubActivity : BaseActivity() {
                             }
                             2 -> { // Add to Collection
                                 checkPremiumStatus {
-                                    // EXISTING LOGIC MOVED INSIDE HERE
-                                    val userId = currentUserId ?: return@checkPremiumStatus
-                                    loadUserCollections { colls ->
-                                        if (colls.isEmpty()) {
-                                            promptNewCollectionName { name ->
-                                                createCollection(name, userId) { newColl ->
-                                                    addCharacterToCollection(newColl.id, preview.id)
+                                    val db = FirebaseFirestore.getInstance()
+
+                                    // 1. Fetch the FULL profile using the ID from the preview
+                                    db.collection("characters").document(preview.id).get()
+                                        .addOnSuccessListener { snapshot ->
+                                            val fullProfile = snapshot.toObject(CharacterProfile::class.java)
+
+                                            if (fullProfile != null) {
+                                                // 2. Security Check: Ensure we aren't saving a private character
+                                                if (fullProfile.private) {
+                                                    Toast.makeText(this, "This character is private and cannot be saved.", Toast.LENGTH_SHORT).show()
+                                                } else {
+                                                    // 3. Use your "Silent Save" logic
+                                                    saveCharacterAsUser(fullProfile)
                                                 }
-                                            }
-                                        } else {
-                                            showCollectionPickerDialog(colls) { picked ->
-                                                addCharacterToCollection(picked.id, preview.id)
+                                            } else {
+                                                Toast.makeText(this, "Error: Could not load full profile.", Toast.LENGTH_SHORT).show()
                                             }
                                         }
-                                    }
+                                        .addOnFailureListener { e ->
+                                            Toast.makeText(this, "Fetch failed: ${e.message}", Toast.LENGTH_SHORT).show()
+                                        }
                                 }
                             }
                         }
@@ -183,6 +192,29 @@ class CharacterHubActivity : BaseActivity() {
 
         // 5) Initial load = “Latest”
         showCharacters(charsRv, orderBy = "createdAt")
+    }
+
+    private fun saveCharacterAsUser(character: CharacterProfile) {
+        val userId = FirebaseAuth.getInstance().currentUser?.uid ?: return
+        val db = FirebaseFirestore.getInstance()
+
+        // Create the "Forked" copy
+        val newChar = character.copy(
+            id = UUID.randomUUID().toString(), // New ID for the user's copy
+            author = userId,                   // User becomes the author of this copy
+            privateDescription = "",      // Redact the secret sauce
+            originalId = character.id,         // Keep the link for attribution
+            private = true                     // Default to private so it doesn't clutter public hub
+        )
+
+        db.collection("characters").document(newChar.id)
+            .set(newChar)
+            .addOnSuccessListener {
+                Toast.makeText(this, "Character saved to your collection!", Toast.LENGTH_SHORT).show()
+            }
+            .addOnFailureListener {
+                Toast.makeText(this, "Failed to save character.", Toast.LENGTH_SHORT).show()
+            }
     }
 
     private fun findSessionForUser(
@@ -379,6 +411,7 @@ class CharacterHubActivity : BaseActivity() {
                     // 2) Build preview
                     CharacterPreview(
                         id = cp.id,
+                        originalId = cp.originalId ?: cp.id,
                         name = cp.name,
                         summary = cp.summary.orEmpty(),
                         avatarUri = cp.avatarUri,
@@ -429,6 +462,7 @@ class CharacterHubActivity : BaseActivity() {
         val previews = filteredList.map { cp ->
             CharacterPreview(
                 id = cp.id,
+                originalId = cp.originalId ?: cp.id,
                 name = cp.name,
                 summary = cp.summary.orEmpty(),
                 avatarUri = cp.avatarUri,

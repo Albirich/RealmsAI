@@ -1,563 +1,615 @@
 <?xml version="1.0" encoding="utf-8"?>
 
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/chatRoot"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:fitsSystemWindows="true"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
-    android:padding="8dp">
+    android:background="@color/deep_space_black"> <com.example.RealmsAI.StarfieldView
+    android:id="@+id/starfieldBackground"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent" />
 
-    <androidx.constraintlayout.widget.ConstraintLayout
+    <ImageView
+        android:id="@+id/backgroundImageView"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:id="@+id/charCreate"
-        android:orientation="vertical">
+        android:scaleType="centerCrop"
+        android:alpha="1.0" />
+
+    <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:fitsSystemWindows="true"
+        xmlns:app="http://schemas.android.com/apk/res-auto"
+        android:padding="8dp">
 
         <androidx.constraintlayout.widget.ConstraintLayout
-            xmlns:android="http://schemas.android.com/apk/res/android"
-            android:id="@+id/chatRoot"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:background="@color/deep_space_black"> <com.example.RealmsAI.StarfieldView
-            android:id="@+id/starfieldBackground"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent" />
+            android:id="@+id/charCreate"
+            android:orientation="vertical">
 
-            <ImageView
-                android:id="@+id/backgroundImageView"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:scaleType="centerCrop"
-                android:alpha="1.0" />
 
-        </androidx.constraintlayout.widget.ConstraintLayout>
-        <!-- Name Input -->
-        <com.google.android.material.textfield.TextInputLayout
-            android:id="@+id/charName"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:padding="8dp"
-            app:layout_constraintTop_toTopOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:counterMaxLength="40">
 
-            <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/characterNameInput"
+            <!-- Name Input -->
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/charName"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:hint="Enter Name"/>
-        </com.google.android.material.textfield.TextInputLayout>
+                android:padding="8dp"
+                app:layout_constraintTop_toTopOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:counterMaxLength="40">
 
-        <!-- Summary -->
-        <com.google.android.material.textfield.TextInputLayout
-            android:id="@+id/charSummary"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            app:layout_constraintTop_toBottomOf="@id/charName"
-            app:layout_constraintStart_toStartOf="parent"
-            android:padding="8dp"
-            app:counterEnabled="true"
-            app:counterMaxLength="80"
-            app:helperText="A short description of the character. This is what will show on the preview.">
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/characterNameInput"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="Enter Name"/>
+            </com.google.android.material.textfield.TextInputLayout>
 
-            <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/etSummary"
+            <!-- Summary -->
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/charSummary"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:hint="Enter Summary"
-                android:maxLines="2"
-                android:inputType="textCapSentences|textMultiLine"/>
-        </com.google.android.material.textfield.TextInputLayout>
-
-        <!-- Personality Input-->
-        <com.google.android.material.textfield.TextInputLayout
-            android:id="@+id/charPersonality"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:padding="8dp"
-            app:counterEnabled="true"
-            app:counterMaxLength="2000"
-            app:layout_constraintTop_toBottomOf="@id/charSummary"
-            app:layout_constraintStart_toStartOf="parent"
-            app:helperText="This is the main meat, telling the AI how to roleplay the character.">
-            <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/characterPersonalityInput"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:maxHeight="200dp"
-                android:scrollbars="vertical"
-                android:maxLines="5"
-                android:overScrollMode="always"
-                android:gravity="top|start"
-                android:hint="Enter personality"
-                android:inputType="textMultiLine"/>
-        </com.google.android.material.textfield.TextInputLayout>
-
-        <!-- private Input -->
-        <com.google.android.material.textfield.TextInputLayout
-            android:id="@+id/charPrivate"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:padding="8dp"
-            app:counterEnabled="true"
-            app:counterMaxLength="400"
-            app:layout_constraintTop_toBottomOf="@+id/charPersonality"
-            app:layout_constraintStart_toStartOf="parent"
-            app:helperText="This does not show up on the character profile, but it is given to the ai when roleplaying">
-
-            <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/characterprivateDescriptionInput"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:scrollbars="vertical"
-                android:maxLines="5"
-                android:overScrollMode="always"
-                android:gravity="top|start"
-                android:hint="Enter private information (for creator)"
-                app:counterMaxLength="400"/>
-        </com.google.android.material.textfield.TextInputLayout>
-
-        <!-- Backstory Input -->
-        <com.google.android.material.textfield.TextInputLayout
-            android:id="@+id/charBackground"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:padding="8dp"
-            app:counterEnabled="true"
-            app:counterMaxLength="2000"
-            app:layout_constraintTop_toBottomOf="@id/charPrivate"
-            app:layout_constraintStart_toStartOf="parent"
-            app:helperText="Write the character's history, lore, and past in detail.">
-
-            <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/backstoryEditText"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
+                app:layout_constraintTop_toBottomOf="@id/charName"
+                app:layout_constraintStart_toStartOf="parent"
+                android:padding="8dp"
                 app:counterEnabled="true"
-                app:counterMaxLength="2000"
-                android:scrollbars="vertical"
-                android:maxLines="5"
-                android:overScrollMode="always"
-                android:gravity="top|start"
-                android:hint="Character Backstory"
-                android:inputType="textMultiLine" />
-        </com.google.android.material.textfield.TextInputLayout>
+                app:counterMaxLength="80"
+                android:textColor="@color/white"
+                app:helperTextTextColor="@color/white"
+                app:counterTextColor="@color/white"
+                app:helperText="A short description of the character. This is what will show on the preview.">
 
-        <!-- Scenario Input-->
-        <com.google.android.material.textfield.TextInputLayout
-            android:id="@+id/charScenario"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:padding="8dp"
-            app:counterEnabled="true"
-            app:counterMaxLength="1000"
-            app:layout_constraintTop_toBottomOf="@id/charBackground"
-            app:layout_constraintStart_toStartOf="parent"
-            app:helperText="This is the main meat, telling the AI how to roleplay the character.">
-            <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/characterScenarioInput"
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/etSummary"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="Summary"
+                    android:maxLines="2"
+                    android:inputType="textCapSentences|textMultiLine"/>
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <!-- Personality Input-->
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/charPersonality"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:maxHeight="200dp"
-                android:scrollbars="vertical"
-                android:maxLines="5"
-                android:overScrollMode="always"
-                android:gravity="top|start"
-                android:hint="Enter a Description for One on One chats"
-                android:inputType="textMultiLine"/>
-        </com.google.android.material.textfield.TextInputLayout>
+                android:padding="8dp"
+                app:counterEnabled="true"
+                app:counterMaxLength="1000"
+                app:layout_constraintTop_toBottomOf="@id/charSummary"
+                app:layout_constraintStart_toStartOf="parent"
+                app:helperTextTextColor="@color/white"
+                app:counterTextColor="@color/white"
+                app:helperText="This is the main meat, telling the AI how to roleplay the character. This must remain PG-13">
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/characterPersonalityInput"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:maxHeight="200dp"
+                    android:scrollbars="vertical"
+                    android:maxLines="5"
+                    android:overScrollMode="always"
+                    android:gravity="top|start"
+                    android:hint="Personality"
+                    android:inputType="textMultiLine"/>
+            </com.google.android.material.textfield.TextInputLayout>
 
-        <!-- Greeting Input-->
-        <com.google.android.material.textfield.TextInputLayout
-            android:id="@+id/charGreeting"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:padding="8dp"
-            app:counterEnabled="true"
-            app:counterMaxLength="200"
-            app:layout_constraintTop_toBottomOf="@id/charScenario"
-            app:layout_constraintStart_toStartOf="parent"
-            app:helperText="Tell the AI what its first message should be. Talk to it like you're speaking to the characters as a director.">
-            >
-
-            <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/characterGreetingInput"
+            <!-- private Input -->
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/charPrivate"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:maxHeight="200dp"
-                android:scrollbars="vertical"
-                android:maxLines="5"
-                android:overScrollMode="always"
-                android:gravity="top|start"
-                android:hint="Enter Greeting (First Message)"
-                android:inputType="textMultiLine"/>
-        </com.google.android.material.textfield.TextInputLayout>
+                android:padding="8dp"
+                app:counterEnabled="true"
+                app:counterMaxLength="400"
+                app:layout_constraintTop_toBottomOf="@+id/charPersonality"
+                app:layout_constraintStart_toStartOf="parent"
+                app:helperTextTextColor="@color/white"
+                app:counterTextColor="@color/white"
+                app:helperText="Quarantine all extreme violence, explicit romance, and dark themes here. This data is hidden during SFW roleplays.">
 
-        <!-- ability Input-->
-        <com.google.android.material.textfield.TextInputLayout
-            android:id="@+id/charAbilities"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:padding="8dp"
-            app:counterEnabled="true"
-            app:counterMaxLength="1000"
-            app:layout_constraintTop_toBottomOf="@id/charGreeting"
-            app:layout_constraintStart_toStartOf="parent"
-            app:helperText="List and describe any skills/abilites/powers the character has.">
-            >
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/characterprivateDescriptionInput"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:scrollbars="vertical"
+                    android:maxLines="5"
+                    android:overScrollMode="always"
+                    android:gravity="top|start"
+                    android:hint="Mature Traits &amp; Secrets"
+                    app:counterMaxLength="400"/>
+            </com.google.android.material.textfield.TextInputLayout>
 
-            <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/abilitiesInput"
+            <!-- Backstory Input -->
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/charBackground"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:scrollbars="vertical"
-                android:maxLines="5"
-                android:overScrollMode="always"
-                android:gravity="top|start"
-                android:hint="Enter Skills/Abilities/Powers"
-                android:inputType="textMultiLine"/>
-        </com.google.android.material.textfield.TextInputLayout>
+                android:padding="8dp"
+                app:counterEnabled="true"
+                app:counterMaxLength="1000"
+                app:layout_constraintTop_toBottomOf="@id/charPrivate"
+                app:layout_constraintStart_toStartOf="parent"
+                app:helperTextTextColor="@color/white"
+                app:counterTextColor="@color/white"
+                app:helperText="Write the character's history, lore, and past in detail.">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/backstoryEditText"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    app:counterEnabled="true"
+                    app:counterMaxLength="1000"
+                    android:scrollbars="vertical"
+                    android:maxLines="5"
+                    android:overScrollMode="always"
+                    android:gravity="top|start"
+                    android:hint="Character Backstory"
+                    android:inputType="textMultiLine" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <!-- Scenario Input-->
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/charScenario"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:padding="8dp"
+                app:counterEnabled="true"
+                app:counterMaxLength="500"
+                app:layout_constraintTop_toBottomOf="@id/charBackground"
+                app:layout_constraintStart_toStartOf="parent"
+                app:helperTextTextColor="@color/white"
+                app:counterTextColor="@color/white"
+                app:helperText="This is the main meat, telling the AI how to roleplay the character.">
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/characterScenarioInput"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:maxHeight="200dp"
+                    android:scrollbars="vertical"
+                    android:maxLines="5"
+                    android:overScrollMode="always"
+                    android:gravity="top|start"
+                    android:hint="Enter a Description for One on One chats"
+                    android:inputType="textMultiLine"/>
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <!-- Greeting Input-->
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/charGreeting"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:padding="8dp"
+                app:counterEnabled="true"
+                app:counterMaxLength="200"
+                app:layout_constraintTop_toBottomOf="@id/charScenario"
+                app:layout_constraintStart_toStartOf="parent"
+                app:helperTextTextColor="@color/white"
+                app:counterTextColor="@color/white"
+                app:helperText="Tell the AI what its first message should be. Talk to it like you're speaking to the characters as a director.">
+                >
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/characterGreetingInput"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:maxHeight="200dp"
+                    android:scrollbars="vertical"
+                    android:maxLines="5"
+                    android:overScrollMode="always"
+                    android:gravity="top|start"
+                    android:hint="Greeting (First Message)"
+                    android:inputType="textMultiLine"/>
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <!-- ability Input-->
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/charAbilities"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:padding="8dp"
+                app:counterTextColor="@color/white"
+                app:counterEnabled="true"
+                app:counterMaxLength="400"
+                app:layout_constraintTop_toBottomOf="@id/charGreeting"
+                app:layout_constraintStart_toStartOf="parent"
+                app:helperTextTextColor="@color/white"
+                app:helperText="List and describe any skills/abilites/powers the character has.">
+                >
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/abilitiesInput"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:scrollbars="vertical"
+                    android:maxLines="5"
+                    android:overScrollMode="always"
+                    android:gravity="top|start"
+                    android:hint="Skills/Abilities/Powers"
+                    android:inputType="textMultiLine"/>
+            </com.google.android.material.textfield.TextInputLayout>
 
 
 
-        <!-- Images -->
-        <TextView
-            android:id="@+id/avatarTextView"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:text="Avatar"
-            android:layout_gravity="center_horizontal"
-            app:layout_constraintTop_toBottomOf="@id/charAbilities"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintEnd_toEndOf="parent"
-            android:textStyle="bold" />
-
-        <ImageView
-            android:id="@+id/avatarImageView"
-            android:layout_width="100dp"
-            android:layout_height="100dp"
-            android:layout_gravity="center_horizontal"
-            android:layout_marginBottom="16dp"
-            android:src="@drawable/placeholder_avatar"
-            android:contentDescription="@string/avatar"
-            app:layout_constraintTop_toBottomOf="@id/avatarTextView"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintEnd_toEndOf="parent"
-            android:scaleType="centerCrop"/>
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/wardrobeButton"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            app:layout_constraintTop_toBottomOf="@id/avatarImageView"
-            app:layout_constraintStart_toStartOf="parent"
-            android:text="Wardrobe" />
-        <include
-            android:id="@+id/infoButtonWardrobe"
-            layout="@layout/info_button"
-            android:layout_width="25dp"
-            android:layout_height="25dp"
-            android:layout_marginStart="8dp"
-            app:layout_constraintTop_toTopOf="@id/wardrobeButton"
-            app:layout_constraintBottom_toBottomOf="@id/wardrobeButton"
-            app:layout_constraintStart_toEndOf="@id/wardrobeButton"
-            android:layout_gravity="center_vertical" />
-
-
-        <Button
-            android:id="@+id/charrelationshipBtn"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            app:layout_constraintTop_toBottomOf="@id/wardrobeButton"
-            app:layout_constraintStart_toStartOf="parent"
-            android:text="Relationships"/>
-        <include
-            android:id="@+id/infoButtonCharRelationships"
-            layout="@layout/info_button"
-            android:layout_width="25dp"
-            android:layout_height="25dp"
-            android:layout_marginStart="8dp"
-            app:layout_constraintStart_toEndOf="@id/charrelationshipBtn"
-            app:layout_constraintTop_toTopOf="@id/charrelationshipBtn"
-            app:layout_constraintBottom_toBottomOf="@id/charrelationshipBtn"
-            android:layout_gravity="center_vertical" />
-
-        <!-- Background Selector -->
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/charBackgroundButton"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            app:layout_constraintTop_toBottomOf="@id/charrelationshipBtn"
-            app:layout_constraintStart_toStartOf="parent"
-            android:text="Background Gallery" />
-        <include
-            android:id="@+id/infoButtonBackgroundGallery"
-            layout="@layout/info_button"
-            android:layout_width="25dp"
-            android:layout_height="25dp"
-            android:layout_marginStart="8dp"
-                app:layout_constraintStart_toEndOf="@id/charBackgroundButton"
-                  app:layout_constraintTop_toTopOf="@id/charBackgroundButton"
-            app:layout_constraintBottom_toBottomOf="@id/charBackgroundButton"
-            android:layout_gravity="center_vertical" />
-
-
-        <!-- 2) Profile Info (collapsible) -->
-        <LinearLayout
-            android:id="@+id/physicalInfoHeader"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            app:layout_constraintTop_toBottomOf="@id/charBackgroundButton"
-            app:layout_constraintStart_toStartOf="parent"
-            android:paddingTop="16dp"
-            android:clickable="true"
-            android:focusable="true">
-
+            <!-- Images -->
             <TextView
-                android:id="@+id/physicalInfoLabel"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="Physcial Info"
-                android:textAppearance="?attr/textAppearanceSubtitle1"/>
-
-            <ImageView
-                android:id="@+id/physicalInfoToggle"
+                android:id="@+id/avatarTextView"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:src="@drawable/ic_expand_more" />
-        </LinearLayout>
+                android:layout_marginTop="12dp"
+                android:text="Avatar"
+                android:layout_gravity="center_horizontal"
+                app:layout_constraintTop_toBottomOf="@id/charAbilities"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toEndOf="parent"
+                android:textStyle="bold" />
 
-        <LinearLayout
-            android:id="@+id/physicalInfoSection"
-            android:orientation="vertical"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            app:layout_constraintTop_toBottomOf="@id/physicalInfoHeader"
-            app:layout_constraintBottom_toTopOf="@id/bubbleTitle"
-            app:layout_constraintStart_toStartOf="parent"
-            android:visibility="gone"
-            android:paddingStart="16dp">
 
-            <EditText
-                android:id="@+id/ageEditText"
+            <ImageView
+                android:id="@+id/avatarImageView"
+                android:layout_width="100dp"
+                android:layout_height="100dp"
+                android:layout_gravity="center_horizontal"
+                android:layout_marginBottom="16dp"
+                android:src="@drawable/placeholder_avatar"
+                android:contentDescription="@string/avatar"
+                app:layout_constraintTop_toBottomOf="@id/avatarTextView"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toEndOf="parent"
+                android:scaleType="centerCrop"/>
+
+            <!-- 2) Profile Info (collapsible) -->
+            <LinearLayout
+                android:id="@+id/physicalInfoHeader"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:hint="Age"/>
-            <EditText
-                android:id="@+id/genderEditText"
+                android:orientation="horizontal"
+                app:layout_constraintTop_toBottomOf="@id/avatarImageView"
+                app:layout_constraintStart_toStartOf="parent"
+                android:paddingTop="16dp"
+                android:clickable="true"
+                android:focusable="true">
+
+                <TextView
+                    android:id="@+id/physicalInfoLabel"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Physcial Info"
+                    android:textColor="@color/white"
+                    android:textAppearance="?attr/textAppearanceSubtitle1"/>
+
+                <ImageView
+                    android:id="@+id/physicalInfoToggle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:src="@drawable/ic_expand_more_white" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/physicalInfoSection"
+                android:orientation="vertical"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:hint="Pronouns"/>
-            <EditText
-                android:id="@+id/heightEditText"
-                android:layout_width="match_parent"
+                app:layout_constraintTop_toBottomOf="@id/physicalInfoHeader"
+                app:layout_constraintBottom_toTopOf="@id/wardrobeButton"
+                app:layout_constraintStart_toStartOf="parent"
+
+                android:visibility="gone"
+                android:paddingStart="16dp">
+
+                <EditText
+                    android:id="@+id/ageEditText"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textColorHint="@color/white"
+                    android:textColor="@color/white"
+                    android:hint="Age"/>
+                <EditText
+                    android:id="@+id/genderEditText"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textColorHint="@color/white"
+                    android:textColor="@color/white"
+                    android:hint="Pronouns"/>
+                <EditText
+                    android:id="@+id/heightEditText"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textColorHint="@color/white"
+                    android:textColor="@color/white"
+                    android:hint="Height"/>
+
+                <EditText
+                    android:id="@+id/weightEditText"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textColorHint="@color/white"
+                    android:textColor="@color/white"
+                    android:hint="Weight"/>
+
+                <EditText
+                    android:id="@+id/eyeColorEditText"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textColorHint="@color/white"
+                    android:textColor="@color/white"
+                    android:hint="Eye Color"/>
+
+                <EditText
+                    android:id="@+id/hairColorEditText"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textColorHint="@color/white"
+                    android:textColor="@color/white"
+                    android:hint="Hair Color"/>
+                <EditText
+                    android:id="@+id/physicalDescriptionEditText"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    app:counterTextColor="@color/white"
+                    app:counterEnabled="true"
+                    app:counterMaxLength="100"
+                    android:textColor="@color/white"
+                    android:textColorHint="@color/white"
+                    android:hint="Physical Description"/>
+            </LinearLayout>
+
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/wardrobeButton"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:hint="Height"/>
-
-            <EditText
-                android:id="@+id/weightEditText"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:hint="Weight"/>
-
-            <EditText
-                android:id="@+id/eyeColorEditText"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:hint="Eye Color"/>
-
-            <EditText
-                android:id="@+id/hairColorEditText"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:hint="Hair Color"/>
-            <EditText
-                android:id="@+id/physicalDescriptionEditText"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:hint="Physical Description"/>
-        </LinearLayout>
-
-        <!-- Bubble Color Picker -->
-        <TextView
-            android:id="@+id/bubbleTitle"
-            app:layout_constraintTop_toBottomOf="@id/physicalInfoHeader"
-            app:layout_constraintBottom_toTopOf="@id/bubbleColorSpinner"
-            app:layout_constraintStart_toStartOf="parent"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Bubble Color"
-            android:paddingTop="8dp"/>
-        <Spinner
-            android:id="@+id/bubbleColorSpinner"
-            app:layout_constraintTop_toBottomOf="@id/bubbleTitle"
-            app:layout_constraintBottom_toTopOf="@id/bubbleTitle"
-            app:layout_constraintStart_toStartOf="parent"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"/>
-
-        <!-- Text Color Picker -->
-        <TextView
-            android:id="@+id/textTitle"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            app:layout_constraintTop_toBottomOf="@id/bubbleColorSpinner"
-            app:layout_constraintBottom_toTopOf="@id/textColorSpinner"
-            app:layout_constraintStart_toStartOf="parent"
-            android:text="Text Color"
-            android:paddingTop="8dp"/>
-        <Spinner
-            android:id="@+id/textColorSpinner"
-            android:layout_width="match_parent"
-            app:layout_constraintTop_toBottomOf="@id/textTitle"
-            app:layout_constraintBottom_toTopOf="@id/universeTitle"
-            app:layout_constraintStart_toStartOf="parent"
-            android:layout_height="wrap_content"/>
-
-        <TextView
-            android:id="@+id/dialogueTitle"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Example Dialogue"
-            android:textColor="#AAAAAA"
-            android:layout_marginTop="24dp"
-            app:layout_constraintTop_toBottomOf="@id/textColorSpinner"
-            app:layout_constraintStart_toStartOf="parent"/>
-
-        <TextView
-            android:id="@+id/dialogueHelper"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:text="Crucial for AI quality! Click 'Auto-Generate' to get scenarios, then write how your character responds."
-            android:textColor="#888888"
-            android:textSize="12sp"
-            app:layout_constraintTop_toBottomOf="@id/dialogueTitle"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintEnd_toEndOf="parent"/>
-
-        <LinearLayout
-            android:id="@+id/dialogueContainer"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:layout_marginTop="12dp"
-            app:layout_constraintTop_toBottomOf="@id/dialogueHelper"
-            app:layout_constraintStart_toStartOf="parent"/>
-
-        <LinearLayout
-            android:id="@+id/dialogueButtons"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:weightSum="2"
-            app:layout_constraintTop_toBottomOf="@id/dialogueContainer">
+                android:layout_marginTop="16dp"
+                app:layout_constraintTop_toBottomOf="@id/physicalInfoSection"
+                app:layout_constraintStart_toStartOf="parent"
+                android:text="Wardrobe" />
+            <include
+                android:id="@+id/infoButtonWardrobe"
+                layout="@layout/info_button"
+                android:layout_width="25dp"
+                android:layout_height="25dp"
+                android:layout_marginStart="8dp"
+                app:layout_constraintTop_toTopOf="@id/wardrobeButton"
+                app:layout_constraintBottom_toBottomOf="@id/wardrobeButton"
+                app:layout_constraintStart_toEndOf="@id/wardrobeButton"
+                android:layout_gravity="center_vertical" />
 
             <Button
-                android:id="@+id/generateDialogueButton"
-                android:layout_width="0dp"
+                android:id="@+id/charrelationshipBtn"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="Auto-Generate (3)"
-                android:layout_marginEnd="4dp"
-                android:backgroundTint="#444444"/>
+                app:layout_constraintTop_toBottomOf="@id/wardrobeButton"
+                app:layout_constraintStart_toStartOf="parent"
+                android:text="Relationships"/>
+            <include
+                android:id="@+id/infoButtonCharRelationships"
+                layout="@layout/info_button"
+                android:layout_width="25dp"
+                android:layout_height="25dp"
+                android:layout_marginStart="8dp"
+                app:layout_constraintStart_toEndOf="@id/charrelationshipBtn"
+                app:layout_constraintTop_toTopOf="@id/charrelationshipBtn"
+                app:layout_constraintBottom_toBottomOf="@id/charrelationshipBtn"
+                android:layout_gravity="center_vertical" />
+
+            <!-- Background Selector -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/charBackgroundButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                app:layout_constraintTop_toBottomOf="@id/charrelationshipBtn"
+                app:layout_constraintStart_toStartOf="parent"
+                android:text="Background Gallery" />
+            <include
+                android:id="@+id/infoButtonBackgroundGallery"
+                layout="@layout/info_button"
+                android:layout_width="25dp"
+                android:layout_height="25dp"
+                android:layout_marginStart="8dp"
+                    app:layout_constraintStart_toEndOf="@id/charBackgroundButton"
+                      app:layout_constraintTop_toTopOf="@id/charBackgroundButton"
+                app:layout_constraintBottom_toBottomOf="@id/charBackgroundButton"
+                android:layout_gravity="center_vertical" />
+
+            <LinearLayout
+                android:id="@+id/colorbox"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingHorizontal="5dp"
+                android:paddingBottom="5dp"
+                app:layout_constraintTop_toBottomOf="@id/charBackgroundButton"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toStartOf="@id/colorExample"
+                app:layout_constraintBottom_toTopOf="@id/dialogueTitle"
+                android:background="#AAAAAA">
+                <!-- Bubble Color Picker -->
+                <TextView
+                    android:id="@+id/bubbleTitle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Bubble Color"
+                    android:paddingTop="8dp"/>
+                <Spinner
+                    android:id="@+id/bubbleColorSpinner"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"/>
+
+                <!-- Text Color Picker -->
+                <TextView
+                    android:id="@+id/textTitle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Text Color"
+                    android:paddingTop="8dp"/>
+                <Spinner
+                    android:id="@+id/textColorSpinner"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"/>
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/colorExample"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                app:layout_constraintTop_toTopOf="@id/colorbox"
+                app:layout_constraintBottom_toBottomOf="@id/colorbox"
+                app:layout_constraintStart_toEndOf="@id/colorbox"
+                app:layout_constraintEnd_toEndOf="parent"
+                android:text="This is an example of a message box. You can use this to check the colors"
+                />
+
+            <TextView
+                android:id="@+id/dialogueTitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Example Dialogue"
+                android:textColor="#AAAAAA"
+                android:layout_marginTop="24dp"
+                app:layout_constraintTop_toBottomOf="@id/colorbox"
+                app:layout_constraintStart_toStartOf="parent"/>
+
+            <TextView
+                android:id="@+id/dialogueHelper"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:text="Crucial for AI quality! Click 'Auto-Generate' to get scenarios, then write how your character responds."
+                android:textColor="#888888"
+                android:textSize="12sp"
+                app:layout_constraintTop_toBottomOf="@id/dialogueTitle"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toEndOf="parent"/>
+
+            <LinearLayout
+                android:id="@+id/dialogueContainer"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:layout_marginTop="12dp"
+                app:layout_constraintTop_toBottomOf="@id/dialogueHelper"
+                app:layout_constraintStart_toStartOf="parent"/>
+
+            <LinearLayout
+                android:id="@+id/dialogueButtons"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:weightSum="2"
+                app:layout_constraintTop_toBottomOf="@id/dialogueContainer">
+
+                <Button
+                    android:id="@+id/generateDialogueButton"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Auto-Generate (5)"
+                    android:layout_marginEnd="4dp"
+                    android:backgroundTint="#444444"/>
+
+                <Button
+                    android:id="@+id/addDialogueRowButton"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="+ Add Custom"
+                    android:layout_marginStart="4dp"
+                    android:backgroundTint="#222222"/>
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/universeTitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Universe / Fandom"
+                android:textColor="#AAAAAA"
+                app:layout_constraintTop_toBottomOf="@id/dialogueButtons"
+                app:layout_constraintStart_toStartOf="parent"/>
+
+            <EditText
+                android:id="@+id/universeEditText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColorHint="#AAAAAA"
+                android:hint="e.g. Marvel, Star Wars, Original"
+                android:textColor="@color/white"
+                app:layout_constraintTop_toBottomOf="@id/universeTitle"/>
+
+            <TextView
+                android:id="@+id/tagsTitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Tags"
+                android:textColor="#AAAAAA"
+                android:layout_marginTop="16dp"
+                app:layout_constraintTop_toBottomOf="@id/universeEditText"
+                app:layout_constraintStart_toStartOf="parent"/>
 
             <Button
-                android:id="@+id/addDialogueRowButton"
+                android:id="@+id/selectTagsButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Select Tags"
+                android:backgroundTint="#444444"
+                app:layout_constraintTop_toBottomOf="@id/tagsTitle"
+                app:layout_constraintStart_toStartOf="parent"/>
+
+            <TextView
+                android:id="@+id/selectedTagsText"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="+ Add Custom"
-                android:layout_marginStart="4dp"
-                android:backgroundTint="#222222"/>
-        </LinearLayout>
+                android:text="None selected"
+                android:textColor="#FFFFFF"
+                android:layout_marginStart="8dp"
+                app:layout_constraintStart_toEndOf="@id/selectTagsButton"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintBottom_toBottomOf="@id/selectTagsButton"
+                app:layout_constraintTop_toTopOf="@id/selectTagsButton"/>
 
-        <TextView
-            android:id="@+id/universeTitle"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Universe / Fandom"
-            android:textColor="#AAAAAA"
-            app:layout_constraintTop_toBottomOf="@id/dialogueButtons"
-            app:layout_constraintStart_toStartOf="parent"/>
+            <Switch
+                android:id="@+id/sfwSwitch"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="NSFW is impportant to the personality."
+                android:textColor="@color/white"
+                app:layout_constraintTop_toBottomOf="@id/selectedTagsText"
+                app:layout_constraintBottom_toTopOf="@id/privateSwitch"
+                app:layout_constraintStart_toStartOf="parent"
+                android:checked="true"
+                android:paddingTop="16dp"
+                android:layout_gravity="start"/>
 
-        <EditText
-            android:id="@+id/universeEditText"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:hint="e.g. Marvel, Star Wars, Original"
-            android:textColor="@color/white"
-            app:layout_constraintTop_toBottomOf="@id/universeTitle"/>
+            <Switch
+                android:id="@+id/privateSwitch"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="@color/white"
+                android:text="Private (wont show up in the character page)"
+                app:layout_constraintTop_toBottomOf="@id/sfwSwitch"
+                app:layout_constraintBottom_toTopOf="@id/charSubmitButton"
+                app:layout_constraintStart_toStartOf="parent"
+                android:checked="false"
+                android:paddingTop="16dp"
+                android:layout_gravity="start"/>
 
-        <TextView
-            android:id="@+id/tagsTitle"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Tags"
-            android:textColor="#AAAAAA"
-            android:layout_marginTop="16dp"
-            app:layout_constraintTop_toBottomOf="@id/universeEditText"
-            app:layout_constraintStart_toStartOf="parent"/>
+            <!-- Save Button -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/charSubmitButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Submit"
+                app:layout_constraintTop_toBottomOf="@id/privateSwitch"
+                app:layout_constraintBottom_toBottomOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toEndOf="parent"
+                android:layout_centerInParent="true"/>
+        </androidx.constraintlayout.widget.ConstraintLayout>
+    </ScrollView>
 
-        <Button
-            android:id="@+id/selectTagsButton"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Select Tags"
-            android:backgroundTint="#444444"
-            app:layout_constraintTop_toBottomOf="@id/tagsTitle"
-            app:layout_constraintStart_toStartOf="parent"/>
-
-        <TextView
-            android:id="@+id/selectedTagsText"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:text="None selected"
-            android:textColor="#FFFFFF"
-            android:layout_marginStart="8dp"
-            app:layout_constraintStart_toEndOf="@id/selectTagsButton"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintBottom_toBottomOf="@id/selectTagsButton"
-            app:layout_constraintTop_toTopOf="@id/selectTagsButton"/>
-
-        <Switch
-            android:id="@+id/sfwSwitch"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Safe For Work (SFW only)"
-            app:layout_constraintTop_toBottomOf="@id/selectedTagsText"
-            app:layout_constraintBottom_toTopOf="@id/privateSwitch"
-            app:layout_constraintStart_toStartOf="parent"
-            android:checked="true"
-            android:paddingTop="16dp"
-            android:layout_gravity="start"/>
-
-        <Switch
-            android:id="@+id/privateSwitch"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Private (wont show up in the character page)"
-            app:layout_constraintTop_toBottomOf="@id/sfwSwitch"
-            app:layout_constraintBottom_toTopOf="@id/charSubmitButton"
-            app:layout_constraintStart_toStartOf="parent"
-            android:checked="false"
-            android:paddingTop="16dp"
-            android:layout_gravity="start"/>
-
-        <!-- Save Button -->
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/charSubmitButton"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Submit"
-            app:layout_constraintTop_toBottomOf="@id/privateSwitch"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintEnd_toEndOf="parent"
-            android:layout_centerInParent="true"/>
-    </androidx.constraintlayout.widget.ConstraintLayout>
-</ScrollView>
+</androidx.constraintlayout.widget.ConstraintLayout>

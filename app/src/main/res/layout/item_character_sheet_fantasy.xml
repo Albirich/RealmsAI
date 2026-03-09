@@ -63,6 +63,117 @@
 
         </androidx.constraintlayout.widget.ConstraintLayout>
 
+    <LinearLayout
+        android:id="@+id/physicalSection"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        app:layout_constraintTop_toBottomOf="@+id/headerBlock"
+        app:layout_constraintStart_toStartOf="parent"
+        android:layout_marginTop="12dp"
+        android:padding="8dp">
+
+        <TextView
+            android:id="@+id/physicalDetailsText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="@color/purple_200"
+            android:textStyle="bold"
+            android:layout_marginBottom="4dp"/>
+
+        <TextView
+            android:id="@+id/physicalDescText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="@color/white" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/loreSection"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        app:layout_constraintTop_toBottomOf="@+id/physicalSection"
+        app:layout_constraintStart_toStartOf="parent"
+        android:layout_marginTop="12dp"
+        android:padding="12dp">
+
+        <TextView
+            android:id="@+id/summaryText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="@color/white"
+            android:textStyle="italic"
+            android:layout_marginBottom="12dp"/>
+
+        <TextView
+            android:id="@+id/personalityHeader"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Personality"
+            android:textColor="@color/purple_200"
+            android:textStyle="bold"/>
+        <TextView
+            android:id="@+id/personalityText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="@color/white"
+            android:layout_marginBottom="8dp"/>
+
+        <TextView
+            android:id="@+id/backstoryHeader"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Backstory"
+            android:textColor="@color/purple_200"
+            android:textStyle="bold"/>
+        <TextView
+            android:id="@+id/backstoryText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="@color/white"
+            android:layout_marginBottom="8dp"/>
+
+        <TextView
+            android:id="@+id/loreAbilitiesHeader"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Abilities"
+            android:textColor="@color/purple_200"
+            android:textStyle="bold"/>
+        <TextView
+            android:id="@+id/loreAbilitiesText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="@color/white"/>
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/secretSection"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        app:layout_constraintTop_toBottomOf="@+id/loreSection"
+        app:layout_constraintStart_toStartOf="parent"
+        android:layout_marginTop="12dp"
+        android:background="#33FF0000"
+        android:padding="12dp">
+
+        <Button
+            android:id="@+id/revealSecretBtn"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Reveal Secret Description"
+            android:backgroundTint="@color/design_default_color_error"/>
+
+        <TextView
+            android:id="@+id/secretText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="@color/white"
+            android:visibility="gone"/>
+    </LinearLayout>
+
     <!-- RPG section wrapper so we can toggle it -->
     <LinearLayout
         android:id="@+id/rpgSection"
@@ -71,7 +182,7 @@
         android:orientation="vertical"
         app:layout_constraintStart_toStartOf="@id/sheetRootColumn"
         app:layout_constraintEnd_toEndOf="@id/sheetRootColumn"
-        app:layout_constraintTop_toBottomOf="@id/headerBlock"
+        app:layout_constraintTop_toBottomOf="@id/secretSection"
         android:layout_marginVertical="8dp">
             <!-- Class -->
             <TextView

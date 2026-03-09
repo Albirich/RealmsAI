@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="20dp"
+    android:background="#aaaaaaaa"> <LinearLayout
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:layout_marginBottom="16dp">
+
+    <com.google.android.material.imageview.ShapeableImageView
+        android:id="@+id/reviewAvatar"
+        android:layout_width="80dp"
+        android:layout_height="80dp"
+        android:scaleType="centerCrop"
+        app:shapeAppearanceOverlay="@drawable/rounded_square"
+        android:src="@drawable/placeholder_avatar" />
+
+    <TextView
+        android:id="@+id/reviewName"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:textSize="24sp"
+        android:textStyle="bold"
+        android:textColor="@color/white" />
+</LinearLayout>
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:fadeScrollbars="false">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Personality"
+                android:textStyle="bold"
+                android:textColor="@color/purple_200"
+                android:layout_marginBottom="4dp"/>
+
+            <TextView
+                android:id="@+id/reviewPersonality"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="@color/white"
+                android:layout_marginBottom="16dp"/>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Summary / Background"
+                android:textStyle="bold"
+                android:textColor="@color/purple_200"
+                android:layout_marginBottom="4dp"/>
+
+            <TextView
+                android:id="@+id/reviewSummary"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="@color/white"
+                android:layout_marginBottom="24dp"/>
+
+            <Button
+                android:id="@+id/btnRevealSecret"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Reveal Mature Traits &amp; Secrets"
+                android:backgroundTint="@color/design_default_color_error"
+                android:textColor="@color/white"
+                android:layout_marginBottom="16dp"/>
+
+            <LinearLayout
+                android:id="@+id/secretContainer"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone"
+                android:background="#33FF0000"
+                android:padding="12dp"
+                android:layout_marginBottom="16dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Warning: Unrestricted Traits"
+                    android:textStyle="bold"
+                    android:textColor="#FF6B6B"
+                    android:layout_marginBottom="8dp"/>
+
+                <TextView
+                    android:id="@+id/reviewSecret"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textColor="@color/white"/>
+            </LinearLayout>
+
+        </LinearLayout>
+    </ScrollView>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginTop="16dp"
+        android:weightSum="2">
+
+        <Button
+            android:id="@+id/btnCancelReview"
+            style="?attr/materialButtonOutlinedStyle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginEnd="8dp"
+            android:text="Cancel" />
+
+        <Button
+            android:id="@+id/btnAddCharacter"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="8dp"
+            android:text="Select Character" />
+    </LinearLayout>
+
+</LinearLayout>

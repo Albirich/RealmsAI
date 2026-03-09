@@ -32,6 +32,7 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toStartOf="@id/personalChars"
         app:layout_constraintHorizontal_weight="1"
+        android:textSize="10dp"
         android:text="GLobal characeter"/>
     <Button
         android:id="@+id/personalChars"
@@ -41,6 +42,7 @@
         app:layout_constraintEnd_toStartOf="@id/personas"
         app:layout_constraintStart_toEndOf="@id/globalChars"
         app:layout_constraintHorizontal_weight="1"
+        android:textSize="10dp"
         android:text="your character"/>
     <Button
         android:id="@+id/personas"
@@ -51,13 +53,50 @@
         app:layout_constraintBottom_toBottomOf="@id/globalChars"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintHorizontal_weight="1"
+        android:textSize="10dp"
         android:text="Persona"/>
+
+    <LinearLayout
+        android:id="@+id/filterarea"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:paddingTop="8dp"
+        android:paddingBottom="8dp"
+        app:layout_constraintTop_toBottomOf="@id/globalChars"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <EditText
+            android:id="@+id/searchEditText"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:hint="Search characters…" />
+
+        <Spinner
+            android:id="@+id/sortSpinner"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:entries="@array/character_hub_sort_options"
+            android:layout_marginStart="8dp"/>
+
+        <ImageButton
+            android:id="@+id/filterButton"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:src="@android:drawable/ic_menu_sort_by_size"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:layout_marginStart="8dp"
+            android:contentDescription="Filter Tags"
+            app:tint="#FFFFFF"/>
+    </LinearLayout>
 
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/personaRecycler"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        app:layout_constraintTop_toBottomOf="@id/globalChars"
+        app:layout_constraintTop_toBottomOf="@id/filterarea"
         app:layout_constraintBottom_toTopOf="@id/doneButton"
         android:layout_weight="1" />
 

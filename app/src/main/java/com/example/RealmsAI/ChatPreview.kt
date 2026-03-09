@@ -6,6 +6,7 @@ import com.google.firebase.Timestamp
 
 data class ChatPreview(
     val id: String,
+    val originalId: String,
     val title: String,
     val description: String,
     val avatar1Uri: String?,

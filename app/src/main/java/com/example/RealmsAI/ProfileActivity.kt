@@ -46,6 +46,11 @@ class ProfileActivity : BaseActivity() {
         }
     }
 
+    private lateinit var devPanel: LinearLayout
+    private lateinit var devServerSwitch: Switch
+    private lateinit var devOfflineMessage: EditText
+    private lateinit var devSaveServerBtn: Button
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_profile)
@@ -63,21 +68,17 @@ class ProfileActivity : BaseActivity() {
         messageButton = findViewById<Button>(R.id.messageButton)
         verifyEmailBtn = findViewById(R.id.verifyEmailButton)
         statsTv = findViewById(R.id.profileMessageStats)
+        devPanel = findViewById(R.id.devPanel)
+        devServerSwitch = findViewById(R.id.devServerSwitch)
+        devOfflineMessage = findViewById(R.id.devOfflineMessage)
+        devSaveServerBtn = findViewById(R.id.devSaveServerBtn)
 
-        // In ProfileActivity.kt or DisplayProfileActivity.kt
-
-        val upgradeBtn = findViewById<Button>(R.id.upgradeButton)
-
-        // 1. Hide the button if they are ALREADY Premium (Optional polish)
-        if (userProfile?.isPremium == true) {
-            upgradeBtn.visibility = View.GONE
-        } else {
-            upgradeBtn.visibility = View.VISIBLE
-            upgradeBtn.setOnClickListener {
-                startActivity(Intent(this, UpgradeActivity::class.java))
-            }
+        devSaveServerBtn.setOnClickListener {
+            saveServerStatus()
         }
 
+
+        // In ProfileActivity.kt or DisplayProfileActivity.k
         verifyEmailBtn.setOnClickListener {
             sendVerificationEmail()
         }
@@ -147,6 +148,47 @@ class ProfileActivity : BaseActivity() {
         loadProfile()
     }
 
+    private fun loadServerStatusForDev() {
+        db.collection("admin").document("server_status").get()
+            .addOnSuccessListener { doc ->
+                val isOnline = doc.getBoolean("isOnline") ?: true
+                val msg = doc.getString("offlineMessage") ?: "The AI servers are resting! We will be back soon."
+
+                devServerSwitch.isChecked = isOnline
+                devOfflineMessage.setText(msg)
+            }
+            .addOnFailureListener {
+                Toast.makeText(this, "Failed to load server status.", Toast.LENGTH_SHORT).show()
+            }
+    }
+
+    private fun saveServerStatus() {
+        val isOnline = devServerSwitch.isChecked
+        val msg = devOfflineMessage.text.toString().trim()
+
+        devSaveServerBtn.isEnabled = false
+        devSaveServerBtn.text = "Saving..."
+
+        val updates = mapOf(
+            "isOnline" to isOnline,
+            "offlineMessage" to msg
+        )
+
+        // Using SetOptions.merge() so it creates the document if it doesn't exist yet!
+        db.collection("admin").document("server_status")
+            .set(updates, com.google.firebase.firestore.SetOptions.merge())
+            .addOnSuccessListener {
+                Toast.makeText(this, "Server status updated!", Toast.LENGTH_LONG).show()
+                devSaveServerBtn.isEnabled = true
+                devSaveServerBtn.text = "Update Server Status"
+            }
+            .addOnFailureListener { e ->
+                Toast.makeText(this, "Failed to update: ${e.message}", Toast.LENGTH_LONG).show()
+                devSaveServerBtn.isEnabled = true
+                devSaveServerBtn.text = "Update Server Status"
+            }
+    }
+
     private fun showMessagesBadge(show: Boolean) {
         val badge = findViewById<View>(R.id.messagesBadge)
         badge.visibility = if (show) View.VISIBLE else View.GONE
@@ -155,44 +197,72 @@ class ProfileActivity : BaseActivity() {
     private fun loadProfile() {
         db.collection("users").document(userId).get()
             .addOnSuccessListener { doc ->
-                userProfile = doc.toObject(UserProfile::class.java)
-                userProfile?.let { profile ->
-                    handle = profile.handle
-                    nameEt.setText(profile.name)
-                    bioEt.setText(profile.bio)
-                    currentIconUrl = profile.iconUrl
+                if (!doc.exists()) {
+                    Toast.makeText(this, "Profile not found in database!", Toast.LENGTH_SHORT).show()
+                    return@addOnSuccessListener
+                }
 
-                    val count = doc.getLong("dailyMessageCount") ?: 0
-                    val isPremium = doc.getBoolean("isPremium") ?: false
+                // 1. Manually extract the exact fields (Bypasses the Kotlin 'is' bug)
+                val isPremium = doc.getBoolean("isPremium") ?: false
+                val isDev = doc.getBoolean("isDev") ?: false
+                val count = doc.getLong("dailyMessageCount") ?: 0
+                val loadedName = doc.getString("name") ?: ""
+                val loadedBio = doc.getString("bio") ?: ""
+                val loadedHandle = doc.getString("handle")
+                val loadedIcon = doc.getString("iconUrl")
 
-                    if (isPremium) {
-                        statsTv.text = ""
-                        statsTv.setTextColor(android.graphics.Color.parseColor("#FFD700")) // Gold
+                // 2. Set the global variables
+                handle = loadedHandle
+                currentIconUrl = loadedIcon
+
+                // 3. Update Text Inputs
+                nameEt.setText(loadedName)
+                bioEt.setText(loadedBio)
+
+                // 4. --- UPGRADE BUTTON LOGIC ---
+                val upgradeBtn = findViewById<Button>(R.id.upgradeButton)
+                if (isPremium) {
+                    upgradeBtn.visibility = View.GONE
+                    statsTv.text = ""
+                    statsTv.setTextColor(android.graphics.Color.parseColor("#FFD700")) // Gold
+                } else {
+                    upgradeBtn.visibility = View.VISIBLE
+                    upgradeBtn.setOnClickListener {
+                        startActivity(Intent(this@ProfileActivity, UpgradeActivity::class.java))
+                    }
+                    statsTv.text = "Messages Today:\n $count / 50"
+                    if (count >= 50) {
+                        statsTv.setTextColor(android.graphics.Color.RED)
                     } else {
-                        statsTv.text = "Messages Today:\n $count / 70"
-                        // Turn red if they are close to the limit
-                        if (count >= 50) {
-                            statsTv.setTextColor(android.graphics.Color.RED)
-                        } else {
-                            statsTv.setTextColor(android.graphics.Color.WHITE)
-                        }
+                        statsTv.setTextColor(android.graphics.Color.WHITE)
                     }
+                }
 
-                    if (profile.handle.isNullOrBlank()) {
-                        handleEditContainer.visibility = View.VISIBLE
-                        handleTv.visibility = View.GONE
-                    } else {
-                        handleTv.text = "\u0040${profile.handle}"
-                        handleTv.visibility = View.VISIBLE
-                        handleEditContainer.visibility = View.GONE
-                    }
+                // 5. --- DEV PANEL LOGIC ---
+                if (isDev) {
+                    devPanel.visibility = View.VISIBLE
+                    loadServerStatusForDev()
+                } else {
+                    devPanel.visibility = View.GONE
+                }
 
-                    if (!profile.iconUrl.isNullOrBlank()) {
-                        Glide.with(this).load(profile.iconUrl).into(iconView)
-                    }
+                // 6. --- HANDLE LOGIC ---
+                if (loadedHandle.isNullOrBlank()) {
+                    handleEditContainer.visibility = View.VISIBLE
+                    handleTv.visibility = View.GONE
+                } else {
+                    handleTv.text = "\u0040$loadedHandle"
+                    handleTv.visibility = View.VISIBLE
+                    handleEditContainer.visibility = View.GONE
+                }
+
+                // 7. --- ICON LOGIC ---
+                if (!loadedIcon.isNullOrBlank()) {
+                    Glide.with(this).load(loadedIcon).into(iconView)
                 }
             }
             .addOnFailureListener {
+                Toast.makeText(this, "Failed to load profile", Toast.LENGTH_SHORT).show()
                 handleEditContainer.visibility = View.VISIBLE
                 handleTv.visibility = View.GONE
             }
@@ -240,24 +310,21 @@ class ProfileActivity : BaseActivity() {
         val userDoc = db.collection("users").document(userId)
 
         fun updateProfileInFirestore(iconUrl: String?) {
-            // Use current data for fields not shown on this page
-            val current = userProfile
-            val profile = UserProfile(
-                handle = updatedHandle,
-                name = name,
-                bio = bio,
-                iconUrl = iconUrl ?: current?.iconUrl,
-                favorites = current?.favorites ?: emptyList(),
-                userPicks = current?.userPicks ?: emptyList(),
-                friends = current?.friends ?: emptyList(),
-                pendingFriends = current?.pendingFriends ?: emptyList(),
-                recentChats = current?.recentChats ?: emptyList()
+            // Build a map of ONLY the things that changed
+            val updates = mutableMapOf<String, Any>(
+                "name" to name,
+                "bio" to bio
             )
-            userDoc.set(profile)
+            updatedHandle?.let { updates["handle"] = it }
+            iconUrl?.let { updates["iconUrl"] = it }
+
+            // Use .update() instead of .set() so it doesn't wipe your isDev or isPremium flags!
+            userDoc.update(updates)
                 .addOnSuccessListener {
                     Toast.makeText(this, "Profile updated!", Toast.LENGTH_SHORT).show()
-                    currentIconUrl = profile.iconUrl
-                    userProfile = profile
+                    currentIconUrl = iconUrl ?: currentIconUrl
+                    // Reload the profile to get the freshest data
+                    loadProfile()
                 }
                 .addOnFailureListener { e ->
                     Toast.makeText(this, "Profile update failed: ${e.message}", Toast.LENGTH_LONG).show()

@@ -17,8 +17,6 @@ class RelationshipLevelAdapter(
     private val onDelete: (Int) -> Unit
 ) : RecyclerView.Adapter<RelationshipLevelAdapter.LevelViewHolder>() {
 
-    init { setHasStableIds(true) }
-
     override fun getItemId(position: Int): Long =
         levels[position].id.hashCode().toLong()
 
@@ -48,29 +46,21 @@ class RelationshipLevelAdapter(
         private var binding = false
 
         fun bind(item: RelationshipLevel) {
-            // 1) Detach old listeners so recycled holders don't keep writing
-            levelWatcher?.let { levelNumber.removeTextChangedListener(it) }
-            thresholdWatcher?.let { threshold.removeTextChangedListener(it) }
+            // 1. COMPLETELY REMOVE OLD WATCHERS FIRST
             personalityWatcher?.let { personality.removeTextChangedListener(it) }
+            thresholdWatcher?.let { threshold.removeTextChangedListener(it) }
 
-            // 2) Populate UI
+            // 2. Set the text while it's "safe"
             binding = true
             levelNumber.setText(item.level.toString())
             threshold.setText(item.threshold.toString())
             personality.setText(item.personality)
+
+            // Hardening limits
+            personality.filters = arrayOf(android.text.InputFilter.LengthFilter(200))
             binding = false
 
-            // 3) Attach fresh listeners that write to the correct row each time
-            levelWatcher = object : SimpleTextWatcher() {
-                override fun afterTextChanged(s: Editable) {
-                    if (binding) return
-                    val pos = bindingAdapterPosition
-                    if (pos != RecyclerView.NO_POSITION) {
-                        levels[pos].level = s.toString().toIntOrNull() ?: 0
-                    }
-                }
-            }.also { levelNumber.addTextChangedListener(it) }
-
+            // 3. CREATE AND ATTACH NEW WATCHERS
             thresholdWatcher = object : SimpleTextWatcher() {
                 override fun afterTextChanged(s: Editable) {
                     if (binding) return
@@ -91,7 +81,7 @@ class RelationshipLevelAdapter(
                 }
             }.also { personality.addTextChangedListener(it) }
 
-            // 4) Safe delete uses current adapter position (not captured 'position')
+            // Button click logic
             btnDelete.setOnClickListener {
                 val pos = bindingAdapterPosition
                 if (pos != RecyclerView.NO_POSITION) onDelete(pos)

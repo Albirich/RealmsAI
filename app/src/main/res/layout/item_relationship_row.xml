@@ -29,24 +29,25 @@
         android:text="Type"
         android:textSize="16sp"
         app:layout_constraintStart_toEndOf="@id/relationshipToNameEdit"
+        app:layout_constraintEnd_toStartOf="@id/relationshipSummaryEdit"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintBottom_toBottomOf="parent"
         android:layout_marginStart="6dp"/>
     <TextView
         android:id="@+id/relationshipSummaryEdit"
-        android:layout_width="wrap_content"
+        android:layout_width="210dp"
         android:layout_height="wrap_content"
         android:hint="Short desc"
         android:textSize="14sp"
         android:layout_marginStart="10dp"
         app:flow_horizontalAlign="start"
-        app:layout_constraintStart_toEndOf="@id/relationshipType"
+        app:layout_constraintEnd_toStartOf="@id/btnDeleteRelationship"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintBottom_toBottomOf="parent"
         android:layout_weight="2"
+        android:layout_marginEnd="10dp"
         android:inputType="textCapSentences|textMultiLine"
         />
-
 
     <!-- Optionally, add a delete button -->
     <ImageButton

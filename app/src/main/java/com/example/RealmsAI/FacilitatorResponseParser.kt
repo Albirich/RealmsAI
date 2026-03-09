@@ -8,6 +8,7 @@ import com.example.RealmsAI.models.ChatMessage
 import com.example.RealmsAI.models.ModeSettings
 import com.example.RealmsAI.models.ModeSettings.VNRelationship
 import com.example.RealmsAI.models.Relationship
+import com.example.RealmsAI.models.SessionProfile
 import com.example.RealmsAI.models.SlotProfile
 import com.example.RealmsAI.models.TaggedMemory
 import com.google.gson.Gson
@@ -173,8 +174,6 @@ object FacilitatorResponseParser {
     )
 
 
-
-
     fun parseRoleplayAIResponse(response: String, senderId: String, slotRoster: List<SlotProfile>): ParsedRoleplayResult {
         Log.d("ai_cycle", "recieved $response")
         val gson = Gson()
@@ -200,13 +199,13 @@ object FacilitatorResponseParser {
                 RelationshipPointChange(fromKey, toKey, entry.change)
             } ?: emptyList()
 
-
             return ParsedRoleplayResult(
                 messages = safeMessages,
                 newMemory = roleplayResponse.new_memory,
                 relationshipChanges = relationshipChanges,
                 actions = roleplayResponse.actions ?: emptyList()
             )
+
         } catch (e: Exception) {
             Log.e("FacilitatorResponseParser", "Malformed JSON (roleplay): $response", e)
             return ParsedRoleplayResult(messages = emptyList(), newMemory = null)
@@ -268,12 +267,18 @@ object FacilitatorResponseParser {
     )
 
     fun updateRelationshipsFromChanges(
-        boards: MutableMap<String, MutableMap<String, VNRelationship>>,
+        sessionProfile: SessionProfile,
         changes: List<RelationshipPointChange>
     ) {
         for (chg in changes) {
-            val row = boards.getOrPut(chg.fromSlotKey) { mutableMapOf() }
-            val rel = row.getOrPut(chg.toSlotKey) {
+            // 1. Extract the index from the slot key (e.g., "character2" -> index 1)
+            val slotIndex = chg.fromSlotKey.replace("character", "").toIntOrNull()?.minus(1) ?: continue
+
+            // 2. Find the character in the roster who is giving the points
+            val fromProfile = sessionProfile.slotRoster.getOrNull(slotIndex) ?: continue
+
+            // 3. Grab their relationship with the target, or create a blank one if it doesn't exist yet
+            val rel = fromProfile.vnRelationships.getOrPut(chg.toSlotKey) {
                 ModeSettings.VNRelationship(
                     fromSlotKey = chg.fromSlotKey,
                     toSlotKey   = chg.toSlotKey,
@@ -285,9 +290,13 @@ object FacilitatorResponseParser {
                     currentLevel= 0
                 )
             }
+
+            // 4. Apply the points and calculate the new level
             rel.points += chg.delta
             updateRelationshipLevel(rel)
-            // Optional: clamp to [0..max] or apply monogamy/jealousy here
+
+            // Note: Because fromProfile.vnRelationships is a direct reference to the map
+            // inside sessionProfile.slotRoster, the session is now successfully updated in memory!
         }
     }
 

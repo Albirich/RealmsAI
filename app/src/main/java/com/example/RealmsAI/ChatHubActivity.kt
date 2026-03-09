@@ -193,10 +193,12 @@ class ChatHubActivity : BaseActivity() {
         val newRef = db.collection("chats").document()
         val newChat = sourceProfile.copy(
             id = newRef.id,
+            originalId = sourceProfile.originalId,
             author = userId,
             title = "Copy of ${sourceProfile.title}",
             private = true,
             timestamp = Timestamp.now(),
+            secretDescription = "",
             ratingCount = 0,
             ratingSum = 0.0
         )
@@ -335,6 +337,7 @@ class ChatHubActivity : BaseActivity() {
 
             ChatPreview(
                 id = profile.id,
+                originalId = profile.originalId,
                 title = profile.title,
                 description = profile.description,
                 avatar1Uri = char1?.avatarUri ?: "",

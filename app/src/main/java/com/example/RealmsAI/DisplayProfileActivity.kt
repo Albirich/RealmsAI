@@ -333,6 +333,7 @@ class DisplayProfileActivity : BaseActivity() {
                     val cp = doc.toObject(CharacterProfile::class.java)?.copy(id = doc.id) ?: return@mapNotNull null
                     CharacterPreview(
                         id = cp.id,
+                        originalId = cp.originalId,
                         name = cp.name,
                         summary = cp.summary.orEmpty(),
                         avatarUri = cp.avatarUri,
@@ -405,6 +406,7 @@ class DisplayProfileActivity : BaseActivity() {
                                 chatList.add(
                                     ChatPreview(
                                         id = chatProfile.id,
+                                        originalId = chatProfile.id,
                                         title = chatProfile.title,
                                         description = chatProfile.description,
                                         avatar1Uri = char1?.avatarUri.orEmpty(),

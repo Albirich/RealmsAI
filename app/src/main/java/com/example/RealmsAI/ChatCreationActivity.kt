@@ -1,6 +1,7 @@
 package com.example.RealmsAI
 
 import android.app.Activity
+import android.content.DialogInterface
 import android.content.Intent
 import android.os.Bundle
 import android.util.Log
@@ -10,6 +11,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.runtime.toMutableStateList
+import androidx.core.text.HtmlCompat
 import com.example.RealmsAI.models.*
 import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
@@ -18,6 +20,7 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.google.firebase.firestore.FieldPath
+import com.google.firebase.firestore.ServerTimestamp
 
 class ChatCreationActivity : AppCompatActivity() {
 
@@ -38,6 +41,7 @@ class ChatCreationActivity : AppCompatActivity() {
     private var characterToLocationMap: MutableMap<String, String> = mutableMapOf()
     private var chatRelationships: MutableList<Relationship> = mutableListOf()
     private var editingChatId: String? = null
+    private var editingOriginalId: String? = null
     private var modeSettings: MutableMap<String, String> = mutableMapOf()
 
 
@@ -54,6 +58,7 @@ class ChatCreationActivity : AppCompatActivity() {
     // Track selection state
     private val checkedTags = BooleanArray(availableTags.size)
     private val currentTags = mutableListOf<String>()
+    private var startedTimestamp: Timestamp? = null
 
 
 
@@ -108,8 +113,8 @@ class ChatCreationActivity : AppCompatActivity() {
         sfwSwitch = findViewById(R.id.sfwSwitch)
         privateSwitch = findViewById(R.id.privateSwitch)
         universeEt = findViewById(R.id.universeEditText)
-        selectTagsBtn = findViewById(R.id.selectTagsButton)
-        selectedTagsTv = findViewById(R.id.selectedTagsText)
+        selectTagsBtn = findViewById(R.id.selectChatTagsButton)
+        selectedTagsTv = findViewById(R.id.selectedChatTagsText)
         createBtn = findViewById(R.id.createChatButton)
         relationshipBtn = findViewById(R.id.chatrelationshipBtn)
         btnLoadCollections = findViewById(R.id.btnLoadCollections)
@@ -127,7 +132,8 @@ class ChatCreationActivity : AppCompatActivity() {
 
         // --- Check if editing a chat ---
         val chatProfileJson = intent.getStringExtra("CHAT_PROFILE_JSON")
-        editingChatId = intent.getStringExtra("CHAT_EDIT_ID") // Track edit mode for save
+        editingChatId = intent.getStringExtra("CHAT_EDIT_ID")
+        editingOriginalId = intent.getStringExtra("CHAT_EDIT_ORIGINALID")
 
         if (chatProfileJson != null) {
             val profile = gson.fromJson(chatProfileJson, ChatProfile::class.java)
@@ -139,12 +145,15 @@ class ChatCreationActivity : AppCompatActivity() {
             sfwSwitch.isChecked = profile.sfwOnly
             privateSwitch.isChecked = profile.private
             universeEt = findViewById(R.id.universeEditText)
-            selectTagsBtn = findViewById(R.id.selectTagsButton)
-            selectedTagsTv = findViewById(R.id.selectedTagsText)
+            selectTagsBtn = findViewById(R.id.selectChatTagsButton)
+            selectedTagsTv = findViewById(R.id.selectedChatTagsText)
             // Store areas and characterToArea
             loadedAreas = profile.areas.toMutableList()
             characterToAreaMap = profile.characterToArea.toMutableMap()
+            characterToLocationMap = profile.characterToLocation.toMutableMap()
             chatRelationships = profile.relationships.toMutableList()
+            startedTimestamp  = profile.timestamp
+
 
             // Load full character objects by ID for UI use (avatars/relationships)
             if (profile.characterIds.isNotEmpty()) {
@@ -185,12 +194,13 @@ class ChatCreationActivity : AppCompatActivity() {
 
         val infoButtonChatGameMode: ImageButton = findViewById(R.id.infoButtonChatGameMode)
         infoButtonChatGameMode.setOnClickListener {
+            val messageHtml = "Choose what special rules you want to add. Modes are additive so you can mix and match them.<br><br>" +
+                    "<b>RPG Mode</b> - gives dice rolls, character sheets, light rpg rules<br><br>" +
+                    "<b>VN Mode</b> - gives relationship levels that evolve the way characters interact<br><br>" +
+                    "<b>God Mode</b> - removes the need for the user to have a character, all their messages will be system messages (Not implemented yet)"
             AlertDialog.Builder(this@ChatCreationActivity)
                 .setTitle("Game Modes")
-                .setMessage("Choose what special rules you want to add. Modes are additive so you can mix and match them\n" +
-                        "RPG Mode - gives dice rolls, character sheets, light rpg rules\n" +
-                        "VN Mode - gives relationship levels that evolve the way characters interact\n" +
-                        "God Mode - removes the need for the user to have a character, all their messages will be system messages (Not implemented yet)")
+                .setMessage(HtmlCompat.fromHtml(messageHtml, HtmlCompat.FROM_HTML_MODE_LEGACY))
                 .setPositiveButton("OK", null)
                 .show()
         }
@@ -293,14 +303,13 @@ class ChatCreationActivity : AppCompatActivity() {
         }
 
         // Create or Save Chat button
-        // Inside onCreate...
-
         createBtn.setOnClickListener {
             // 1. Basic Validation
             if (titleEt.text.isNullOrBlank()) {
                 titleEt.error = "Title required"
                 return@setOnClickListener
             }
+
 
             // 2. Define the save action
             val performSave = { isPrivateOverride: Boolean? ->
@@ -387,7 +396,7 @@ class ChatCreationActivity : AppCompatActivity() {
     private fun attemptSaveLogic(editingId: String?, onPermissionGranted: (Boolean?) -> Unit) {
         val userId = FirebaseAuth.getInstance().currentUser?.uid ?: return
         val db = FirebaseFirestore.getInstance()
-        val PRIVATE_CHAT_LIMIT = 5 // Set your limit for free users
+        val PRIVATE_CHAT_LIMIT = 5
 
         // Optional: Add a simple progress dialog here if you want visuals like CharacterCreation
         // showProgressDialog()
@@ -449,6 +458,7 @@ class ChatCreationActivity : AppCompatActivity() {
 
     private fun saveAndLaunchChat() {
         val chatId = editingChatId ?: System.currentTimeMillis().toString()
+        val originalId = editingOriginalId ?: chatId
         val title = titleEt.text.toString().trim()
         val desc = descEt.text.toString().trim()
         val secretDesc = secretDescEt.text.toString().trim()
@@ -461,11 +471,38 @@ class ChatCreationActivity : AppCompatActivity() {
         if (findViewById<CheckBox>(R.id.checkboxRPG).isChecked) enabledModes.add("rpg")
         if (findViewById<CheckBox>(R.id.checkboxVisualNovel).isChecked) enabledModes.add("visual_novel")
         if (findViewById<CheckBox>(R.id.checkboxGodMode).isChecked) enabledModes.add("god_mode")
+        val actualTimestamp = if (startedTimestamp == null ){
+            Timestamp.now()
+        } else {
+            startedTimestamp
+        }
+
+        if (title.isEmpty()) {
+            titleEt.error = "Title required"
+            return
+        }
+        if (title.length > 100) {
+            Toast.makeText(this, "Title too long (Max 100)", Toast.LENGTH_SHORT).show()
+            return
+        }
+        if (desc.length > 1000) {
+            Toast.makeText(this, "Description too long (Max 1000)", Toast.LENGTH_SHORT).show()
+            return
+        }
+        if (secretDesc.length > 1000) {
+            Toast.makeText(this, "Secret Description too long (Max 1000)", Toast.LENGTH_SHORT).show()
+            return
+        }
+        if (firstMsg.length > 200) {
+            Toast.makeText(this, "First Message too long (Max 100)", Toast.LENGTH_SHORT).show()
+            return
+        }
 
         val authorId = FirebaseAuth.getInstance().currentUser?.uid ?: ""
 
         val profile = ChatProfile(
             id = chatId,
+            originalId = originalId,
             title = title,
             description = desc,
             secretDescription = secretDesc,
@@ -479,7 +516,8 @@ class ChatCreationActivity : AppCompatActivity() {
             characterToLocation = characterToLocationMap,
             relationships = chatRelationships,
             rating = 0f,
-            timestamp = Timestamp.now(),
+            timestamp = actualTimestamp,
+            updateTimestamp = Timestamp.now(),
             author = authorId,
             tags = tags,
             universe = universe,
@@ -489,6 +527,7 @@ class ChatCreationActivity : AppCompatActivity() {
 
         val chatData = mapOf(
             "id" to profile.id,
+            "originalid" to profile.originalId,
             "title" to profile.title,
             "description" to profile.description,
             "secretDescription" to profile.secretDescription,
@@ -498,10 +537,15 @@ class ChatCreationActivity : AppCompatActivity() {
             "modeSettings" to profile.modeSettings,
             "areas" to profile.areas.map { area ->
                 mapOf(
+                    "creatorId" to area.creatorId,
                     "id" to area.id,
-                    "name" to area.name,
+                    "name" to area.name.trim(),
                     "locations" to area.locations.map { loc ->
-                        mapOf("id" to loc.id, "name" to loc.name, "uri" to loc.uri)
+                        mapOf(
+                            "id" to loc.id,
+                            "name" to loc.name.trim(),
+                            "uri" to loc.uri,
+                            "description" to (loc.description?.trim() ?: ""))
                     }
                 )
             },
@@ -510,7 +554,9 @@ class ChatCreationActivity : AppCompatActivity() {
             "characterToLocation" to profile.characterToLocation,
             "relationships" to profile.relationships,
             "rating" to profile.rating,
-            "timestamp" to Timestamp.now(),
+            "timestamp" to actualTimestamp,
+            "updateTimestamp" to FieldValue.serverTimestamp(),
+            "lastTimestamp" to FieldValue.serverTimestamp(),
             "author" to authorId,
             "tags" to profile.tags,
             "universe" to profile.universe,
@@ -525,6 +571,7 @@ class ChatCreationActivity : AppCompatActivity() {
             .document(chatId)
             .set(chatData)
             .addOnSuccessListener {
+                Log.d("creation_debug", "sucessfully saved")
                 Toast.makeText(this, "Chat saved!", Toast.LENGTH_SHORT).show()
                 val intent = Intent(this, CreationHubActivity::class.java)
                 intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP

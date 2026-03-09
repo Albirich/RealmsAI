@@ -57,12 +57,21 @@ class SessionHubActivity : BaseActivity() {
                     // Check if session has actually started
                     val isStarted = data["started"] as? Boolean ?: false
 
+                    // Safely cast both to strings first
+                    val sessionTitle = data["sessionTitle"] as? String
+                    val baseTitle = data["title"] as? String
+
+                    // Check sessionTitle. If it's empty, fall back to baseTitle. If THAT is empty, use Untitled.
+                    val displayTitle = sessionTitle?.takeIf { it.isNotBlank() }
+                        ?: baseTitle?.takeIf { it.isNotBlank() }
+                        ?: "(Untitled Session)"
+
                     if (isStarted) {
                         // Valid session -> Add to list
                         previews.add(
                             SessionPreview(
                                 id = doc.id,
-                                title = data["title"] as? String ?: "(Untitled Session)",
+                                title = displayTitle, // Use our newly calculated title here
                                 chatId = data["chatId"] as? String ?: "",
                                 timestamp = (data["startedAt"] as? Timestamp)?.seconds ?: 0L,
                                 rawJson = gson.toJson(data)
@@ -130,7 +139,6 @@ class SessionHubActivity : BaseActivity() {
             val updatedUserAssignments = userAssignments.filterValues { it != userId }
             userList.remove(userId)
 
-            // TODO: If you want, also update/remove user from userMap and any other structures.
 
             if (userList.isEmpty()) {
                 // Last user: delete subcollections, then session doc
@@ -333,8 +341,7 @@ class SessionHubActivity : BaseActivity() {
             Area(
                 id = map["id"] as? String ?: "",
                 name = map["name"] as? String ?: "",
-                locations = parseLocations(map["locations"]).toMutableList(),
-                creatorId = map["creatorId"] as? String ?: ""
+                locations = parseLocations(map["locations"]).toMutableList()
             )
         } ?: emptyList()
     }
@@ -346,8 +353,7 @@ class SessionHubActivity : BaseActivity() {
             LocationSlot(
                 id = map["id"] as? String ?: "",
                 name = map["name"] as? String ?: "",
-                uri = map["uri"] as? String ?: "",
-                characters = ((map["characters"] as? List<String>) ?: emptyList()).toMutableList()
+                uri = map["uri"] as? String ?: ""
             )
         } ?: emptyList()
     }
@@ -355,11 +361,7 @@ class SessionHubActivity : BaseActivity() {
     private fun parseChatMessages(raw: Any?): List<ChatMessage> {
         return (raw as? List<*>)?.mapNotNull { item ->
             val map = item as? Map<*, *> ?: return@mapNotNull null
-            val poseMap = (map["pose"] as? Map<*, *>)?.mapNotNull { (k, v) ->
-                val key = k as? String ?: return@mapNotNull null
-                val poseName = v as? String ?: return@mapNotNull null
-                key to poseName
-            }?.toMap()
+            val poseString = map["pose"] as? String
             val imageUpdatesMap = (map["imageUpdates"] as? Map<*, *>)?.mapNotNull { (k, v) ->
                 val key = (k as? String)?.toIntOrNull() ?: return@mapNotNull null
                 key to (v as? String)
@@ -369,7 +371,7 @@ class SessionHubActivity : BaseActivity() {
                 id = map["id"] as? String ?: "",
                 senderId = map["senderId"] as? String ?: "",
                 text = map["text"] as? String ?: "",
-                pose = poseMap,
+                pose = poseString,
                 delay = (map["delay"] as? Number)?.toInt() ?: 0,
                 timestamp = map["timestamp"] as? com.google.firebase.Timestamp
                     ?: com.google.firebase.Timestamp.now(),

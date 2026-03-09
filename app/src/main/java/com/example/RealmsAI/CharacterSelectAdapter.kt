@@ -11,7 +11,7 @@ import com.example.RealmsAI.models.CharacterProfile
 class CharacterSelectAdapter(
     private val characters: List<CharacterProfile>,
     private val selectedIds: Set<String>,
-    private val onToggle: (String) -> Unit,
+    private val onClick: (CharacterProfile) -> Unit,
     private val loadAvatar: (ImageView, String?) -> Unit
 ) : RecyclerView.Adapter<CharacterSelectAdapter.ViewHolder>() {
 
@@ -31,7 +31,7 @@ class CharacterSelectAdapter(
                 if (isSelected) R.drawable.chat_card_selected else R.drawable.chat_card
             )
             itemView.setOnClickListener {
-                onToggle(character.id)
+                onClick(character)
             }
         }
     }

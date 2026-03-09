@@ -1,6 +1,6 @@
 package com.example.RealmsAI
 
-import android.app.AlertDialog
+import androidx.appcompat.app.AlertDialog
 import android.net.Uri
 import android.os.Bundle
 import android.util.Log
@@ -40,17 +40,21 @@ class BackgroundGalleryActivity : AppCompatActivity() {
     private lateinit var imagePicker: ActivityResultLauncher<String>
 
     private var currentArea: Area? = null
-    private var currentLocation: LocationSlot? = null
-    private var progressDialog: androidx.appcompat.app.AlertDialog? = null
+    // removed current location variable as it was part of the bug
+    private var progressDialog: AlertDialog? = null
+
     // Temp state for the dialog being edited
     private var editingLocation: LocationSlot? = null
     private var dialogImageView: ImageView? = null
+
+    private var pendingLocation: LocationSlot? = null
+    private var pendingAdapter: RecyclerView.Adapter<*>? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_background_gallery)
 
-        // Image Picker Setup
+        // Image Picker Registration
         imagePicker = registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
             uri?.let {
                 if (editingLocation != null && dialogImageView != null) {
@@ -62,57 +66,57 @@ class BackgroundGalleryActivity : AppCompatActivity() {
 
         // Recycler Setup
         val recycler = findViewById<RecyclerView>(R.id.areaRecycler)
+
+        // FIX: Assign to the class-level variable 'areaAdapter', NOT a local 'val adapter'
         areaAdapter = AreaAdapter(
             areas = areas,
-            onManageLocation = { area, location, adapter ->
-                showLocationDialog(area, location, adapter)
+            areaColors = null,
+            readonly = false,
+
+            onRemoveArea = { area ->
+                confirmDeleteArea(area)
             },
-            readonly = false
+
+            onManageLocation = { area, locSlot, adapter ->
+                // FIX: Use the actual function name we defined
+                showLocationDialog(area, locSlot, adapter)
+            }
         )
+
         recycler.layoutManager = LinearLayoutManager(this)
         recycler.adapter = areaAdapter
 
-        // Image Picker
-        imagePicker = registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
-            uri?.let {
-                currentLocation?.uri = uri.toString()
-                areaAdapter.notifyDataSetChanged() // Or notify the right item
-            }
-        }
-
-        // Add Area
+        // Add Area Button
         findViewById<MaterialButton>(R.id.addAreaButton).setOnClickListener {
             areas.add(
                 Area(
                     id = UUID.randomUUID().toString(),
                     creatorId = FirebaseAuth.getInstance().currentUser?.uid ?: "",
                     name = "",
-                    locations = mutableListOf() // Start empty
+                    locations = mutableListOf()
                 )
             )
             areaAdapter.notifyItemInserted(areas.size - 1)
         }
 
+        // Load Areas logic...
         loadAreasForPicker { userAreas, _ ->
             areas.clear()
-            areas.addAll(userAreas.map { area ->
-                area.copy(
-                    id = UUID.randomUUID().toString(),
-                    creatorId = FirebaseAuth.getInstance().currentUser?.uid ?: "",
-                    locations = area.locations.map { it.copy(id = UUID.randomUUID().toString()) }.toMutableList()
-                )
-            })
+            areas.addAll(userAreas)
+            areas.sortBy { it.name.lowercase() }
             areaAdapter.notifyDataSetChanged()
         }
 
-        // Load Area
+        // Load/Import Button
         findViewById<MaterialButton>(R.id.loadAreaButton).setOnClickListener {
             loadAreasForPicker { userAreas, defaultAreas ->
                 showDualAreaPickerDialog(userAreas, defaultAreas) { pickedArea ->
                     val newArea = pickedArea.copy(
                         id = UUID.randomUUID().toString(),
                         creatorId = FirebaseAuth.getInstance().currentUser?.uid ?: "",
-                        locations = pickedArea.locations.map { it.copy(id = UUID.randomUUID().toString()) }.toMutableList()
+                        locations = pickedArea.locations.map { oldLoc ->
+                            oldLoc.copy(id = UUID.randomUUID().toString())
+                        }.toMutableList()
                     )
                     areas.add(newArea)
                     areaAdapter.notifyItemInserted(areas.size - 1)
@@ -120,7 +124,7 @@ class BackgroundGalleryActivity : AppCompatActivity() {
             }
         }
 
-        // Save All
+        // Save Button
         findViewById<MaterialButton>(R.id.submitGalleryButton).setOnClickListener {
             saveAllAreas()
         }
@@ -158,6 +162,8 @@ class BackgroundGalleryActivity : AppCompatActivity() {
         // Bind Actions
         imgView.setOnClickListener {
             imagePicker.launch("image/*")
+            pendingLocation = tempLocation
+            pendingAdapter = adapter
         }
 
         val dialog = AlertDialog.Builder(this)
@@ -172,7 +178,9 @@ class BackgroundGalleryActivity : AppCompatActivity() {
                 val index = area.locations.indexOfFirst { it.id == existingLocation?.id }
                 if (index != -1) {
                     area.locations.removeAt(index)
-                    adapter.notifyItemRemoved(index)
+                    // Notify the AREA adapter that the AREA changed (so it redraws the location list)
+                    val areaIndex = areas.indexOf(area)
+                    if (areaIndex != -1) adapter.notifyItemChanged(areaIndex)
                 }
             }
             dialog.dismiss()
@@ -185,23 +193,40 @@ class BackgroundGalleryActivity : AppCompatActivity() {
                 Toast.makeText(this, "Name is required", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
+            if (newName.length > 20) {
+                Toast.makeText(this, "First Message too long (Max 20)", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            val newDesc = descInput.text.toString().trim()
+            if (newDesc.length > 100) {
+                Toast.makeText(this, "First Message too long (Max 100)", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
 
             // Update the temp object
             tempLocation.name = newName
-            tempLocation.description = descInput.text.toString().trim()
+            tempLocation.description = newDesc
 
+            // --- FIX 2: CORRECT ADAPTER NOTIFICATION ---
             if (isNew) {
-                // Add to list
                 area.locations.add(tempLocation)
-                adapter.notifyItemInserted(area.locations.size - 1)
             } else {
-                // Update existing in list
                 val index = area.locations.indexOfFirst { it.id == existingLocation?.id }
                 if (index != -1) {
                     area.locations[index] = tempLocation
-                    adapter.notifyItemChanged(index)
                 }
             }
+
+            // We modified the internals of an Area, so we must tell the AreaAdapter
+            // to refresh that specific Area row.
+            val areaIndex = areas.indexOf(area)
+            if (areaIndex != -1) {
+                adapter.notifyItemChanged(areaIndex)
+            } else {
+                // Fallback if we somehow can't find the index
+                adapter.notifyDataSetChanged()
+            }
+
             dialog.dismiss()
         }
 
@@ -223,6 +248,8 @@ class BackgroundGalleryActivity : AppCompatActivity() {
         }
 
         fun saveAreaWithUploads(area: Area, onComplete: (Boolean) -> Unit) {
+            // 1. USE THE UUID AS THE DOC ID (This prevents duplicates)
+            val saveDocId = area.id
             val safeAreaName = safeName(area.name)
             val tasks = mutableListOf<Task<*>>()
 
@@ -231,11 +258,15 @@ class BackgroundGalleryActivity : AppCompatActivity() {
                 if (uriStr.isNullOrBlank()) return@forEach
                 val fileUri = Uri.parse(uriStr)
 
+                // Only upload if it's a local file (content:// or file://)
                 if (fileUri.scheme == "content" || fileUri.scheme == "file") {
-                    // Ensure unique file per location using ID
-                    val safeLocName = safeName(loc.name) + "_" + (loc.id ?: UUID.randomUUID().toString())
+                    // Include UUID in filename to prevent overwriting images in storage
+                    val safeLocName = safeName(loc.name) + "_" + UUID.randomUUID().toString().take(8)
                     val filename = "$safeLocName.jpg"
-                    val storageRef = storage.reference.child("backgrounds/$safeAreaName/$filename")
+
+                    // Organize storage by Area ID to keep it clean
+                    val storageRef = storage.reference.child("backgrounds/${area.id}/$filename")
+
                     val uploadTask = storageRef.putFile(fileUri)
                         .continueWithTask { task ->
                             if (!task.isSuccessful) throw task.exception ?: Exception("Upload failed")
@@ -247,14 +278,23 @@ class BackgroundGalleryActivity : AppCompatActivity() {
                     tasks.add(uploadTask)
                 }
             }
-            Tasks.whenAllComplete(tasks).addOnSuccessListener {
+
+            // Define the final save action to avoid code duplication
+            val finalSave = {
                 area.creatorId = userId
-                val saveDocId = "${userId}_${safeAreaName}"
                 db.collection("areas").document(saveDocId).set(area)
                     .addOnSuccessListener { onComplete(true) }
                     .addOnFailureListener { onComplete(false) }
-            }.addOnFailureListener {
-                onComplete(false)
+            }
+
+            if (tasks.isEmpty()) {
+                finalSave()
+            } else {
+                Tasks.whenAllComplete(tasks).addOnSuccessListener {
+                    finalSave()
+                }.addOnFailureListener {
+                    onComplete(false)
+                }
             }
         }
 
@@ -268,7 +308,6 @@ class BackgroundGalleryActivity : AppCompatActivity() {
             saveAreaWithUploads(areas[index]) { success ->
                 if (!success) {
                     Toast.makeText(this, "Failed to save area: ${areas[index].name}", Toast.LENGTH_SHORT).show()
-                    // Optionally bail out here: return
                 }
                 saveNextArea(index + 1)
             }
@@ -359,11 +398,83 @@ class BackgroundGalleryActivity : AppCompatActivity() {
     }
 
     private fun showProgressDialog() {
-        progressDialog = AlertDialog.Builder(this)
-            .setTitle("Saving Backgrounds")
-            .setMessage("Please don’t close the app. Your backgrounds are being saved and uploaded. This can take a while for large images or slow connections…")
-            .setCancelable(false)
-            .show() as androidx.appcompat.app.AlertDialog?
+        // Force the usage of the AppCompat (Modern) Builder
+        val builder = AlertDialog.Builder(this)
+        builder.setMessage("Saving backgrounds...") // Or setView if you use a custom layout
+        builder.setCancelable(false)
+
+        progressDialog = builder.create()
+        progressDialog?.show()
+    }
+
+    private fun hideProgressDialog() {
+        progressDialog?.dismiss()
+        progressDialog = null
+    }
+
+    // In BackgroundGalleryActivity.kt
+
+    private fun confirmDeleteArea(area: Area) {
+        // 1. Use the Modern Dialog Builder (Safe from crashes!)
+        androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle("Delete '${area.name}'?")
+            .setMessage("This will remove the Area and all its Locations from your list.\n\n(Existing chats using this area will NOT be affected.)")
+            .setPositiveButton("Delete") { _, _ ->
+                performDeleteArea(area)
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun performDeleteArea(area: Area) {
+        val db = com.google.firebase.firestore.FirebaseFirestore.getInstance()
+
+        showProgressDialog()
+
+        // 1. QUERY to find the document in the Root Collection
+        db.collection("areas")
+            .whereEqualTo("id", area.id) // Look for the document containing this UUID
+            .get()
+            .addOnSuccessListener { snapshot ->
+
+                if (snapshot.isEmpty) {
+                    hideProgressDialog()
+                    // It's already gone from the server, just clean up UI
+                    val index = areas.indexOfFirst { it.id == area.id }
+                    if (index != -1) {
+                        areas.removeAt(index)
+                        areaAdapter.notifyDataSetChanged()
+                    }
+                    return@addOnSuccessListener
+                }
+
+                // 2. DELETE every matching document (should usually be just one)
+                val batch = db.batch()
+                for (document in snapshot.documents) {
+                    batch.delete(document.reference)
+                }
+
+                batch.commit()
+                    .addOnSuccessListener {
+                        hideProgressDialog()
+                        android.widget.Toast.makeText(this, "Area deleted!", android.widget.Toast.LENGTH_SHORT).show()
+
+                        // 3. Update UI
+                        val index = areas.indexOfFirst { it.id == area.id }
+                        if (index != -1) {
+                            areas.removeAt(index)
+                            areaAdapter.notifyDataSetChanged()
+                        }
+                    }
+                    .addOnFailureListener { e ->
+                        hideProgressDialog()
+                        android.widget.Toast.makeText(this, "Error deleting: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
+                    }
+            }
+            .addOnFailureListener { e ->
+                hideProgressDialog()
+                android.widget.Toast.makeText(this, "Connection failed: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
+            }
     }
 
     private fun dismissProgressDialog() {

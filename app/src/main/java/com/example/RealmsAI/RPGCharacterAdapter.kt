@@ -240,15 +240,20 @@ class RPGCharacterAdapter(
 
         // Equipment logic
         holder.equipmentEdit.setText(rpgChar.equipment.joinToString(", "))
+        holder.equipmentEdit.filters = arrayOf(android.text.InputFilter.LengthFilter(200))
         holder.equipmentEdit.addTextChangedListener(object : TextWatcher {
+            override fun afterTextChanged(s: Editable?) {
+                val list = s.toString().split(",").map { it.trim() }.filter { it.isNotEmpty() }
+                if (list.size > 10) {
+                    holder.equipmentEdit.error = "Max 10 items allowed"
+                } else {
+                    holder.equipmentEdit.error = null
+                }
+
+                rpgChar.equipment = list
+            }
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
-            override fun afterTextChanged(s: Editable?) {
-                rpgChar.equipment = holder.equipmentEdit.text.toString()
-                    .split(",")
-                    .map { it.trim() }
-                    .filter { it.isNotEmpty() }
-            }
         })
     }
 

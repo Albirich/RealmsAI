@@ -44,7 +44,6 @@ import androidx.core.content.ContextCompat
 import com.example.RealmsAI.FacilitatorResponseParser.Action
 import com.example.RealmsAI.FacilitatorResponseParser.NewNPCData
 import com.example.RealmsAI.FacilitatorResponseParser.updateRelationshipLevel
-import com.example.RealmsAI.FacilitatorResponseParser.updateRelationshipsFromChanges
 import com.example.RealmsAI.adapters.CollectionAdapter.CharacterRowAdapter
 import com.example.RealmsAI.ai.Director
 import com.example.RealmsAI.ai.PromptBuilder.buildDiceRoll
@@ -88,8 +87,8 @@ class MainActivity : AppCompatActivity() {
 
    
     // UI
-    private lateinit var chatTitleView: TextView
-    private lateinit var chatDescriptionView: TextView
+//    private lateinit var chatTitleView: TextView
+//    private lateinit var chatDescriptionView: TextView
     private lateinit var chatRecycler: RecyclerView
     private lateinit var rollRecyclerView: RecyclerView
     private lateinit var messageEditText: EditText
@@ -106,7 +105,7 @@ class MainActivity : AppCompatActivity() {
     private var isDescriptionExpanded = false
     private var lastMultiplayerValue: Boolean? = null
     private lateinit var resendButton: ImageButton
-    private lateinit var typingIndicatorBar: LinearLayout
+    private lateinit var typingIndicatorBar: android.view.ViewGroup
     private lateinit var toggleControlButton: ImageButton
     private lateinit var toggleChatButton: ImageButton
     private lateinit var moveButton: Button
@@ -115,6 +114,7 @@ class MainActivity : AppCompatActivity() {
     // Dice roll UI elements
     private lateinit var rollButton: ImageButton
     private lateinit var diceImageView: ImageView
+    private val expandedAreaIds = mutableSetOf<String>()
 
     // State
     private lateinit var sessionProfile: SessionProfile
@@ -148,10 +148,11 @@ class MainActivity : AppCompatActivity() {
 
     private var typingTimeoutJob: Job? = null
 
-
     private lateinit var sessionId: String
     private lateinit var userId: String
     private lateinit var chatId: String
+    private lateinit var nextSlotId: String
+    private lateinit var previousSpeakerId: String
 
     private var currentUser: SessionUser? = null
 
@@ -172,6 +173,23 @@ class MainActivity : AppCompatActivity() {
     private val isHost: Boolean
         get() = sessionProfile.userList.isNotEmpty() && sessionProfile.userList[0] == userId
 
+    // Friendly Name -> Internal ID
+    private val availableModels = mapOf(
+        "DeepSeek V3.2" to "deepseek",
+        "Grok 4.1" to "grok4.1",
+        "Openai gpt-oss-120b" to "openai",
+        "Gemini 2.5" to "gemini",
+        "Z-AI" to "z-ai",
+        "Acree" to "acre",
+        "Nemo (12B)" to "nemo",
+        "Xiaomi" to "xiaomi",
+        "Mistral Small" to "mistral_small",
+        // "moonshot" to "moonshot"
+        "Mistral Medium" to "mistral_med",
+        "Minimax (sfw)" to "minimax",
+        "OpenAI GPT-4o (sfw)" to "openai-gpt-4o",
+        // "Haiku.5" to "Claude",
+    )
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -192,7 +210,7 @@ class MainActivity : AppCompatActivity() {
             finish()
             return
         }
-        initialGreeting = intent.getStringExtra("GREETING")
+
 
         // 2. Check if we received the Profile (Legacy/Small) OR need to fetch (Safe)
         val profileJson = intent.getStringExtra("SESSION_PROFILE_JSON")
@@ -238,12 +256,13 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun initializeChatInterface() {
+
         // Find the current SessionUser (for name lookup, etc.)
         currentUser = sessionProfile.userMap[userId]
 
         // Bind UI
-        chatTitleView = findViewById(R.id.chatTitle)
-        chatDescriptionView = findViewById(R.id.chatDescription)
+//        chatTitleView = findViewById(R.id.chatTitle)
+//        chatDescriptionView = findViewById(R.id.chatDescription)
         chatRecycler = findViewById(R.id.chatRecyclerView)
         rollRecyclerView = findViewById(R.id.rollRecyclerView)
         messageEditText = findViewById(R.id.messageEditText)
@@ -272,11 +291,11 @@ class MainActivity : AppCompatActivity() {
         characterSheetButton = findViewById(R.id.characterSheetButton)
         rollHistoryButton = findViewById(R.id.rollHistoryButton)
         // UI display
-        chatTitleView.text = sessionProfile.title
-        val descriptionHeader = findViewById<LinearLayout>(R.id.descriptionHeader)
-        val descriptionDropdown = findViewById<LinearLayout>(R.id.descriptionDropdown)
-        val chatDescriptionView = findViewById<TextView>(R.id.chatDescription)
-        val descriptionToggle = findViewById<ImageView>(R.id.descriptionToggle)
+        // chatTitleView.text = sessionProfile.title
+        // val descriptionHeader = findViewById<LinearLayout>(R.id.descriptionHeader)
+        // val descriptionDropdown = findViewById<LinearLayout>(R.id.descriptionDropdown)
+        // val chatDescriptionView = findViewById<TextView>(R.id.chatDescription)
+        // val descriptionToggle = findViewById<ImageView>(R.id.descriptionToggle)
         chatId = sessionProfile.chatId
 
         val rootView = findViewById<View>(R.id.chatRoot)
@@ -310,21 +329,21 @@ class MainActivity : AppCompatActivity() {
                 backgroundImageView.translationY = 0f
             }
         }
-        chatDescriptionView.text = sessionProfile.sessionDescription
-        descriptionDropdown.visibility = View.GONE
-
-        descriptionHeader.setOnClickListener {
-            isDescriptionExpanded = !isDescriptionExpanded
-            if (isDescriptionExpanded) {
-                descriptionDropdown.visibility = View.VISIBLE
-                // Optional: Animate arrow down (expanded)
-                descriptionToggle.setImageResource(R.drawable.ic_expand_less) // up arrow
-            } else {
-                descriptionDropdown.visibility = View.GONE
-                // Optional: Animate arrow up (collapsed)
-                descriptionToggle.setImageResource(R.drawable.ic_expand_more) // down arrow
-            }
-        }
+//        chatDescriptionView.text = sessionProfile.sessionDescription
+//        descriptionDropdown.visibility = View.GONE
+//
+//        descriptionHeader.setOnClickListener {
+//            isDescriptionExpanded = !isDescriptionExpanded
+//            if (isDescriptionExpanded) {
+//                descriptionDropdown.visibility = View.VISIBLE
+//                // Optional: Animate arrow down (expanded)
+//                descriptionToggle.setImageResource(R.drawable.ic_expand_less) // up arrow
+//            } else {
+//                descriptionDropdown.visibility = View.GONE
+//                // Optional: Animate arrow up (collapsed)
+//                descriptionToggle.setImageResource(R.drawable.ic_expand_more) // down arrow
+//            }
+//        }
         var activeSlotId = sessionProfile.userMap[userId]?.activeSlotId
         // Adapter setup (pass in modern fields)
         val isMultiplayer = sessionProfile.userMap.size > 1
@@ -336,28 +355,54 @@ class MainActivity : AppCompatActivity() {
             sessionProfile.userMap.values.toList(),
             userId,
             onEditMessage = { editedMessage, position ->
-                lifecycleScope.launch {
-                    // 1. Delete following messages
-                    val deletedIds = saveEditedMessageAndDeleteFollowing(editedMessage, position)
+                // 0. Check server status
+                checkServerStatusBeforeSending {
+                    // 1. Run the limit check (Standard function, safe to call here)
+                    checkMessageLimit {
 
-                    // 2. Clean up histories
-                    deleteFromSlotPersonalHistories(sessionId, deletedIds)
+                        // 2. Limit Passed! NOW launch the coroutine to handle the suspend functions.
+                        lifecycleScope.launch {
+                            try {
+                                // 1. Delete following messages (Suspend)
+                                val deletedIds =
+                                    saveEditedMessageAndDeleteFollowing(editedMessage, position)
 
-                    // 3. NEW: Delete memories associated with deleted messages
-                    deleteMemoriesFromSession(deletedIds)
+                                // 2. Clean up histories (Suspend)
+                                deleteFromSlotPersonalHistories(sessionId, deletedIds)
 
-                    if (!mySlotId.isNullOrBlank()) {
-                        addToPersonalHistoryFirestore(sessionId, mySlotId!!, editedMessage)
+                                // 3. Delete memories associated with deleted messages
+                                deleteMemoriesFromSession(deletedIds)
+
+                                if (!mySlotId.isNullOrBlank()) {
+                                    addToPersonalHistoryFirestore(
+                                        sessionId,
+                                        mySlotId!!,
+                                        editedMessage
+                                    )
+                                }
+
+                                if (position < chatAdapter.itemCount) {
+                                    chatAdapter.removeMessagesFrom(position)
+                                    chatAdapter.insertMessageAt(position, editedMessage)
+                                } else {
+                                    Log.w(
+                                        TAG,
+                                        "Skipped manual adapter update: Position $position out of bounds."
+                                    )
+                                }
+
+                                sendToAI(editedMessage.text)
+
+                            } catch (e: Exception) {
+                                Log.e(TAG, "Error processing edit", e)
+                                Toast.makeText(
+                                    this@MainActivity,
+                                    "Error updating chat history",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
+                        }
                     }
-
-                    if (position < chatAdapter.itemCount) {
-                        chatAdapter.removeMessagesFrom(position)
-                        chatAdapter.insertMessageAt(position, editedMessage)
-                    } else {
-                        Log.w(TAG, "Skipped manual adapter update: Position $position out of bounds.")
-                    }
-
-                    sendToAI(editedMessage.text)
                 }
             },
             onDeleteMessages = { fromPosition ->
@@ -442,7 +487,11 @@ class MainActivity : AppCompatActivity() {
                 chatAdapter.clearMessages()
                 // Determine if all users have selected a character
                 val allPlayersChosen = sessionProfile.userMap.values.all { it.activeSlotId != null }
-                val greetingText = initialGreeting ?: ""
+
+                initialGreeting = intent.getStringExtra("GREETING") ?: sessionProfile.initialGreeting
+                Log.d("greeting check", "greeting = $initialGreeting")
+                val greetingText = initialGreeting
+                Log.d("greeting check", "greeting text is $greetingText")
                 if (allPlayersChosen) {
                     // --- ONE-ON-ONE SYNC LOGIC ---
                     if (sessionProfile.chatMode == "ONEONONE") {
@@ -470,7 +519,7 @@ class MainActivity : AppCompatActivity() {
                     }
                     // All players have characters – send greeting immediately
                     updateButtonState(ButtonState.INTERRUPT)
-                    if (greetingText.isNotBlank()) {
+                    if (greetingText!!.isNotBlank()) {
                         lifecycleScope.launch {
                             // Add greeting to each bot's personal history
                             sessionProfile.slotRoster
@@ -495,8 +544,7 @@ class MainActivity : AppCompatActivity() {
                     initialGreetingSent = true  // Mark greeting as sent
                 } else {
                     // Not everyone has a character yet – delay the greeting
-                    updateButtonState(ButtonState.WAITING)  // Show "Waiting…" to disable sending
-                    // (Optional: You could show a toast or message indicating waiting for all players)
+                    updateButtonState(ButtonState.WAITING)
                 }
                 updateRPGToggleVisibility()
             }
@@ -552,7 +600,7 @@ class MainActivity : AppCompatActivity() {
                 loadSessionHistory()
             }
         }
-
+        Log.d("Entry_mode", "mode: ${sessionProfile.chatMode}")
         val myUserId = FirebaseAuth.getInstance().currentUser?.uid
         val mySessionUser = sessionProfile?.userMap?.get(myUserId)
         if (mySessionUser?.activeSlotId == null) {
@@ -569,6 +617,8 @@ class MainActivity : AppCompatActivity() {
             val isVisible = chatInputGroup.visibility == View.VISIBLE
             chatInputGroup.visibility = if (isVisible) View.GONE else View.VISIBLE
         }
+
+        typingIndicatorBar?.visibility = View.GONE
 
         val moveOptions = findViewById<ConstraintLayout>(R.id.moveOptions)
         val avatarOptions = findViewById<ConstraintLayout>(R.id.personaOptions)
@@ -600,18 +650,44 @@ class MainActivity : AppCompatActivity() {
 
             // Build Flattened List: Area Header -> Location Rows
             val items = mutableListOf<MoveMapItem>()
+
+            val voidArea = Area(id = "void_id", name = "Unknown")
+            val starFieldLoc = LocationSlot(id = "star_field_id", name = "Unknown", description = "The space between worlds.")
+
+            items.add(MoveMapItem.Header(voidArea))
+
+            if (expandedAreaIds.contains(voidArea.id)) {
+                val charsInLimbo = sessionProfile.slotRoster.filter {
+                    it.lastActiveArea == "Unknown" || it.lastActiveLocation == "Unknown"
+                }
+                items.add(MoveMapItem.LocationRow(voidArea, starFieldLoc, charsInLimbo))
+            }
+
             sessionProfile.areas.forEach { area ->
                 items.add(MoveMapItem.Header(area))
-                area.locations.forEach { loc ->
-                    val charsHere = sessionProfile.slotRoster.filter {
-                        it.lastActiveArea == area.name && it.lastActiveLocation == loc.name
+
+                // ONLY add locations if this area is expanded
+                if (expandedAreaIds.contains(area.id)) {
+                    area.locations.forEach { loc ->
+                        val charsHere = sessionProfile.slotRoster.filter {
+                            it.lastActiveArea == area.name && it.lastActiveLocation == loc.name
+                        }
+                        items.add(MoveMapItem.LocationRow(area, loc, charsHere))
                     }
-                    items.add(MoveMapItem.LocationRow(area, loc, charsHere))
                 }
             }
 
             recycler.adapter = MoveMapAdapter(
                 items,
+                onHeaderClick = { area ->
+                    // Toggle Logic: If in set, remove it; if not, add it
+                    if (expandedAreaIds.contains(area.id)) {
+                        expandedAreaIds.remove(area.id)
+                    } else {
+                        expandedAreaIds.add(area.id)
+                    }
+                    showMove() // Refresh the list with new items
+                },
                 onCharacterClick = { slot ->
                     moveSelectedSlotId = slot.slotId
                     Toast.makeText(this, "Selected ${slot.name}. Tap a location to move them.", Toast.LENGTH_SHORT).show()
@@ -681,13 +757,13 @@ class MainActivity : AppCompatActivity() {
             var selectedPose: PoseSlot? = null
             val avatarSlotLocked = BooleanArray(4) { false }
 
-
-
             val presentSlots = sessionProfile.slotRoster
             val characterNames = presentSlots.map { it.name }
             val characterAdapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, characterNames)
             characterAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
             characterSpinner.adapter = characterAdapter
+
+
 
             characterSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
                 override fun onItemSelected(parent: AdapterView<*>, view: View?, position: Int, id: Long) {
@@ -758,14 +834,24 @@ class MainActivity : AppCompatActivity() {
                 }
             }
 
-            var selectedAvatarSlotIndex = 0 // default to first
+            val initialSelection = presentSlots.indexOfFirst { it.slotId == activeSlotId }
+
+            if (initialSelection >= 0) {
+                // Set 'false' for animate to avoid unwanted triggering during init
+                characterSpinner.setSelection(initialSelection, false)
+            }
+
+            var selectedAvatarSlotIndex = -1 // default to first
 
             slotSelectors.forEachIndexed { i, btn ->
                 btn.setOnClickListener {
-                    selectedAvatarSlotIndex = i
+                    // If they click the already selected one, unselect it
+                    selectedAvatarSlotIndex = if (selectedAvatarSlotIndex == i) -1 else i
+
                     slotSelectors.forEachIndexed { j, button ->
-                        button.isSelected = (i == j)
-                        if (i == j) {
+                        val isCurrent = (selectedAvatarSlotIndex == j)
+                        button.isSelected = isCurrent
+                        if (isCurrent) {
                             button.setBackgroundResource(R.drawable.avatar_slot_selected_bg)
                         } else {
                             button.setBackgroundResource(android.R.color.transparent)
@@ -784,30 +870,41 @@ class MainActivity : AppCompatActivity() {
 
             setImage.setOnClickListener {
                 val selectedCharacter = presentSlots[characterSpinner.selectedItemPosition]
-                val poseName = selectedPose?.name   // assuming PoseSlot has a `name`
-                val poseUri = selectedPose?.uri
+                val poseName = selectedPose?.name
+                val outfitName = outfitSpinner.selectedItem?.toString()
 
-                if (poseName != null && poseUri != null) {
-                    // Update local UI immediately
-
-                    Log.d("AvatarDebug1", "Setting avatar for slot $selectedAvatarSlotIndex to $poseUri")
-                    Glide.with(this)
-                        .load(poseUri)
-                        .into(avatarViews[selectedAvatarSlotIndex])
-                    avatarViews[selectedAvatarSlotIndex].visibility = View.VISIBLE
-
-                    // Update sessionProfile slotRoster!
-                    val slotIndex = sessionProfile.slotRoster.indexOfFirst { it.slotId == selectedCharacter.slotId }
-                    if (slotIndex != -1) {
-                        val slot = sessionProfile.slotRoster[slotIndex]
-                        val updatedSlot = slot.copy(pose = poseName)  // or whatever structure you use!
-                        val updatedSlotRoster = sessionProfile.slotRoster.toMutableList()
-                        updatedSlotRoster[slotIndex] = updatedSlot
-                        sessionProfile = sessionProfile.copy(slotRoster = updatedSlotRoster)
-
-                        // Optionally: save to Firestore if needed
-                        saveSessionProfile(sessionProfile, sessionId)
+                if (poseName != null) {
+                    // --- STEP 1: Update the SlotProfile data ---
+                    val updatedSlotRoster = sessionProfile.slotRoster.map { slot ->
+                        if (slot.slotId == selectedCharacter.slotId) {
+                            slot.copy(
+                                pose = poseName,
+                                currentOutfit = outfitName ?: slot.currentOutfit
+                            )
+                        } else slot
                     }
+
+                    // --- STEP 2: Handle UI Lineup ---
+                    if (selectedAvatarSlotIndex != -1) {
+                        // A slot IS selected: Force this character into that index
+                        // and remove them from any other index they might be in
+                        avatarSlotAssignments.entries.forEach { if (it.value == selectedCharacter.slotId) it.setValue(null) }
+
+                        // If the slot was locked, we honor the user's force-set and keep it locked
+                        avatarSlotAssignments[selectedAvatarSlotIndex] = selectedCharacter.slotId
+                    }
+                    // If selectedAvatarSlotIndex == -1, we do NOTHING to the assignments.
+                    // updateAvatarsFromSlots will naturally pick up the new pose/outfit
+                    // if they are already on screen.
+
+                    // --- STEP 3: Sync and Refresh ---
+                    sessionProfile = sessionProfile.copy(slotRoster = updatedSlotRoster)
+                    saveSessionProfile(sessionProfile, sessionId)
+
+                    // Refresh the ImageViews
+                    updateAvatarsFromSlots(sessionProfile.slotRoster, avatarSlotAssignments)
+
+                    Toast.makeText(this, "Avatar updated!", Toast.LENGTH_SHORT).show()
                 } else {
                     Toast.makeText(this, "Select a pose first!", Toast.LENGTH_SHORT).show()
                 }
@@ -858,8 +955,52 @@ class MainActivity : AppCompatActivity() {
             val returnHomeButton = findViewById<Button>(R.id.returnHome)
             val reportBugButton = findViewById<Button>(R.id.reportBug)
             val directorBtn = findViewById<Button>(R.id.directorBtn)
+            val changeTitleBtn = findViewById<Button>(R.id.titleBtn)
             val messageCounterTv = findViewById<TextView>(R.id.optionsMessageCounter)
+            val modelSpinner = findViewById<Spinner>(R.id.modelSpinner)
+            val modelNames = availableModels.keys.toList()
+            val adapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, modelNames)
+            adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+            modelSpinner.adapter = adapter
 
+            // 1. Find the correct index FIRST
+            val currentId = sessionProfile.aiModel ?: "DeepSeek V3.2" // Use your actual default
+            val currentKey = availableModels.entries.find { it.value == currentId }?.key ?: "DeepSeek V3.2"
+            val initialPosition = modelNames.indexOf(currentKey)
+
+            // 2. Set the selection BEFORE the listener to avoid the "Loop of Death"
+            if (initialPosition >= 0) {
+                modelSpinner.setSelection(initialPosition, false)
+            }
+
+            modelSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+                override fun onItemSelected(parent: AdapterView<*>, view: View?, position: Int, id: Long) {
+                    val selectedId = availableModels[modelNames[position]] ?: "DeepSeek V3.2"
+
+                    // Use a local variable to prevent race conditions during the save
+                    val currentIdInProfile = sessionProfile?.aiModel ?: "DeepSeek V3.2"
+
+                    if (currentIdInProfile != selectedId) {
+                        val sessionId = sessionId ?: return
+                        val db = FirebaseFirestore.getInstance()
+
+                        // 1. Update the local object
+                        sessionProfile = sessionProfile.copy(aiModel = selectedId)
+
+                        // 2. Push directly to the specific field in Firebase
+                        db.collection("sessions").document(sessionId)
+                            .update("aiModel", selectedId)
+                            .addOnSuccessListener {
+                                Log.d("model_debug", "Firebase updated: $selectedId")
+                                Toast.makeText(this@MainActivity, "Model (sorted by openrouter ranking): ${modelNames[position]}", Toast.LENGTH_SHORT).show()
+                            }
+                            .addOnFailureListener { e ->
+                                Log.e("model_debug", "Firebase failed to update", e)
+                            }
+                    }
+                }
+                override fun onNothingSelected(parent: AdapterView<*>) {}
+            }
 
             resetTypingButton.setOnClickListener {
                 // Set all slot profiles typing = false
@@ -947,6 +1088,10 @@ class MainActivity : AppCompatActivity() {
                 }
             }
 
+            changeTitleBtn.setOnClickListener {
+                showTitleChangeDialog()
+            }
+
             // --- FETCH & DISPLAY COUNT ---
             val userId = FirebaseAuth.getInstance().currentUser?.uid
             if (userId != null) {
@@ -1026,18 +1171,47 @@ class MainActivity : AppCompatActivity() {
                 .lastOrNull { it.senderId == sessionProfile.userMap[userId]?.activeSlotId }
 
             if (lastMessage != null) {
-                checkMessageLimit {
-                    // Resend same text but with visibility=false and blank text
-                    val resendMsg = lastMessage.copy(
-                        id = "System",
-                        text = "",
-                        visibility = false,
-                        timestamp = com.google.firebase.Timestamp.now()
-                    )
-                    activationRound = 0
-                    SessionManager.sendMessage(chatId, sessionId, resendMsg)
-                    // (Optional: Trigger AI if you want this to start a new round)
-                    sendToAI("")
+                checkServerStatusBeforeSending {
+                    checkMessageLimit {
+                        // Resend same text but with visibility=false and blank text
+                        val resendMsg = lastMessage.copy(
+                            id = "System",
+                            text = "",
+                            visibility = false,
+                            timestamp = com.google.firebase.Timestamp.now()
+                        )
+                        activationRound = 0
+                        SessionManager.sendMessage(chatId, sessionId, resendMsg)
+                        // (Optional: Trigger AI if you want this to start a new round)
+                        sendToAI("")
+                    }
+                }
+            } else {
+                checkServerStatusBeforeSending {
+                    checkMessageLimit {
+                        val greetingText = sessionProfile.initialGreeting
+                        // Resend same text but with visibility=false and blank text
+                        if (greetingText!!.isNotBlank()) {
+                            lifecycleScope.launch {
+                                // Add greeting to each bot's personal history
+                                sessionProfile.slotRoster
+                                    .filter { it.profileType == "bot" }
+                                    .forEach { botSlot ->
+                                        val greetingMsg = ChatMessage(
+                                            id = UUID.randomUUID().toString(),
+                                            senderId = "system",
+                                            text = greetingText,
+                                            area = botSlot.lastActiveArea,
+                                            location = botSlot.lastActiveLocation,
+                                            timestamp = Timestamp.now(),
+                                            visibility = false
+                                        )
+                                        addToPersonalHistoryFirestore(sessionId, botSlot.slotId, greetingMsg)
+                                    }
+                            }
+                            sendToAI(greetingText)  // Send initial greeting to AI:contentReference[oaicite:2]{index=2}:contentReference[oaicite:3]{index=3}
+                        }
+                    }
                 }
             }
         }
@@ -1150,70 +1324,75 @@ class MainActivity : AppCompatActivity() {
                 val text = messageEditText.text.toString().trim()
                 if (text.isNotEmpty()) {
 
-                    // WRAP THE SEND LOGIC WITH LIMIT CHECK
-                    checkMessageLimit {
-                        // --- DIRECTOR / SPY LOGIC START ---
-                        val isDirector = mySlotId == "narrator"
+                    // 1. FIRST GATE: Is the AI awake?
+                    checkServerStatusBeforeSending {
 
-                        // 1. Determine Sender & Location
-                        val finalSenderId: String
-                        val finalDisplayName: String
-                        val targetArea: String?
-                        val targetLocation: String?
+                        // 2. SECOND GATE: Do they have quota left?
+                        checkMessageLimit {
 
-                        if (isDirector) {
-                            // DIRECTOR MODE: Must rely on Spy variables
-                            if (spyingArea != null && spyingLocation != null) {
-                                targetArea = spyingArea
-                                targetLocation = spyingLocation
-                                finalSenderId = "narrator"
-                                finalDisplayName = "Narrator"
+                            // --- DIRECTOR / SPY LOGIC START ---
+                            val isDirector = mySlotId == "narrator"
+
+                            // 1. Determine Sender & Location
+                            val finalSenderId: String
+                            val finalDisplayName: String
+                            val targetArea: String?
+                            val targetLocation: String?
+
+                            if (isDirector) {
+                                // DIRECTOR MODE: Must rely on Spy variables
+                                if (spyingArea != null && spyingLocation != null) {
+                                    targetArea = spyingArea
+                                    targetLocation = spyingLocation
+                                    finalSenderId = "narrator"
+                                    finalDisplayName = "Narrator"
+                                } else {
+                                    Toast.makeText(this, "Directors must SPY on a location to speak there.", Toast.LENGTH_SHORT).show()
+                                    return@checkMessageLimit // Abort sending
+                                }
                             } else {
-                                Toast.makeText(this, "Directors must SPY on a location to speak there.", Toast.LENGTH_SHORT).show()
-                                return@checkMessageLimit // Abort sending
+                                // REGULAR MODE: Use Player's physical location
+                                val myChar = sessionProfile?.slotRoster?.find { it.slotId == mySlotId }
+                                // Safety check
+                                if (myChar == null) {
+                                    Toast.makeText(this, "No character selected.", Toast.LENGTH_SHORT).show()
+                                    return@checkMessageLimit
+                                }
+                                targetArea = myChar.lastActiveArea
+                                targetLocation = myChar.lastActiveLocation
+                                finalSenderId = mySlotId ?: ""
+                                finalDisplayName = myChar.name
                             }
-                        } else {
-                            // REGULAR MODE: Use Player's physical location
-                            val myChar = sessionProfile.slotRoster.find { it.slotId == mySlotId }
-                            // Safety check
-                            if (myChar == null) {
-                                Toast.makeText(this, "No character selected.", Toast.LENGTH_SHORT).show()
-                                return@checkMessageLimit
-                            }
-                            targetArea = myChar.lastActiveArea
-                            targetLocation = myChar.lastActiveLocation
-                            finalSenderId = mySlotId ?: ""
-                            finalDisplayName = myChar.name
+
+                            // 2. Update UI State (Do this before async calls)
+                            updateButtonState(ButtonState.INTERRUPT)
+                            setPlayerTyping(false)
+                            activationRound = 0
+                            messageEditText.text.clear()
+                            ignoreTextWatcher = false
+
+                            // 3. Construct Message with Overrides
+                            val timestamp = com.google.firebase.Timestamp.now()
+                            val newMessage = ChatMessage(
+                                id = UUID.randomUUID().toString(),
+                                senderId = finalSenderId,
+                                displayName = finalDisplayName,
+                                text = text,
+                                timestamp = timestamp,
+                                area = targetArea,
+                                location = targetLocation,
+                                visibility = true
+                            )
+
+                            // 4. Send to Firestore
+                            val activeSessionId = sessionProfile?.sessionId ?: return@checkMessageLimit
+                            val activeChatId = sessionProfile?.chatId ?: ""
+                            SessionManager.sendMessage(activeChatId, activeSessionId, newMessage)
+
+                            // 5. Trigger AI Loop
+                            val userInput = newMessage.text
+                            sendToAI(userInput)
                         }
-
-                        // 2. Update UI State (Do this before async calls)
-                        updateButtonState(ButtonState.INTERRUPT)
-                        setPlayerTyping(false)
-                        activationRound = 0
-                        messageEditText.text.clear()
-                        ignoreTextWatcher = false
-
-                        // 3. Construct Message with Overrides
-                        val timestamp = com.google.firebase.Timestamp.now()
-                        val newMessage = ChatMessage(
-                            id = UUID.randomUUID().toString(),
-                            senderId = finalSenderId,
-                            displayName = finalDisplayName,
-                            text = text,
-                            timestamp = timestamp,
-                            area = targetArea,
-                            location = targetLocation,
-                            visibility = true
-                        )
-
-                        // 4. Send to Firestore
-                        SessionManager.sendMessage(chatId, sessionId, newMessage)
-
-                        // 5. Trigger AI Loop (Manually calling what sendMessageAndCallAI used to do)
-                        // We pass the new message into the history so the AI sees it immediately
-                        processActivationRound(text, sessionProfile.history + newMessage)
-
-                        // --- DIRECTOR / SPY LOGIC END ---
                     }
                 }
             } else if (currentState == ButtonState.INTERRUPT) {
@@ -1222,27 +1401,102 @@ class MainActivity : AppCompatActivity() {
             }
         }
     }
-    
+
+    private fun checkServerStatusBeforeSending(onOnline: () -> Unit) {
+        val db = FirebaseFirestore.getInstance()
+
+        db.collection("admin").document("server_status").get()
+            .addOnSuccessListener { doc ->
+                // Default to true if the document doesn't exist yet
+                val isOnline = doc.getBoolean("isOnline") ?: true
+                val offlineMsg = doc.getString("offlineMessage")
+                    ?: "The AI servers are currently resting! You can still manage characters and read past chats, but new messages are paused."
+
+                if (!isOnline) {
+                    // Soft lock: Just show the message, don't close the app!
+                    AlertDialog.Builder(this)
+                        .setTitle("Beta Offline")
+                        .setMessage(offlineMsg)
+                        .setPositiveButton("Got it", null)
+                        .show()
+                } else {
+                    // Server is awake, proceed!
+                    onOnline()
+                }
+            }
+            .addOnFailureListener {
+                // Failsafe: If the database read blips, let them try to send anyway
+                onOnline()
+            }
+    }
+
     fun updateRPGToggleVisibility() {
-        val isRPG = sessionProfile.modeSettings.containsKey("rpg") ||
-                sessionProfile.enabledModes.contains("rpg")
-        val isVN = sessionProfile.modeSettings.containsKey("vn") ||
-                sessionProfile.enabledModes.contains("visual_novel")
+        val isRPG = sessionProfile.modeSettings.containsKey("rpg")
+        val isVN = sessionProfile.modeSettings.containsKey("vn")
         if (isRPG) {
-            rpgToggleContainer.visibility = View.VISIBLE
+            rollHistoryButton.visibility = View.VISIBLE
             rollButton.visibility = View.VISIBLE
         } else {
             if (isVN){
-                rpgToggleContainer.visibility = View.VISIBLE
+                rollHistoryButton.visibility = View.VISIBLE
                 rollButton.visibility = View.GONE
                 rollHistoryButton.visibility = View.GONE
             }else{
-                rpgToggleContainer.visibility = View.GONE
+                rollHistoryButton.visibility = View.GONE
                 rollButton.visibility = View.GONE
             }
         }
 
         Log.d("rpg", "is this session an rpg? $isRPG")
+    }
+
+    private fun showTitleChangeDialog() {
+        // 1. Inflate your custom XML
+        val dialogView = layoutInflater.inflate(R.layout.dialog_change_title, null)
+        val nameInput = dialogView.findViewById<EditText>(R.id.newName)
+
+        // 2. Pre-fill with the current session title (or fallback to base title)
+        val currentTitle = sessionProfile?.sessionTitle?.takeIf { it.isNotBlank() }
+            ?: sessionProfile?.title
+            ?: ""
+
+        nameInput.setText(currentTitle)
+
+        // Put the cursor at the end of the text
+        nameInput.setSelection(currentTitle.length)
+
+        // 3. Build and show the Dialog
+        AlertDialog.Builder(this)
+            .setView(dialogView)
+            .setPositiveButton("Save") { _, _ ->
+                val updatedTitle = nameInput.text.toString().trim()
+
+                if (updatedTitle.isNotBlank() && updatedTitle != currentTitle) {
+                    saveNewSessionTitle(updatedTitle)
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun saveNewSessionTitle(newTitle: String) {
+        val sessionId = sessionProfile?.sessionId ?: return
+        val db = FirebaseFirestore.getInstance()
+
+        // Update Firestore
+        db.collection("sessions").document(sessionId)
+            .update("sessionTitle", newTitle)
+            .addOnSuccessListener {
+                // Update local state
+                sessionProfile = sessionProfile.copy(sessionTitle = newTitle)
+
+                // TODO: Update your UI here! (e.g., toolbarTitle.text = newTitle)
+
+                Toast.makeText(this, "Session renamed to: $newTitle", Toast.LENGTH_SHORT).show()
+            }
+            .addOnFailureListener { e ->
+                Toast.makeText(this, "Failed to rename session: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
     }
 
     private fun showInstructionDialog() {
@@ -1380,26 +1634,86 @@ class MainActivity : AppCompatActivity() {
             try { Gson().fromJson(it, ModeSettings.MurderSettings::class.java).enabled } catch (_: Exception) { false }
         }) == true
         val vnEnabled = (sessionProfile?.modeSettings?.get("vn") as? String)?.isNotBlank() == true
+        val isSfwOnly = sessionProfile?.sfwOnly == true
 
-        // ----- required views (fail fast if layout ids don’t exist) -----
+        // ----- required views -----
         fun <T: View> req(id: Int): T =
             sheet.findViewById<T>(id) ?: error("Missing view id in item_character_sheet_fantasy: ${resources.getResourceEntryName(id)}")
 
-        val root = req<androidx.constraintlayout.widget.ConstraintLayout>(R.id.sheetRootColumn)   // <- make root a ConstraintLayout with this id
+        val root = req<androidx.constraintlayout.widget.ConstraintLayout>(R.id.sheetRootColumn)
         val header = req<View>(R.id.headerBlock)
-        val rpgSection = sheet.findViewById<View>(R.id.rpgSection)                        // optional
-        val vnSection  = sheet.findViewById<View>(R.id.vnSection)                         // optional
 
-        // MoreInfo may be either a container or just the TextView; try both gracefully
-        val moreInfoBlock = sheet.findViewById<View>(R.id.moreInfoTV)
-            ?: sheet.findViewById<View>(R.id.moreInfo)
-        val moreInfoText  = sheet.findViewById<TextView>(R.id.moreInfo)                   // ok if null when using a container w/ inner TextView
+        // Block Views
+        val physicalSection = sheet.findViewById<View>(R.id.physicalSection)
+        val loreSection = sheet.findViewById<View>(R.id.loreSection)
+        val secretSection = sheet.findViewById<View>(R.id.secretSection)
+        val rpgSection = sheet.findViewById<View>(R.id.rpgSection)
+        val vnSection  = sheet.findViewById<View>(R.id.vnSection)
+        val moreInfoBlock = sheet.findViewById<View>(R.id.moreInfoTV) ?: sheet.findViewById<View>(R.id.moreInfo)
+        val moreInfoText  = sheet.findViewById<TextView>(R.id.moreInfo)
 
-        // ----- header visuals -----
+        // ----- 1. Header Visuals -----
         req<TextView>(R.id.nameView).text = slot.name
         slot.avatarUri?.takeIf { it.isNotBlank() }?.let { Glide.with(this).load(it).into(req(R.id.avatarView)) }
 
-        // ----- RPG fill + visibility -----
+        // ----- 2. Physical Details -----
+        val physDetails = buildString {
+            if (!slot.gender.isNullOrBlank()) append("${slot.gender} • ")
+            if (slot.age != null && slot.age != 0) append("Age: ${slot.age} • ")
+            if (!slot.height.isNullOrBlank()) append("${slot.height} ")
+            if (!slot.weight.isNullOrBlank()) append("/ ${slot.weight} • ")
+            if (!slot.hairColor.isNullOrBlank()) append("Hair: ${slot.hairColor} • ")
+            if (!slot.eyeColor.isNullOrBlank()) append("Eyes: ${slot.eyeColor}")
+        }.trimEnd(' ', '•')
+
+        sheet.findViewById<TextView>(R.id.physicalDetailsText)?.apply {
+            text = physDetails
+            visibility = if (physDetails.isNotBlank()) View.VISIBLE else View.GONE
+        }
+        sheet.findViewById<TextView>(R.id.physicalDescText)?.apply {
+            text = slot.physicalDescription
+            visibility = if (!slot.physicalDescription.isNullOrBlank()) View.VISIBLE else View.GONE
+        }
+        // Hide entire container if both are blank
+        physicalSection?.visibility = if (physDetails.isNotBlank() || !slot.physicalDescription.isNullOrBlank()) View.VISIBLE else View.GONE
+
+        // ----- 3. Lore Section -----
+        sheet.findViewById<TextView>(R.id.summaryText)?.apply {
+            text = slot.summary
+            visibility = if (!slot.summary.isNullOrBlank()) View.VISIBLE else View.GONE
+        }
+
+        // Helpers to hide headers if text is blank
+        fun bindTextAndHeader(textId: Int, headerId: Int, value: String?) {
+            val hasText = !value.isNullOrBlank()
+            sheet.findViewById<TextView>(textId)?.apply { text = value; visibility = if (hasText) View.VISIBLE else View.GONE }
+            sheet.findViewById<TextView>(headerId)?.visibility = if (hasText) View.VISIBLE else View.GONE
+        }
+
+        bindTextAndHeader(R.id.personalityText, R.id.personalityHeader, slot.personality)
+        bindTextAndHeader(R.id.backstoryText, R.id.backstoryHeader, slot.backstory)
+        bindTextAndHeader(R.id.loreAbilitiesText, R.id.loreAbilitiesHeader, slot.abilities)
+
+        val hasLore = !slot.summary.isNullOrBlank() || !slot.personality.isNullOrBlank() || !slot.backstory.isNullOrBlank() || !slot.abilities.isNullOrBlank()
+        loreSection?.visibility = if (hasLore) View.VISIBLE else View.GONE
+
+        // ----- 4. Secret Section (The NSFW Vault) -----
+        val hasSecret = !slot.privateDescription.isNullOrBlank()
+        if (!isSfwOnly && hasSecret) {
+            secretSection?.visibility = View.VISIBLE
+            val secretText = sheet.findViewById<TextView>(R.id.secretText)
+            val revealBtn = sheet.findViewById<Button>(R.id.revealSecretBtn)
+            secretText?.text = slot.privateDescription
+
+            revealBtn?.setOnClickListener {
+                revealBtn.visibility = View.GONE
+                secretText?.visibility = View.VISIBLE
+            }
+        } else {
+            secretSection?.visibility = View.GONE
+        }
+
+        // ----- 5. RPG fill + visibility -----
         val hasRpg = rpgEnabled && (slot.rpgClass.isNotBlank() || slot.stats.isNotEmpty() || (slot.hp > 0 && slot.maxHp > 0))
         rpgSection?.apply {
             visibility = if (hasRpg) View.VISIBLE else View.GONE
@@ -1407,8 +1721,6 @@ class MainActivity : AppCompatActivity() {
                 sheet.findViewById<TextView>(R.id.classView)?.text   = "Class: ${slot.rpgClass}"
                 sheet.findViewById<TextView>(R.id.hpView)?.text      = "HP: ${slot.hp}/${slot.maxHp}"
                 sheet.findViewById<TextView>(R.id.defenseView)?.text = "Defense: ${slot.defense}"
-                sheet.findViewById<TextView>(R.id.abilitiesView)?.text =
-                    if (slot.abilities.isNotBlank()) slot.abilities else "None"
 
                 sheet.findViewById<LinearLayout>(R.id.statusList)?.let { list ->
                     list.removeAllViews()
@@ -1427,49 +1739,40 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // --- More Info (role + timeline) ---
+        // ----- 6. More Info (Role + Timeline) -----
         val roleRaw = (slot.hiddenRoles ?: "").trim()
         val roleDisplay = when (roleRaw.uppercase()) {
             "VILLAIN" -> "killer"
             "TARGET"  -> "victim"
-            // treat everyone else as "innocent" only when murder mode is on
             "HERO", "GM", "SIDEKICK", "" -> if (murderEnabled) "innocent" else ""
             else -> roleRaw.lowercase()
         }
 
         val timelineText = slot.moreInfo?.takeIf { it.isNotBlank() }
         val headerLine = if (roleDisplay.isNotBlank()) "Role: ${roleDisplay.replaceFirstChar { it.uppercase() }}" else null
-
-// Compose: Role (if any) above timeline (or fallback)
         val composed = buildString {
             headerLine?.let { append(it).append('\n') }
             append(timelineText ?: "Nothing to add here.")
         }
-
         moreInfoText?.text = composed
 
-// Show the section if we have a timeline OR (in murder mode) a role to display
         val showMoreInfo = (timelineText != null) || (murderEnabled && roleDisplay.isNotBlank())
         moreInfoBlock?.visibility = if (showMoreInfo) View.VISIBLE else View.GONE
 
-        // ----- VN section -----
+        // ----- 7. VN section -----
         val showVn = vnEnabled && !slot.vnRelationships.isNullOrEmpty()
         vnSection?.apply {
             visibility = if (showVn) View.VISIBLE else View.GONE
             if (showVn) {
                 val vnList = sheet.findViewById<LinearLayout>(R.id.vnRelationshipsList)
                 vnList?.removeAllViews()
-                val byKey = (sessionProfile?.slotRoster ?: emptyList()).mapIndexed { idx, s ->
-                    ModeSettings.SlotKeys.fromPosition(idx) to s
-                }.toMap()
+                val byKey = (sessionProfile?.slotRoster ?: emptyList()).mapIndexed { idx, s -> ModeSettings.SlotKeys.fromPosition(idx) to s }.toMap()
                 slot.vnRelationships.forEach { (toKey, rel) ->
                     val other = byKey[toKey] ?: return@forEach
                     val maxL = rel.levels.maxOfOrNull { it.level } ?: 5
                     val filled = rel.currentLevel.coerceIn(0, maxL)
                     val hearts = "❤".repeat(filled) + "♡".repeat((maxL - filled).coerceAtLeast(0))
-                    val row = LinearLayout(this@MainActivity).apply {
-                        orientation = LinearLayout.HORIZONTAL; setPadding(0, 8, 0, 8); gravity = Gravity.CENTER_VERTICAL
-                    }
+                    val row = LinearLayout(this@MainActivity).apply { orientation = LinearLayout.HORIZONTAL; setPadding(0, 8, 0, 8); gravity = Gravity.CENTER_VERTICAL }
                     val icon = ImageView(this@MainActivity).apply {
                         layoutParams = LinearLayout.LayoutParams(64, 64).apply { rightMargin = 12 }
                         scaleType = ImageView.ScaleType.CENTER_CROP
@@ -1483,22 +1786,39 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // ----- Constraint wiring: header top, then RPG -> MoreInfo -> VN -----
+        // ----- Constraint Wiring Engine -----
         fun dp(n: Int) = (n * resources.displayMetrics.density).toInt()
         val cs = androidx.constraintlayout.widget.ConstraintSet().apply { clone(root) }
-
-        fun topToParent(id: Int, m: Int) { cs.clear(id, ConstraintSet.TOP); cs.connect(id, ConstraintSet.TOP, ConstraintSet.PARENT_ID, ConstraintSet.TOP, dp(m)) }
         fun topToBottom(id: Int, anchor: Int, m: Int) { cs.clear(id, ConstraintSet.TOP); cs.connect(id, ConstraintSet.TOP, anchor, ConstraintSet.BOTTOM, dp(m)) }
 
-        topToParent(R.id.headerBlock, 8)
+        // Automatically stack visible sections!
         var anchor = R.id.headerBlock
-        if (hasRpg && rpgSection != null) { topToBottom(R.id.rpgSection, anchor, 12); anchor = R.id.rpgSection }
-        if (murderEnabled && moreInfoBlock != null) { topToBottom(moreInfoBlock.id, anchor, 12); anchor = moreInfoBlock.id }
-        if (showVn && vnSection != null) { topToBottom(R.id.vnSection, anchor, 12) }
+
+        if (physicalSection != null && physicalSection.visibility == View.VISIBLE) {
+            topToBottom(physicalSection.id, anchor, 12)
+            anchor = physicalSection.id
+        }
+        if (loreSection != null && loreSection.visibility == View.VISIBLE) {
+            topToBottom(loreSection.id, anchor, 12)
+            anchor = loreSection.id
+        }
+        if (secretSection != null && secretSection.visibility == View.VISIBLE) {
+            topToBottom(secretSection.id, anchor, 12)
+            anchor = secretSection.id
+        }
+        if (hasRpg && rpgSection != null) {
+            topToBottom(rpgSection.id, anchor, 12)
+            anchor = rpgSection.id
+        }
+        if (showMoreInfo && moreInfoBlock != null) {
+            topToBottom(moreInfoBlock.id, anchor, 12)
+            anchor = moreInfoBlock.id
+        }
+        if (showVn && vnSection != null) {
+            topToBottom(vnSection.id, anchor, 12)
+        }
 
         cs.applyTo(root)
-
-        // finally attach
         content.addView(sheet)
     }
 
@@ -1510,7 +1830,6 @@ class MainActivity : AppCompatActivity() {
         cs.clone(root)
         cs.connect(R.id.toggleButtonContainer, ConstraintSet.BOTTOM, viewBelowId, ConstraintSet.TOP)
         cs.connect(R.id.toggleChatButton, ConstraintSet.BOTTOM, viewBelowId, ConstraintSet.TOP)
-        cs.connect(R.id.rpgToggleContainer, ConstraintSet.BOTTOM, viewBelowId, ConstraintSet.TOP)
         cs.applyTo(root)
     }
 
@@ -1610,7 +1929,6 @@ class MainActivity : AppCompatActivity() {
             targetArea = spyingArea ?: playerSlot.lastActiveArea
             targetLocation = spyingLocation ?: playerSlot.lastActiveLocation
         }
-        // --- FIX ENDS HERE ---
 
         Log.d("ai_cycle", "getting speaker from $targetLocation in $targetArea")
 
@@ -1632,30 +1950,40 @@ class MainActivity : AppCompatActivity() {
         if (mentionedChar != null) return mentionedChar.slotId
 
         // 4. Who spoke last?
-        val lastSpeakerId = chatHistory.lastOrNull {
-            it.senderId != activeSlotId && it.senderId != "narrator"
-        }?.senderId
+        val lastSpeakerId = previousSpeakerId
+
+        Log.d("ai_cycle", "last speaker is $lastSpeakerId")
 
         val candidates = presentChars.filter { it.slotId != lastSpeakerId }
 
         Log.d ("ai_cycle", "character check: ${candidates.size}")
 
         // 5. Pick random
-        return candidates.randomOrNull()?.slotId ?: presentChars.random().slotId
+        return candidates.randomOrNull()?.slotId ?: activeSlotId
     }
 
     private suspend fun fetchRelevantMemories(text: String, charSlotId: String): List<TaggedMemory> {
-        val char = sessionProfile.slotRoster.find { it.slotId == charSlotId } ?: return emptyList()
-        if (char.memories.isEmpty()) return emptyList()
+        // 1. Fetch this specific character's memories from the Subcollection
+        val snapshot = FirebaseFirestore.getInstance()
+            .collection("sessions").document(sessionId)
+            .collection("character_memories")
+            .whereEqualTo("slotId", charSlotId)
+            .get()
+            .await()
 
-        // 1. Embed the User's Input (The "Query")
+        if (snapshot.isEmpty) return emptyList()
+
+        val memories = snapshot.documents.mapNotNull { it.toObject(TaggedMemory::class.java) }
+        if (memories.isEmpty()) return emptyList()
+
+        // 2. Embed the User's Input (The "Query")
         val queryVector = Director.getEmbedding(text, BuildConfig.OPENAI_API_KEY)
 
         // If embedding fails (offline/error), fallback to recent memories
-        if (queryVector.isEmpty()) return char.memories.takeLast(3)
+        if (queryVector.isEmpty()) return memories.takeLast(3)
 
-        // 2. Score every memory
-        return char.memories.map { mem ->
+        // 3. Score every memory
+        return memories.map { mem ->
             val score = if (mem.embedding.isNotEmpty()) {
                 Director.cosineSimilarity(queryVector, mem.embedding)
             } else {
@@ -1681,8 +2009,8 @@ class MainActivity : AppCompatActivity() {
         aiJob = lifecycleScope.launch(Dispatchers.IO) {
             try {
                 // 2. LOCAL LOGIC: Pick the next speaker
-                val nextSlotId = determineNextSpeakerLocal(input, chatHistory)
-
+                nextSlotId = determineNextSpeakerLocal(input, chatHistory)
+                Log.d("ai_cycle","new next slot: $nextSlotId")
                 // Handle Narrator or "No one here"
                 if (nextSlotId == "narrator" || nextSlotId.isBlank()) {
                     // (Optional: You can insert a narrator call here if you want logic for that,
@@ -1690,6 +2018,18 @@ class MainActivity : AppCompatActivity() {
                     withContext(Dispatchers.Main) { updateButtonState(ButtonState.SEND) }
                     return@launch
                 }
+                
+                val activeSlotId = sessionProfile.userMap[userId]?.activeSlotId 
+                
+                if (nextSlotId == activeSlotId){
+                    withContext(Dispatchers.Main) {
+                        updateButtonState(ButtonState.SEND)
+                        // Move the toast INSIDE this block
+                        Toast.makeText(this@MainActivity, "Control returned to you", Toast.LENGTH_SHORT).show()
+                    }
+                    return@launch
+                }
+
                 // 3. Set Typing Indicator
                 setSlotTyping(sessionId, nextSlotId, true)
                 Log.d("ai_response", "$nextSlotId starting to type")
@@ -1708,7 +2048,6 @@ class MainActivity : AppCompatActivity() {
                 val historyString = buildHistoryString(myPersonalHistory.takeLast(10))
 
                 val isStrictSfw = sessionProfile.sfwOnly == true ||
-                        slotProfile.sfwOnly == true ||
                         (slotProfile.age ?: 18) < 18
 
                 // Gather Poses
@@ -1737,53 +2076,45 @@ class MainActivity : AppCompatActivity() {
                 val sentinel = "DO NOT INCLUDE THIS CHARACTER IN THE POSES SECTION"
                 val isNSFW = !isStrictSfw
 
-                val condensedCharacterInfo = sessionProfile.slotRoster
-                    .filter { it.lastActiveArea == sceneArea && it.lastActiveLocation == sceneLocation }
-                    .associate { profile ->
-                        val outfits = profile.outfits.orEmpty()
-                        val currentName = profile.currentOutfit?.trim().orEmpty()
-                        val chosenOutfit = outfits.firstOrNull { it.name.trim().equals(currentName, ignoreCase = true) }
-                            ?: outfits.firstOrNull()
+                // 1. LOCAL PRESENCE: Just the names of people in the exact same room
+                val namesInRoom = sessionProfile.slotRoster
+                    .filter {
+                        it.lastActiveArea == sceneArea &&
+                                it.lastActiveLocation == sceneLocation &&
+                                it.slotId != nextSlotId // Don't include the character themselves
+                    }
+                    .map { it.name }
+                    .joinToString(", ")
 
-                        val poseSlots = (chosenOutfit?.poseSlots ?: outfits.flatMap { it.poseSlots }).orEmpty()
-                        val (nsfwSlots, sfwSlots) = poseSlots.partition { it.nsfw }
-
-                        val sfwNames = sfwSlots.map { it.name.trim() }.filter { it.isNotEmpty() }.distinct()
-                        val nsfwNames = nsfwSlots.map { it.name.trim() }.filter { it.isNotEmpty() }.distinct()
-
-                        val info = mutableMapOf<String, Any?>()
-                        info["summary"] = profile.summary
-                        info["pose"] = profile.pose  // String?
-
-
-                        if (isNSFW) {
-                            if (sfwNames.isEmpty() && nsfwNames.isEmpty()) {
-                                info["available_poses"] = sentinel
-                            } else {
-                                info["available_poses"] = sfwNames
-                                info["available_poses_nsfw"] = nsfwNames
-                            }
-                        } else {
-                            info["available_poses"] = if (sfwNames.isEmpty()) sentinel else sfwNames
-                        }
-
-                        profile.slotId to info
+                // 2. GLOBAL KNOWLEDGE: The dense facts for EVERYONE in the session
+                val worldCompendium = sessionProfile.slotRoster
+                    .joinToString("\n") { profile ->
+                        // Use the condensed summary generated by the harmonize AI
+                        "- ${profile.name}: ${profile.summary}"
                     }
 
+                val personality = if(isStrictSfw){
+                    slotProfile.personality
+                }else{
+                    slotProfile.personality + "\n Only use Secrets when its appropriate.\n Secrets:" + slotProfile.privateDescription
+                }
+
+                Log.d("ai_cycle", "personality: $personality")
                 // 6. Build the Roleplay Prompt
                 val roleplayPrompt = PromptBuilder.buildRoleplayPrompt(
                     slotProfile = slotProfile,
                     sessionProfile = sessionProfile,
+                    personality = personality,
                     modeSettings = sessionProfile.modeSettings,
                     sessionSummary = sessionProfile.sessionDescription + sessionProfile.secretDescription,
                     sceneSlotIds = sceneSlotIds,
-                    condensedCharacterInfo = condensedCharacterInfo,
+                    condensedCharacterInfo = worldCompendium,
+                    currentScene = namesInRoom,
                     chatHistory = historyString,
                     memories = memoriesMap,
                     poses = poses,
                     locationDescription = locDescription
                 )
-                Log.d("ai_cycle", "using prompt: $roleplayPrompt")
 
                 // 7. SFW / NSFW Routing (The Logic Check)
 
@@ -1793,8 +2124,9 @@ class MainActivity : AppCompatActivity() {
                 )
 
                 val NPCGenPrompt = buildNPCGeneration(sessionProfile.areas)
-                val vnModeEnabled = sessionProfile.modeSettings["visual_novel"] == "true" ||
-                        !(sessionProfile.modeSettings["vn"] as? String).isNullOrBlank()
+                // Delete the modeSettings JSON check and use this:
+                val vnModeEnabled = sessionProfile.enabledModes.contains("visual_novel") ||
+                        sessionProfile.enabledModes.contains("vn")
 
                 val vnCheckedPrompt = if (vnModeEnabled) {
                     roleplayPrompt + NPCGenPrompt + vnPrompt
@@ -1803,17 +2135,64 @@ class MainActivity : AppCompatActivity() {
                 }
 
 
-                val nsfwinstructions =  "/n - Be descriptive and explicit. The more sexual and erotic the better"
+                val nsfwinstructions =  "\n - Be descriptive and explicit. The more sexual and erotic the better." +
+                        "\n - ONLY get sexual when its APPROPRIATE in context of the conversation."
                 val nsfwRejection = "\n - If responding to not safe for work messages, reject them while remaining in character."
                 val nsfwRejectionPrompt = vnCheckedPrompt + nsfwRejection
                 val nsfwPrompt = vnCheckedPrompt + nsfwinstructions
 
-                val responseText = if (isStrictSfw) {
-                    // OpenAI (Smart, Safe)
-                    Facilitator.callOpenAiApi(nsfwRejectionPrompt, BuildConfig.OPENAI_API_KEY)
-                } else {
-                    // Mixtral (Unfiltered)
-                    Facilitator.callMixtralApi(nsfwPrompt, BuildConfig.MIXTRAL_API_KEY)
+                val selectedModelId = sessionProfile.aiModel ?: "DeepSeek V3.2"
+                when {
+                    // Branch A: Existing Strict SFW logic
+                    isStrictSfw -> {
+                        Log.d("ai_cycle", "$selectedModelId branch a prompt: $nsfwRejectionPrompt")
+                    }
+
+                    // Branch B: The new OpenAI Experiment (using nsfwPrompt)
+                    selectedModelId == "openai-gpt-4o" -> {
+                        Log.d("ai_cycle", "$selectedModelId branch b prompt: $nsfwPrompt")
+                    }
+
+                    // Branch C: Standard Unfiltered / Mixtral Path
+                    else -> {
+                        Log.d("ai_cycle", " $selectedModelId branch c prompt: $nsfwPrompt")
+                    }
+                }
+                val finalPrompt = if (isStrictSfw){
+                    nsfwRejectionPrompt
+                }else{
+                    nsfwPrompt
+                }
+
+                val responseText = withTimeoutOrNull(60_000L) {
+                    when {
+                        // Branch B: The new OpenAI Experiment (using nsfwPrompt)
+                        selectedModelId == "openai-gpt-4o" -> {
+                            Facilitator.callOpenAiApi(finalPrompt, BuildConfig.OPENAI_API_KEY)
+                        }
+
+                        // Branch C: Standard Unfiltered / Mixtral Path
+                        else -> {
+                            Facilitator.callMixtralApi(
+                                finalPrompt,
+                                BuildConfig.MIXTRAL_API_KEY,
+                                selectedModelId
+                            )
+                        }
+                    }
+                }
+
+
+                Log.d("ai_response", "raw response: $responseText")
+
+                if (responseText == null) {
+                    Log.e("AI_CYCLE", "The AI request timed out after 60 seconds.")
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(this@MainActivity, "The AI took too long to respond. Please try again.", Toast.LENGTH_SHORT).show()
+                        setSlotTyping(sessionId, nextSlotId, false)
+                        updateButtonState(ButtonState.SEND)
+                    }
+                    return@launch
                 }
 
                 // 8. Parse Response
@@ -1822,38 +2201,140 @@ class MainActivity : AppCompatActivity() {
                     nextSlotId,
                     sessionProfile.slotRoster
                 )
+                withContext(Dispatchers.Main) { updateButtonState(ButtonState.WAITING) }
+
+                // bad response check
+                if (result.messages == null) {
+                    Log.e("AI_CYCLE", "The AI response is bad.")
+
+                    var isPremium = false
+                    val userId = FirebaseAuth.getInstance().currentUser?.uid
+
+                    // If it's round 1, we need to know their premium status to show the right Toast
+                    if (activationRound == 1 && userId != null) {
+                        try {
+                            val db = FirebaseFirestore.getInstance()
+                            // .await() safely pauses the coroutine here on the IO thread without blocking the UI
+                            val snapshot = db.collection("users").document(userId).get().await()
+                            isPremium = snapshot.getBoolean("isPremium") ?: false
+                        } catch (e: Exception) {
+                            Log.e("Billing", "Failed to check premium status: ${e.message}")
+                        }
+                    }
+
+                    // Switch to Main thread STRICTLY for UI updates
+                    withContext(Dispatchers.Main) {
+                        val toastMsg = if (activationRound == 1 && !isPremium) {
+                            "The AI response was malformed. Your message was not charged."
+
+                        } else {
+                            "The AI response was malformed." // Premium users or subsequent rounds see this
+                        }
+                        Toast.makeText(this@MainActivity, toastMsg, Toast.LENGTH_SHORT).show()
+                        setSlotTyping(sessionId, nextSlotId, false)
+                        updateButtonState(ButtonState.SEND)
+                    }
+
+                    // ABORT the rest of the round entirely. No DB writes, no billing!
+                    return@launch
+                }
+
+                if (activationRound == 1) {
+                    val userId = FirebaseAuth.getInstance().currentUser?.uid
+                    if (userId != null) {
+                        val db = FirebaseFirestore.getInstance()
+                        val userRef = db.collection("users").document(userId)
+                        val today = Timestamp.now()
+
+                        // Run this in the background (IO context) without blocking the UI
+                        CoroutineScope(Dispatchers.IO).launch {
+                            try {
+                                db.runTransaction { transaction ->
+                                    val snapshot = transaction.get(userRef)
+
+                                    // Double-check they didn't just go over limit in a race condition
+                                    // (Optional, but good for security)
+                                    val isPremium = snapshot.getBoolean("isPremium") ?: false
+                                    if (!isPremium) {
+                                        val currentCount =
+                                            snapshot.getLong("dailyMessageCount") ?: 0
+
+                                        transaction.set(
+                                            userRef,
+                                            mapOf(
+                                                "dailyMessageCount" to currentCount + 1,
+                                                "lastMessageDate" to today
+                                            ),
+                                            SetOptions.merge()
+                                        )
+                                        Log.d("Billing", "User charged for Round 1 response.")
+                                    }
+                                }.await()
+                            } catch (e: Exception) {
+                                Log.e("Billing", "Failed to update message count: ${e.message}")
+                            }
+                        }
+                    }
+                }
+
                 Log.d("ai_response", "recieved: $result")
-                // 9. Handle New Memories (UPDATED)
+                // 9. Handle New Memories (Subcollection Write)
                 val newMemory = result.newMemory
                 if (newMemory != null) {
-                    val vector = Director.getEmbedding(newMemory.text, BuildConfig.OPENAI_API_KEY)
+                    try {
+                        Log.d("Memory", "Attempting to embed and save new memory...")
+                        val vector = Director.getEmbedding(newMemory.text, BuildConfig.OPENAI_API_KEY)
+                        val firstMsgId = result.messages.firstOrNull()?.id ?: UUID.randomUUID().toString()
+                        val allMsgIds = result.messages.mapNotNull { it.id }
 
-                    // --- NEW LOGIC START ---
-                    // Use the first message's ID as the Memory ID to link them
-                    val firstMsgId = result.messages.firstOrNull()?.id ?: UUID.randomUUID().toString()
-                    val allMsgIds = result.messages.map { it.id }
-                    // --- NEW LOGIC END ---
+                        // Create the standalone memory object
+                        val memDoc = TaggedMemory(
+                            id = firstMsgId,
+                            slotId = nextSlotId, // Link it to the character
+                            tags = newMemory.tags,
+                            text = newMemory.text,
+                            messageIds = allMsgIds,
+                            embedding = vector
+                        )
 
-                    val updatedRoster = sessionProfile.slotRoster.map { s ->
-                        if (s.slotId == nextSlotId) {
-                            val updatedMems = s.memories.toMutableList()
-                            updatedMems.add(
-                                TaggedMemory(
-                                    id = firstMsgId,        // <--- LINKED ID
-                                    tags = newMemory.tags,
-                                    text = newMemory.text,
-                                    messageIds = allMsgIds, // <--- LINKED ID LIST
-                                    embedding = vector
-                                )
-                            )
-                            s.copy(memories = updatedMems)
-                        } else s
+                        // Push directly to the subcollection and AWAIT the confirmation
+                        FirebaseFirestore.getInstance()
+                            .collection("sessions").document(sessionId)
+                            .collection("character_memories").document(firstMsgId)
+                            .set(memDoc)
+                            .await() // <--- THIS FORCES THE SYSTEM TO WAIT FOR UPLOAD
+
+                        Log.d("Memory", "SUCCESS: Vector memory saved safely to subcollection!")
+                    } catch (e: Exception) {
+                        Log.e("Memory", "CRITICAL ERROR saving memory to Firestore: ${e.message}", e)
                     }
-                    sessionProfile = sessionProfile.copy(slotRoster = updatedRoster)
                 }
 
 
+                if (result.relationshipChanges.isNotEmpty()) {
+                    // 1. Apply the point changes and recalculate levels locally
+                    FacilitatorResponseParser.updateRelationshipsFromChanges(
+                        sessionProfile = sessionProfile,
+                        changes = result.relationshipChanges
+                    )
+
+                    // 2. Push the updated relationships back to Firestore!
+                    FirebaseFirestore.getInstance()
+                        .collection("sessions")
+                        .document(sessionProfile.sessionId) // Make sure you have the session ID
+                        .update("slotRoster", sessionProfile.slotRoster)
+                        .addOnSuccessListener {
+                            Log.d(
+                                "VN_UPDATE",
+                                "Successfully saved ${result.relationshipChanges.size} relationship changes to Firestore!"
+                            )
+                        }
+                        .addOnFailureListener { e ->
+                            Log.e("VN_UPDATE", "Failed to save relationship changes", e)
+                        }
+                }
                 handleRPGActionList(result.actions)
+
 
                 // 10. Update UI & Save
                 withContext(Dispatchers.Main) {
@@ -1863,27 +2344,34 @@ class MainActivity : AppCompatActivity() {
                     // Save Session Data (Memories, etc)
                     saveSessionProfile(sessionProfile, sessionId)
 
-
                     val enrichedMessages = result.messages.map { msg ->
-                        val senderSlot = sessionProfile.slotRoster.find { it.slotId == msg.senderId }
-                        // Filter empty poses from the map if necessary
-                        val cleanedPose = msg.pose?.filterValues { !it.isNullOrBlank() }
 
+                        Log.d("pose_debug", "pose: ${msg.pose}")
+                        val senderSlot = sessionProfile.slotRoster.find { it.slotId == msg.senderId }
+                        val outfit = if (msg.outfit.isNullOrBlank() || msg.outfit.equals("null", ignoreCase = true)) {
+                            senderSlot?.currentOutfit ?: slotProfile.currentOutfit
+                        } else {
+                            msg.outfit
+                        }
+                        // Filter empty poses from the map if necessary
                         msg.copy(
                             displayName = senderSlot?.name ?: "Bot",
                             area = senderSlot?.lastActiveArea,
                             location = senderSlot?.lastActiveLocation,
-                            pose = cleanedPose,
+                            outfit = outfit,
+                            pose = msg.pose,
                             visibility = true,
-                            timestamp = msg.timestamp ?: com.google.firebase.Timestamp.now()
+                            timestamp = Timestamp.now()
                         )
                     }
+
                     Log.d("ai_response", "enriched")
 
                     // Display Messages
                     saveMessagesSequentially(enrichedMessages, sessionId, chatId)
                     Log.d("ai_response", "saved")
 
+                    previousSpeakerId = nextSlotId
                     Log.d ("ai_response", "$nextSlotId needs to stop typing")
                     setSlotTyping(sessionId, nextSlotId, false)
                     // 11. Recurse (Keep the conversation going)
@@ -1928,7 +2416,8 @@ class MainActivity : AppCompatActivity() {
                     return@launch
                 }
 
-                val nextSlotId = characterSlot.slotId
+
+                nextSlotId = characterSlot.slotId
 
                 // 3. Set Typing Indicator
                 setSlotTyping(sessionId, nextSlotId, true)
@@ -1947,7 +2436,6 @@ class MainActivity : AppCompatActivity() {
                 val historyString = buildHistoryString(myPersonalHistory.takeLast(10))
 
                 val isStrictSfw = sessionProfile.sfwOnly == true ||
-                        slotProfile.sfwOnly == true ||
                         (slotProfile.age ?: 18) < 18
 
                 // Gather Poses
@@ -1974,55 +2462,47 @@ class MainActivity : AppCompatActivity() {
                     .map { it.slotId }
                     .distinct()
 
-                val sentinel = "DO NOT INCLUDE THIS CHARACTER IN THE POSES SECTION"
-                val isNSFW = !isStrictSfw
 
-                val condensedCharacterInfo = sessionProfile.slotRoster
-                    .filter { it.lastActiveArea == sceneArea && it.lastActiveLocation == sceneLocation }
-                    .associate { profile ->
-                        val outfits = profile.outfits.orEmpty()
-                        val currentName = profile.currentOutfit?.trim().orEmpty()
-                        val chosenOutfit = outfits.firstOrNull { it.name.trim().equals(currentName, ignoreCase = true) }
-                            ?: outfits.firstOrNull()
+                // 1. LOCAL PRESENCE: Just the names of people in the exact same room
+                val namesInRoom = sessionProfile.slotRoster
+                    .filter {
+                        it.lastActiveArea == sceneArea &&
+                                it.lastActiveLocation == sceneLocation &&
+                                it.slotId != nextSlotId // Don't include the character themselves
+                    }
+                    .map { it.name }
+                    .joinToString(", ")
 
-                        val poseSlots = (chosenOutfit?.poseSlots ?: outfits.flatMap { it.poseSlots }).orEmpty()
-                        val (nsfwSlots, sfwSlots) = poseSlots.partition { it.nsfw }
-
-                        val sfwNames = sfwSlots.map { it.name.trim() }.filter { it.isNotEmpty() }.distinct()
-                        val nsfwNames = nsfwSlots.map { it.name.trim() }.filter { it.isNotEmpty() }.distinct()
-
-                        val info = mutableMapOf<String, Any?>()
-                        info["summary"] = profile.summary
-                        info["pose"] = profile.pose
-
-                        if (isNSFW) {
-                            if (sfwNames.isEmpty() && nsfwNames.isEmpty()) {
-                                info["available_poses"] = sentinel
-                            } else {
-                                info["available_poses"] = sfwNames
-                                info["available_poses_nsfw"] = nsfwNames
-                            }
-                        } else {
-                            info["available_poses"] = if (sfwNames.isEmpty()) sentinel else sfwNames
-                        }
-
-                        profile.slotId to info
+                // 2. GLOBAL KNOWLEDGE: The dense facts for EVERYONE in the session
+                val worldCompendium = sessionProfile.slotRoster
+                    .joinToString("\n") { profile ->
+                        // Use the condensed summary generated by the harmonize AI
+                        "- ${profile.name}: ${profile.summary}"
                     }
 
-                // 6. Build Prompt
+                val personality = if(isStrictSfw){
+                    slotProfile.personality
+                }else{
+                    slotProfile.personality + "\n\n Only use Secrets when its appropriate. \n\n Secrets:" + slotProfile.privateDescription
+                }
+
+
+                Log.d("ai_cycle", "personality: $personality")
+                // 6. Build the Roleplay Prompt
                 val roleplayPrompt = PromptBuilder.buildRoleplayPrompt(
                     slotProfile = slotProfile,
                     sessionProfile = sessionProfile,
+                    personality = personality,
                     modeSettings = sessionProfile.modeSettings,
                     sessionSummary = sessionProfile.sessionDescription + sessionProfile.secretDescription,
                     sceneSlotIds = sceneSlotIds,
-                    condensedCharacterInfo = condensedCharacterInfo,
+                    condensedCharacterInfo = worldCompendium,
+                    currentScene = namesInRoom,
                     chatHistory = historyString,
                     memories = memoriesMap,
                     poses = poses,
                     locationDescription = locDescription
                 )
-                Log.d("ai_cycle", "One-on-One Prompt: $roleplayPrompt")
 
                 // 7. VN / SFW Layering
                 val vnPrompt = buildVNPrompt(
@@ -2030,8 +2510,9 @@ class MainActivity : AppCompatActivity() {
                     sessionProfile = sessionProfile
                 )
 
-                val vnModeEnabled = sessionProfile.modeSettings["visual_novel"] == "true" ||
-                        !(sessionProfile.modeSettings["vn"] as? String).isNullOrBlank()
+                // Delete the modeSettings JSON check and use this:
+                val vnModeEnabled = sessionProfile.enabledModes.contains("visual_novel") ||
+                        sessionProfile.enabledModes.contains("vn")
 
                 val vnCheckedPrompt = if (vnModeEnabled) {
                     roleplayPrompt + "\n\n" + vnPrompt
@@ -2044,10 +2525,59 @@ class MainActivity : AppCompatActivity() {
                 val nsfwRejectionPrompt = vnCheckedPrompt + nsfwRejection
                 val nsfwPrompt = vnCheckedPrompt + nsfwinstructions
 
-                val responseText = if (isStrictSfw) {
-                    Facilitator.callOpenAiApi(nsfwRejectionPrompt, BuildConfig.OPENAI_API_KEY)
-                } else {
-                    Facilitator.callMixtralApi(nsfwPrompt, BuildConfig.MIXTRAL_API_KEY)
+                val selectedModelId = sessionProfile.aiModel ?: "DeepSeek V3.2"
+
+
+                when {
+                    // Branch A: Existing Strict SFW logic
+                    isStrictSfw -> {
+                        Log.d("ai_cycle", "$selectedModelId branch a prompt: $nsfwRejectionPrompt")
+                    }
+
+                    // Branch B: The new OpenAI Experiment (using nsfwPrompt)
+                    selectedModelId == "openai-gpt-4o" -> {
+                        Log.d("ai_cycle", "$selectedModelId branch b prompt: $nsfwPrompt")
+                    }
+
+                    // Branch C: Standard Unfiltered / Mixtral Path
+                    else -> {
+                        Log.d("ai_cycle", " $selectedModelId branch c prompt: $nsfwPrompt")
+                    }
+                }
+
+                val finalPrompt = if (isStrictSfw){
+                    nsfwRejectionPrompt
+                }else{
+                    nsfwPrompt
+                }
+
+                val responseText = withTimeoutOrNull(60_000L) {
+                    when {
+                        // Branch B: The new OpenAI Experiment (using nsfwPrompt)
+                        selectedModelId == "openai-gpt-4o" -> {
+                            Facilitator.callOpenAiApi(finalPrompt, BuildConfig.OPENAI_API_KEY)
+                        }
+
+                        // Branch C: Standard Unfiltered / Mixtral Path
+                        else -> {
+                            Facilitator.callMixtralApi(
+                                finalPrompt,
+                                BuildConfig.MIXTRAL_API_KEY,
+                                selectedModelId
+                            )
+                        }
+                    }
+                }
+                Log.d("ai_response", "Ai raw: $responseText")
+
+                if (responseText == null) {
+                    Log.e("AI_CYCLE", "The AI request timed out after 60 seconds.")
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(this@MainActivity, "The AI took too long to respond. Please try again.", Toast.LENGTH_SHORT).show()
+                        setSlotTyping(sessionId, nextSlotId, false)
+                        updateButtonState(ButtonState.SEND)
+                    }
+                    return@launch
                 }
 
                 // 8. Parse
@@ -2056,35 +2586,113 @@ class MainActivity : AppCompatActivity() {
                     nextSlotId,
                     sessionProfile.slotRoster
                 )
+                withContext(Dispatchers.Main) { updateButtonState(ButtonState.WAITING) }
+
+                // bad response check
+                if (result.messages == null) {
+                    Log.e("AI_CYCLE", "The AI response is bad.")
+
+                    var isPremium = false
+                    val userId = FirebaseAuth.getInstance().currentUser?.uid
+
+                    // If it's round 1, we need to know their premium status to show the right Toast
+                    if (activationRound == 1 && userId != null) {
+                        try {
+                            val db = FirebaseFirestore.getInstance()
+                            // .await() safely pauses the coroutine here on the IO thread without blocking the UI
+                            val snapshot = db.collection("users").document(userId).get().await()
+                            isPremium = snapshot.getBoolean("isPremium") ?: false
+                        } catch (e: Exception) {
+                            Log.e("Billing", "Failed to check premium status: ${e.message}")
+                        }
+                    }
+
+                    // Switch to Main thread STRICTLY for UI updates
+                    withContext(Dispatchers.Main) {
+                        val toastMsg = if (activationRound == 1 && !isPremium) {
+                            "The AI response was malformed. Your message was not charged."
+
+                        } else {
+                            "The AI response was malformed." // Premium users or subsequent rounds see this
+                        }
+                        Toast.makeText(this@MainActivity, toastMsg, Toast.LENGTH_SHORT).show()
+                        setSlotTyping(sessionId, nextSlotId, false)
+                        updateButtonState(ButtonState.SEND)
+                    }
+
+                    // ABORT the rest of the round entirely. No DB writes, no billing!
+                    return@launch
+                }
+
+                if (activationRound == 1) {
+                    val userId = FirebaseAuth.getInstance().currentUser?.uid
+                    if (userId != null) {
+                        val db = FirebaseFirestore.getInstance()
+                        val userRef = db.collection("users").document(userId)
+                        val today = Timestamp.now()
+
+                        // Run this in the background (IO context) without blocking the UI
+                        CoroutineScope(Dispatchers.IO).launch {
+                            try {
+                                db.runTransaction { transaction ->
+                                    val snapshot = transaction.get(userRef)
+
+                                    // Double-check they didn't just go over limit in a race condition
+                                    // (Optional, but good for security)
+                                    val isPremium = snapshot.getBoolean("isPremium") ?: false
+                                    if (!isPremium) {
+                                        val currentCount =
+                                            snapshot.getLong("dailyMessageCount") ?: 0
+
+                                        transaction.set(
+                                            userRef,
+                                            mapOf(
+                                                "dailyMessageCount" to currentCount + 1,
+                                                "lastMessageDate" to today
+                                            ),
+                                            SetOptions.merge()
+                                        )
+                                        Log.d("Billing", "User charged for Round 1 response.")
+                                    }
+                                }.await()
+                            } catch (e: Exception) {
+                                Log.e("Billing", "Failed to update message count: ${e.message}")
+                            }
+                        }
+                    }
+                }
                 Log.d("ai_response", "recieved: $result")
 
-                // 9. Handle New Memories (UPDATED)
+                // 9. Handle New Memories (Subcollection Write)
                 val newMemory = result.newMemory
                 if (newMemory != null) {
-                    val vector = Director.getEmbedding(newMemory.text, BuildConfig.OPENAI_API_KEY)
+                    try {
+                        Log.d("Memory", "Attempting to embed and save new memory...")
+                        val vector = Director.getEmbedding(newMemory.text, BuildConfig.OPENAI_API_KEY)
+                        val firstMsgId = result.messages.firstOrNull()?.id ?: UUID.randomUUID().toString()
+                        val allMsgIds = result.messages.mapNotNull { it.id }
 
-                    // --- NEW LOGIC START ---
-                    // Use the first message's ID as the Memory ID to link them
-                    val firstMsgId = result.messages.firstOrNull()?.id ?: UUID.randomUUID().toString()
-                    val allMsgIds = result.messages.map { it.id }
-                    // --- NEW LOGIC END ---
+                        // Create the standalone memory object
+                        val memDoc = TaggedMemory(
+                            id = firstMsgId,
+                            slotId = nextSlotId, // Link it to the character
+                            tags = newMemory.tags,
+                            text = newMemory.text,
+                            messageIds = allMsgIds,
+                            embedding = vector
+                        )
 
-                    val updatedRoster = sessionProfile.slotRoster.map { s ->
-                        if (s.slotId == nextSlotId) {
-                            val updatedMems = s.memories.toMutableList()
-                            updatedMems.add(
-                                TaggedMemory(
-                                    id = firstMsgId,        // <--- LINKED ID
-                                    tags = newMemory.tags,
-                                    text = newMemory.text,
-                                    messageIds = allMsgIds, // <--- LINKED ID LIST
-                                    embedding = vector
-                                )
-                            )
-                            s.copy(memories = updatedMems)
-                        } else s
+                        // Push directly to the subcollection and AWAIT the confirmation
+                        FirebaseFirestore.getInstance()
+                            .collection("sessions").document(sessionId)
+                            .collection("character_memories").document(firstMsgId)
+                            .set(memDoc)
+                            .await() // <--- THIS FORCES THE SYSTEM TO WAIT FOR UPLOAD
+
+                        Log.d("Memory", "SUCCESS: Vector memory saved safely to subcollection!")
+                    } catch (e: Exception) {
+                        Log.e("Memory", "CRITICAL ERROR saving memory to Firestore: ${e.message}", e)
                     }
-                    sessionProfile = sessionProfile.copy(slotRoster = updatedRoster)
                 }
 
                 handleRPGActionList(result.actions)
@@ -2096,30 +2704,25 @@ class MainActivity : AppCompatActivity() {
                     saveSessionProfile(sessionProfile, sessionId)
 
                     val enrichedMessages = result.messages.map { msg ->
+                        Log.d("pose_debug", "pose: ${msg.pose}")
                         val senderSlot = sessionProfile.slotRoster.find { it.slotId == msg.senderId }
-                        val cleanedPose = msg.pose?.filterValues { !it.isNullOrBlank() }
-
+                        // Filter empty poses from the map if necessary
                         msg.copy(
                             displayName = senderSlot?.name ?: "Bot",
                             area = senderSlot?.lastActiveArea,
                             location = senderSlot?.lastActiveLocation,
-                            pose = cleanedPose,
+                            outfit = slotProfile.currentOutfit,
+                            pose = msg.pose,
                             visibility = true,
-                            timestamp = msg.timestamp ?: com.google.firebase.Timestamp.now()
+                            timestamp = Timestamp.now()
                         )
                     }
 
                     saveMessagesSequentially(enrichedMessages, sessionId, chatId)
 
-                    // 11. Recurse (FIXED: Calls processOneonOneRound, NOT ActivationRound)
-                    if (activationRound < maxActivationRounds) {
-                        val updatedHistory = chatAdapter.getMessages()
-                        processOneonOneRound("", updatedHistory)
-                        setSlotTyping(sessionId, nextSlotId, false)
-                    } else {
-                        updateButtonState(ButtonState.SEND)
-                        setSlotTyping(sessionId, nextSlotId, false)
-                    }
+                    previousSpeakerId = nextSlotId
+                    updateButtonState(ButtonState.SEND)
+                    setSlotTyping(sessionId, nextSlotId, false)
                 }
 
             } catch (e: Exception) {
@@ -2140,12 +2743,12 @@ class MainActivity : AppCompatActivity() {
         }
         activationRound++
         updateButtonState(ButtonState.INTERRUPT)
-        Log.d("AI_CYCLE", "Round $activationRound (Local Logic)")
+        Log.d("AI_CYCLE", "Round $activationRound (above the table)")
 
         aiJob = lifecycleScope.launch(Dispatchers.IO) {
             try {
                 // 2. LOCAL LOGIC: Pick the next speaker
-                val nextSlotId = determineNextSpeakerLocal(input, chatHistory)
+                nextSlotId = determineNextSpeakerLocal(input, chatHistory)
 
                 // Handle Narrator or "No one here"
                 if (nextSlotId == "narrator" || nextSlotId.isBlank()) {
@@ -2154,6 +2757,17 @@ class MainActivity : AppCompatActivity() {
                     withContext(Dispatchers.Main) { updateButtonState(ButtonState.SEND) }
                     return@launch
                 }
+                val activeSlotId = sessionProfile.userMap[userId]?.activeSlotId
+
+                if (nextSlotId == activeSlotId){
+                    withContext(Dispatchers.Main) {
+                        updateButtonState(ButtonState.SEND)
+                        // Move the toast INSIDE this block
+                        Toast.makeText(this@MainActivity, "Control returned to you", Toast.LENGTH_SHORT).show()
+                    }
+                    return@launch
+                }
+
                 // 3. Set Typing Indicator
                 setSlotTyping(sessionId, nextSlotId, true)
 
@@ -2171,7 +2785,6 @@ class MainActivity : AppCompatActivity() {
                 val historyString = buildHistoryString(myPersonalHistory.takeLast(10))
 
                 val isStrictSfw = sessionProfile.sfwOnly == true ||
-                        slotProfile.sfwOnly == true ||
                         (slotProfile.age ?: 18) < 18
 
                 // Gather Poses
@@ -2199,47 +2812,41 @@ class MainActivity : AppCompatActivity() {
                 val sentinel = "DO NOT INCLUDE THIS CHARACTER IN THE POSES SECTION"
                 val isNSFW = !isStrictSfw
 
-                val condensedCharacterInfo = sessionProfile.slotRoster
-                    .filter { it.lastActiveArea == sceneArea && it.lastActiveLocation == sceneLocation }
-                    .associate { profile ->
-                        val outfits = profile.outfits.orEmpty()
-                        val currentName = profile.currentOutfit?.trim().orEmpty()
-                        val chosenOutfit = outfits.firstOrNull { it.name.trim().equals(currentName, ignoreCase = true) }
-                            ?: outfits.firstOrNull()
+                // 1. LOCAL PRESENCE: Just the names of people in the exact same room
+                val namesInRoom = sessionProfile.slotRoster
+                    .filter {
+                        it.lastActiveArea == sceneArea &&
+                                it.lastActiveLocation == sceneLocation &&
+                                it.slotId != nextSlotId // Don't include the character themselves
+                    }
+                    .map { it.name }
+                    .joinToString(", ")
 
-                        val poseSlots = (chosenOutfit?.poseSlots ?: outfits.flatMap { it.poseSlots }).orEmpty()
-                        val (nsfwSlots, sfwSlots) = poseSlots.partition { it.nsfw }
-
-                        val sfwNames = sfwSlots.map { it.name.trim() }.filter { it.isNotEmpty() }.distinct()
-                        val nsfwNames = nsfwSlots.map { it.name.trim() }.filter { it.isNotEmpty() }.distinct()
-
-                        val info = mutableMapOf<String, Any?>()
-                        info["summary"] = profile.summary
-                        info["pose"] = profile.pose  // String?
-
-
-                        if (isNSFW) {
-                            if (sfwNames.isEmpty() && nsfwNames.isEmpty()) {
-                                info["available_poses"] = sentinel
-                            } else {
-                                info["available_poses"] = sfwNames
-                                info["available_poses_nsfw"] = nsfwNames
-                            }
-                        } else {
-                            info["available_poses"] = if (sfwNames.isEmpty()) sentinel else sfwNames
-                        }
-
-                        profile.slotId to info
+                // 2. GLOBAL KNOWLEDGE: The dense facts for EVERYONE in the session
+                val worldCompendium = sessionProfile.slotRoster
+                    .joinToString("\n") { profile ->
+                        // Use the condensed summary generated by the harmonize AI
+                        "- ${profile.name}: ${profile.summary}"
                     }
 
+                val personality = if(isStrictSfw){
+                    slotProfile.personality
+                }else{
+                    slotProfile.personality + "\n\n Only use Secrets when its appropriate. \n\n Secrets:" + slotProfile.privateDescription
+                }
+
+
+                Log.d("ai_cycle", "personality: $personality")
                 // 6. Build the Roleplay Prompt
                 val roleplayPrompt = PromptBuilder.buildRoleplayPrompt(
                     slotProfile = slotProfile,
                     sessionProfile = sessionProfile,
+                    personality = personality,
                     modeSettings = sessionProfile.modeSettings,
                     sessionSummary = sessionProfile.sessionDescription + sessionProfile.secretDescription,
                     sceneSlotIds = sceneSlotIds,
-                    condensedCharacterInfo = condensedCharacterInfo,
+                    condensedCharacterInfo = worldCompendium,
+                    currentScene = namesInRoom,
                     chatHistory = historyString,
                     memories = memoriesMap,
                     poses = poses,
@@ -2267,8 +2874,9 @@ class MainActivity : AppCompatActivity() {
                     sessionProfile = sessionProfile
                 )
 
-                val vnModeEnabled = sessionProfile.modeSettings["visual_novel"] == "true" ||
-                        !(sessionProfile.modeSettings["vn"] as? String).isNullOrBlank()
+                // Delete the modeSettings JSON check and use this:
+                val vnModeEnabled = sessionProfile.enabledModes.contains("visual_novel") ||
+                        sessionProfile.enabledModes.contains("vn")
 
                 val checkedroleplayPrompt = if (slotProfile == gmProfile){
                     PromptBuilder.buildRPGLiteRules() + roleplayPrompt + gmPrompt
@@ -2287,11 +2895,40 @@ class MainActivity : AppCompatActivity() {
                 val nsfwRejectionPrompt = vnCheckedPrompt + nsfwRejection
                 val nsfwPrompt = vnCheckedPrompt + nsfwinstructions
 
-                val responseText = if (isStrictSfw) {
-                    // OpenAI (Smart, Safe)
-                    Facilitator.callOpenAiApi(nsfwRejectionPrompt, BuildConfig.OPENAI_API_KEY)
-                } else {
-                    Facilitator.callMixtralApi(nsfwPrompt, BuildConfig.MIXTRAL_API_KEY)
+                val selectedModelId = sessionProfile.aiModel ?: "DeepSeek V3.2"
+
+                val finalPrompt = if (isStrictSfw){
+                    nsfwRejectionPrompt
+                }else{
+                    nsfwPrompt
+                }
+
+                val responseText = withTimeoutOrNull(60_000L) {
+                    when {
+                        // Branch B: The new OpenAI Experiment (using nsfwPrompt)
+                        selectedModelId == "openai-gpt-4o" -> {
+                            Facilitator.callOpenAiApi(finalPrompt, BuildConfig.OPENAI_API_KEY)
+                        }
+
+                        // Branch C: Standard Unfiltered / Mixtral Path
+                        else -> {
+                            Facilitator.callMixtralApi(
+                                finalPrompt,
+                                BuildConfig.MIXTRAL_API_KEY,
+                                selectedModelId
+                            )
+                        }
+                    }
+                }
+
+                if (responseText == null) {
+                    Log.e("AI_CYCLE", "The AI request timed out after 60 seconds.")
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(this@MainActivity, "The AI took too long to respond. Please try again.", Toast.LENGTH_SHORT).show()
+                        setSlotTyping(sessionId, nextSlotId, false)
+                        updateButtonState(ButtonState.SEND)
+                    }
+                    return@launch
                 }
 
                 // 8. Parse Response
@@ -2300,34 +2937,111 @@ class MainActivity : AppCompatActivity() {
                     nextSlotId,
                     sessionProfile.slotRoster
                 )
+                withContext(Dispatchers.Main) { updateButtonState(ButtonState.WAITING) }
+                // bad response check
+                if (result.messages == null) {
+                    Log.e("AI_CYCLE", "The AI response is bad.")
+
+                    var isPremium = false
+                    val userId = FirebaseAuth.getInstance().currentUser?.uid
+
+                    // If it's round 1, we need to know their premium status to show the right Toast
+                    if (activationRound == 1 && userId != null) {
+                        try {
+                            val db = FirebaseFirestore.getInstance()
+                            // .await() safely pauses the coroutine here on the IO thread without blocking the UI
+                            val snapshot = db.collection("users").document(userId).get().await()
+                            isPremium = snapshot.getBoolean("isPremium") ?: false
+                        } catch (e: Exception) {
+                            Log.e("Billing", "Failed to check premium status: ${e.message}")
+                        }
+                    }
+
+                    // Switch to Main thread STRICTLY for UI updates
+                    withContext(Dispatchers.Main) {
+                        val toastMsg = if (activationRound == 1 && !isPremium) {
+                            "The AI response was malformed. Your message was not charged."
+
+                        } else {
+                            "The AI response was malformed." // Premium users or subsequent rounds see this
+                        }
+                        Toast.makeText(this@MainActivity, toastMsg, Toast.LENGTH_SHORT).show()
+                        setSlotTyping(sessionId, nextSlotId, false)
+                        updateButtonState(ButtonState.SEND)
+                    }
+
+                    // ABORT the rest of the round entirely. No DB writes, no billing!
+                    return@launch
+                }
+
+                if (activationRound == 1) {
+                    val userId = FirebaseAuth.getInstance().currentUser?.uid
+                    if (userId != null) {
+                        val db = FirebaseFirestore.getInstance()
+                        val userRef = db.collection("users").document(userId)
+                        val today = Timestamp.now()
+
+                        // Run this in the background (IO context) without blocking the UI
+                        CoroutineScope(Dispatchers.IO).launch {
+                            try {
+                                db.runTransaction { transaction ->
+                                    val snapshot = transaction.get(userRef)
+
+                                    // Double-check they didn't just go over limit in a race condition
+                                    // (Optional, but good for security)
+                                    val isPremium = snapshot.getBoolean("isPremium") ?: false
+                                    if (!isPremium) {
+                                        val currentCount =
+                                            snapshot.getLong("dailyMessageCount") ?: 0
+
+                                        transaction.set(
+                                            userRef,
+                                            mapOf(
+                                                "dailyMessageCount" to currentCount + 1,
+                                                "lastMessageDate" to today
+                                            ),
+                                            SetOptions.merge()
+                                        )
+                                        Log.d("Billing", "User charged for Round 1 response.")
+                                    }
+                                }.await()
+                            } catch (e: Exception) {
+                                Log.e("Billing", "Failed to update message count: ${e.message}")
+                            }
+                        }
+                    }
+                }
                 Log.d("ai_response", "recieved: $result")
-                // 9. Handle New Memories (UPDATED)
+                // 9. Handle New Memories (Subcollection Write)
                 val newMemory = result.newMemory
                 if (newMemory != null) {
-                    val vector = Director.getEmbedding(newMemory.text, BuildConfig.OPENAI_API_KEY)
+                    try {
+                        Log.d("Memory", "Attempting to embed and save new memory...")
+                        val vector = Director.getEmbedding(newMemory.text, BuildConfig.OPENAI_API_KEY)
+                        val firstMsgId = result.messages.firstOrNull()?.id ?: UUID.randomUUID().toString()
+                        val allMsgIds = result.messages.mapNotNull { it.id }
 
-                    // --- NEW LOGIC START ---
-                    // Use the first message's ID as the Memory ID to link them
-                    val firstMsgId = result.messages.firstOrNull()?.id ?: UUID.randomUUID().toString()
-                    val allMsgIds = result.messages.map { it.id }
-                    // --- NEW LOGIC END ---
+                        // Create the standalone memory object
+                        val memDoc = TaggedMemory(
+                            id = firstMsgId,
+                            slotId = nextSlotId, // Link it to the character
+                            tags = newMemory.tags,
+                            text = newMemory.text,
+                            messageIds = allMsgIds,
+                            embedding = vector
+                        )
 
-                    val updatedRoster = sessionProfile.slotRoster.map { s ->
-                        if (s.slotId == nextSlotId) {
-                            val updatedMems = s.memories.toMutableList()
-                            updatedMems.add(
-                                TaggedMemory(
-                                    id = firstMsgId,        // <--- LINKED ID
-                                    tags = newMemory.tags,
-                                    text = newMemory.text,
-                                    messageIds = allMsgIds, // <--- LINKED ID LIST
-                                    embedding = vector
-                                )
-                            )
-                            s.copy(memories = updatedMems)
-                        } else s
+                        // Push directly to the subcollection and AWAIT the confirmation
+                        FirebaseFirestore.getInstance()
+                            .collection("sessions").document(sessionId)
+                            .collection("character_memories").document(firstMsgId)
+                            .set(memDoc)
+                            .await() // <--- THIS FORCES THE SYSTEM TO WAIT FOR UPLOAD
+
+                        Log.d("Memory", "SUCCESS: Vector memory saved safely to subcollection!")
+                    } catch (e: Exception) {
+                        Log.e("Memory", "CRITICAL ERROR saving memory to Firestore: ${e.message}", e)
                     }
-                    sessionProfile = sessionProfile.copy(slotRoster = updatedRoster)
                 }
 
                 handleRPGActionList(result.actions)
@@ -2343,14 +3057,11 @@ class MainActivity : AppCompatActivity() {
 
                     val enrichedMessages = result.messages.map { msg ->
                         val senderSlot = sessionProfile.slotRoster.find { it.slotId == msg.senderId }
-                        // Filter empty poses from the map if necessary
-                        val cleanedPose = msg.pose?.filterValues { !it.isNullOrBlank() }
-
                         msg.copy(
                             displayName = senderSlot?.name ?: "Bot",
                             area = senderSlot?.lastActiveArea,       // <--- Vital!
                             location = senderSlot?.lastActiveLocation, // <--- Vital!
-                            pose = cleanedPose,
+                            pose = msg.pose,
                             visibility = true,
                             timestamp = msg.timestamp ?: com.google.firebase.Timestamp.now()
                         )
@@ -2358,6 +3069,8 @@ class MainActivity : AppCompatActivity() {
 
                     // Display Messages
                     saveMessagesSequentially(enrichedMessages, sessionId, chatId)
+
+                    previousSpeakerId = nextSlotId
 
                     // 11. Recurse (Keep the conversation going)
                     if (activationRound < maxActivationRounds) {
@@ -2383,6 +3096,7 @@ class MainActivity : AppCompatActivity() {
     private fun determineNextSpeakerOnTable(input: String, chatHistory: List<ChatMessage>): String {
         // 1. FORCED OVERRIDE
         val forced = forcedNextSpeakerId
+
         if (forced != null) {
             forcedNextSpeakerId = null
             runOnUiThread {
@@ -2411,7 +3125,6 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
-        // --- FIX ENDS HERE ---
 
         // 3. CHECK FOR TRIGGER: Dice Rolls
         // (Valid for Director too: if Director rolls, AI can interpret result)
@@ -2443,7 +3156,7 @@ class MainActivity : AppCompatActivity() {
 
         aiJob = lifecycleScope.launch(Dispatchers.IO) {
             try {
-                // 1. Decide Speaker (using the new Trigger Logic)
+                // 1. Decide Speaker
                 val nextSlotId = determineNextSpeakerOnTable(input, chatHistory)
 
                 if (nextSlotId.isBlank()) {
@@ -2451,24 +3164,29 @@ class MainActivity : AppCompatActivity() {
                     return@launch
                 }
 
+                val activeSlotId = sessionProfile.userMap[userId]?.activeSlotId
+                if (nextSlotId == activeSlotId){
+                    withContext(Dispatchers.Main) {
+                        updateButtonState(ButtonState.SEND)
+                        Toast.makeText(this@MainActivity, "Control returned to you", Toast.LENGTH_SHORT).show()
+                    }
+                    return@launch
+                }
+
                 // 2. Setup Context
                 setSlotTyping(sessionId, nextSlotId, true)
-                val relevantMemories = fetchRelevantMemories(input, nextSlotId) // RAG still works for GM!
+                val relevantMemories = fetchRelevantMemories(input, nextSlotId)
                 val memoriesMap = mapOf(nextSlotId to relevantMemories)
 
                 val slotProfile = sessionProfile.slotRoster.find { it.slotId == nextSlotId }!!
-                Log.d("ai_response", "replying as: ${slotProfile.name}")
                 val sceneArea = slotProfile.lastActiveArea ?: "Unknown"
                 val sceneLocation = slotProfile.lastActiveLocation ?: "Unknown"
 
                 // 3. GM-Specific Context
-                // If next is Narrator, we need to know the Scene info
                 val playerSlot = sessionProfile.slotRoster.find { it.profileType == "player" }
                 val areaName = playerSlot?.lastActiveArea
                 val locName = playerSlot?.lastActiveLocation
 
-
-                // Helper to normalize strings for comparison
                 fun String.normalize(): String = this.trim().lowercase()
 
                 val areaObj = sessionProfile.areas.find {
@@ -2484,61 +3202,16 @@ class MainActivity : AppCompatActivity() {
                     .map { it.slotId }
                     .distinct()
 
-                val sentinel = "DO NOT INCLUDE THIS CHARACTER IN THE POSES SECTION"
-
                 val isStrictSfw = sessionProfile.sfwOnly == true ||
-                        slotProfile.sfwOnly == true ||
                         (slotProfile.age ?: 18) < 18
-
-                val isNSFW = !isStrictSfw
-
 
                 val currentOutfit = slotProfile.outfits?.find { it.name == slotProfile.currentOutfit }
                 val poses = currentOutfit?.poseSlots?.map { it.name } ?: emptyList()
-
-                val condensedCharacterInfo = sessionProfile.slotRoster
-                    .filter { it.lastActiveArea == sceneArea && it.lastActiveLocation == sceneLocation }
-                    .associate { profile ->
-                        val outfits = profile.outfits.orEmpty()
-                        val currentName = profile.currentOutfit?.trim().orEmpty()
-                        val chosenOutfit = outfits.firstOrNull { it.name.trim().equals(currentName, ignoreCase = true) }
-                            ?: outfits.firstOrNull()
-
-                        val poseSlots = (chosenOutfit?.poseSlots ?: outfits.flatMap { it.poseSlots }).orEmpty()
-                        val (nsfwSlots, sfwSlots) = poseSlots.partition { it.nsfw }
-
-                        val sfwNames = sfwSlots.map { it.name.trim() }.filter { it.isNotEmpty() }.distinct()
-                        val nsfwNames = nsfwSlots.map { it.name.trim() }.filter { it.isNotEmpty() }.distinct()
-
-                        val info = mutableMapOf<String, Any?>()
-                        info["summary"] = profile.summary
-                        info["pose"] = profile.pose  // String?
-
-
-                        if (isNSFW) {
-                            if (sfwNames.isEmpty() && nsfwNames.isEmpty()) {
-                                info["available_poses"] = sentinel
-                            } else {
-                                info["available_poses"] = sfwNames
-                                info["available_poses_nsfw"] = nsfwNames
-                            }
-                        } else {
-                            info["available_poses"] = if (sfwNames.isEmpty()) sentinel else sfwNames
-                        }
-
-                        profile.slotId to info
-                    }
-
-                // 4. Build Prompt
                 val historyString = buildHistoryString(chatHistory.takeLast(10))
 
-
-                // VISIBLE CLUES/ITEMS: ${cluesInRoom.joinToString { it.title }}
-                // BASE PROMPT
-                var prompt = ""
-
-                if (nextSlotId == "narrator") {
-                    prompt = """
+                // 4. Build Final Prompt Safely
+                val lastPrompt = if (nextSlotId == "narrator") {
+                    """
                     You are the Game Master/Narrator for a Tabletop RPG.
                     CURRENT SCENE: $areaName - $locName
                     SCENE DESCRIPTION: $locDescription
@@ -2549,143 +3222,237 @@ class MainActivity : AppCompatActivity() {
                     3. If the user moved, describe the new area.
                     4. Keep it under 150 words.
                     5. Be neutral and fair.
-                """.trimIndent()
+                    
+                    CHAT HISTORY:
+                    $historyString
+                    """.trimIndent()
                 } else {
-                    // It's an NPC speaking
-                    val vnPrompt = buildVNPrompt(
-                        slotProfile = slotProfile,
-                        sessionProfile = sessionProfile
-                    )
-                    prompt = PromptBuilder.buildRoleplayPrompt(
+                    val vnPrompt = buildVNPrompt(slotProfile = slotProfile, sessionProfile = sessionProfile)
+                    val namesInRoom = sessionProfile.slotRoster
+                        .filter { it.lastActiveArea == sceneArea && it.lastActiveLocation == sceneLocation && it.slotId != nextSlotId }
+                        .joinToString(", ") { it.name }
+                    val worldCompendium = sessionProfile.slotRoster.joinToString("\n") { "- ${it.name}: ${it.summary}. physical stats: ${it.gender} ${it.physicalDescription}, ${it.age}, ${it.height}, ${it.weight}, ${it.eyeColor}, ${it.hairColor}" }
+
+                    val personality = if(isStrictSfw){
+                        slotProfile.personality
+                    }else{
+                        slotProfile.personality + "\n\n Only use Secrets when its appropriate. \n\n Secrets:" + slotProfile.privateDescription
+                    }
+
+                    Log.d("ai_cycle", "personality: $personality")
+
+                    val basePrompt = PromptBuilder.buildRoleplayPrompt(
                         slotProfile = slotProfile,
                         sessionProfile = sessionProfile,
+                        personality = personality,
                         modeSettings = sessionProfile.modeSettings,
-                        sessionSummary = sessionProfile.sessionDescription,
-                        sceneSlotIds = sceneSlotIds, // Optimize later
-                        condensedCharacterInfo = condensedCharacterInfo,
+                        sessionSummary = sessionProfile.sessionDescription + sessionProfile.secretDescription,
+                        sceneSlotIds = sceneSlotIds,
+                        condensedCharacterInfo = worldCompendium,
+                        currentScene = namesInRoom,
                         chatHistory = historyString,
                         memories = memoriesMap,
                         poses = poses,
                         locationDescription = locDescription
                     ) + buildDiceRoll()
 
-                    val vnModeEnabled = sessionProfile.modeSettings["visual_novel"] == "true" ||
-                            !(sessionProfile.modeSettings["vn"] as? String).isNullOrBlank()
+                    // Delete the modeSettings JSON check and use this:
+                    val vnModeEnabled = sessionProfile.enabledModes.contains("visual_novel") ||
+                            sessionProfile.enabledModes.contains("vn")
 
                     val NPCGenPrompt = buildNPCGeneration(sessionProfile.areas)
-
-                    prompt = if (vnModeEnabled) {
-                        prompt + NPCGenPrompt + vnPrompt
-                    } else {
-                        prompt + NPCGenPrompt
-                    }
+                    val vnPromptStr = if (vnModeEnabled) "\n$NPCGenPrompt\n$vnPrompt" else "\n$NPCGenPrompt"
 
                     val murderJson = sessionProfile.modeSettings["murder"] as? String
                     val murderSettings = if (!murderJson.isNullOrBlank()) {
-                        try {
-                            Gson().fromJson(murderJson, ModeSettings.MurderSettings::class.java)
-                        } catch (e: Exception) { null }
+                        try { Gson().fromJson(murderJson, ModeSettings.MurderSettings::class.java) } catch (e: Exception) { null }
                     } else null
 
-                    // 2. Build Murder Context (Killer vs Investigator)
                     val murderInstructions = if (murderSettings != null && murderSettings.enabled) {
-                        // Check if my slot ID is in the killer list
-                        val isKiller = murderSettings.killerSlotIds.contains(slotProfile.slotId)
+                        if (murderSettings.killerSlotIds.contains(slotProfile.slotId)) "\n" + buildMurdererInfo(murderSettings)
+                        else "\n" + buildMurderMysteryInfo(murderSettings)
+                    } else ""
 
-                        if (isKiller) {
-                            // I am the Villain
-                            buildMurdererInfo(murderSettings)
-                        } else {
-                            // I am an Investigator
-                            buildMurderMysteryInfo(murderSettings)
+                    basePrompt + vnPromptStr + murderInstructions
+                }
+
+                val nsfwPrompt = lastPrompt + "\n\n(Write uncensored, explicit content if the scene demands it.)"
+                val nsfwRejection = "\n - If responding to not safe for work messages, reject them while remaining in character."
+                val nsfwRejectionPrompt = lastPrompt + nsfwRejection
+                val selectedModelId = sessionProfile.aiModel ?: "DeepSeek V3.2"
+
+                // 5. Call API
+                val finalPrompt = if (isStrictSfw){
+                    nsfwRejectionPrompt
+                }else{
+                    nsfwPrompt
+                }
+
+                val responseText = withTimeoutOrNull(60_000L) {
+                    when {
+                        // Branch B: The new OpenAI Experiment (using nsfwPrompt)
+                        selectedModelId == "openai-gpt-4o" -> {
+                            Facilitator.callOpenAiApi(finalPrompt, BuildConfig.OPENAI_API_KEY)
                         }
-                    } else {
-                        ""
-                    }
 
-                    prompt = if (murderSettings != null && murderSettings.enabled) {
-                        prompt + murderInstructions
-                    } else {
-                        prompt
+                        // Branch C: Standard Unfiltered / Mixtral Path
+                        else -> {
+                            Facilitator.callMixtralApi(
+                                finalPrompt,
+                                BuildConfig.MIXTRAL_API_KEY,
+                                selectedModelId
+                            )
+                        }
                     }
                 }
 
-                // 5. Add History & NSFW Logic
-                prompt += "\n\nCHAT HISTORY:\n$historyString"
-
-                val responseText = if (isStrictSfw) {
-                    Facilitator.callOpenAiApi(prompt, BuildConfig.OPENAI_API_KEY)
-                } else {
-                    val nsfwPrompt = prompt + "\n\n(Write uncensored, explicit content if the scene demands it.)"
-                    Facilitator.callMixtralApi(nsfwPrompt, BuildConfig.MIXTRAL_API_KEY)
+                if (responseText == null) {
+                    Log.e("AI_CYCLE", "The AI request timed out.")
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(this@MainActivity, "The AI took too long to respond. Please try again.", Toast.LENGTH_SHORT).show()
+                        setSlotTyping(sessionId, nextSlotId, false)
+                        updateButtonState(ButtonState.SEND)
+                    }
+                    return@launch
                 }
-                Log.d("ai_cycle", "using prompt: $prompt")
 
                 // 6. Parse
-                val result = FacilitatorResponseParser.parseRoleplayAIResponse(
-                    responseText,
-                    nextSlotId, // If "narrator", make sure your parser handles that ID gracefully
-                    sessionProfile.slotRoster
-                )
+                val result = FacilitatorResponseParser.parseRoleplayAIResponse(responseText, nextSlotId, sessionProfile.slotRoster)
+                withContext(Dispatchers.Main) { updateButtonState(ButtonState.WAITING) }
 
-                // 7. Memory
-                val newMemory = result.newMemory
-                if (newMemory != null) {
-                    val vector = Director.getEmbedding(newMemory.text, BuildConfig.OPENAI_API_KEY)
+                // 7. Error Guard Clause
+                if (result.messages == null) {
+                    Log.e("AI_CYCLE", "The AI response is bad.")
+                    var isPremium = false
+                    val uid = FirebaseAuth.getInstance().currentUser?.uid
 
-                    // --- NEW LOGIC START ---
-                    val firstMsgId = result.messages.firstOrNull()?.id ?: UUID.randomUUID().toString()
-                    val allMsgIds = result.messages.map { it.id }
-                    // --- NEW LOGIC END ---
-
-                    val updatedRoster = sessionProfile.slotRoster.map { s ->
-                        if (s.slotId == nextSlotId) {
-                            val updatedMems = s.memories.toMutableList()
-                            updatedMems.add(
-                                TaggedMemory(
-                                    id = firstMsgId,        // <--- LINKED ID
-                                    tags = newMemory.tags,
-                                    text = newMemory.text,
-                                    messageIds = allMsgIds, // <--- LINKED ID LIST
-                                    embedding = vector
-                                )
-                            )
-                            s.copy(memories = updatedMems)
-                        } else s
+                    if (activationRound == 1 && uid != null) {
+                        try {
+                            val snapshot = FirebaseFirestore.getInstance().collection("users").document(uid).get().await()
+                            isPremium = snapshot.getBoolean("isPremium") ?: false
+                        } catch (e: Exception) { Log.e("Billing", "Failed to check premium status: ${e.message}") }
                     }
-                    sessionProfile = sessionProfile.copy(slotRoster = updatedRoster)
+
+                    withContext(Dispatchers.Main) {
+                        val toastMsg = if (activationRound == 1 && !isPremium) "The AI response was malformed. Your message was not charged."
+                        else "The AI response was malformed."
+                        Toast.makeText(this@MainActivity, toastMsg, Toast.LENGTH_SHORT).show()
+                        setSlotTyping(sessionId, nextSlotId, false)
+                        updateButtonState(ButtonState.SEND)
+                    }
+                    return@launch // Abort!
                 }
 
-                // 8. Handle Actions
-                handleRPGActionList(result.actions)
-                setSlotTyping(sessionId, nextSlotId, false)
+                // 8. Billing
+                if (activationRound == 1) {
+                    val uid = FirebaseAuth.getInstance().currentUser?.uid
+                    if (uid != null) {
+                        val db = FirebaseFirestore.getInstance()
+                        val userRef = db.collection("users").document(uid)
+                        try {
+                            db.runTransaction { transaction ->
+                                val snapshot = transaction.get(userRef)
+                                val isPremium = snapshot.getBoolean("isPremium") ?: false
+                                if (!isPremium) {
+                                    val currentCount = snapshot.getLong("dailyMessageCount") ?: 0
+                                    transaction.set(userRef, mapOf("dailyMessageCount" to currentCount + 1, "lastMessageDate" to Timestamp.now()), SetOptions.merge())
+                                }
+                            }.await()
+                        } catch (e: Exception) { Log.e("Billing", "Failed to update message count: ${e.message}") }
+                    }
+                }
+
+                val baseTimeMs = System.currentTimeMillis()
+
+                // We MUST attach the area/location so the UI knows to show it!
+                val enrichedMessages = result.messages.map { msg ->
+                    val senderSlot = sessionProfile.slotRoster.find { it.slotId == msg.senderId }
+                    val outfitToUse = if (msg.outfit.isNullOrBlank() || msg.outfit.equals("null", ignoreCase = true)) {
+                        senderSlot?.currentOutfit ?: slotProfile.currentOutfit
+                    } else {
+                        msg.outfit
+                    }
+
+                    msg.copy(
+                        id = msg.id ?: UUID.randomUUID().toString(),
+                        displayName = senderSlot?.name ?: "Bot",
+                        area = senderSlot?.lastActiveArea,       // <--- Vital!
+                        location = senderSlot?.lastActiveLocation, // <--- Vital!
+                        outfit = outfitToUse,
+                        pose = msg.pose,
+                        visibility = true,
+                        timestamp = msg.timestamp ?: Timestamp.now()
+                    )
+                }
+
+                // 9. Handle New Memories (Subcollection Write)
+                val newMemory = result.newMemory
+                if (newMemory != null) {
+                    try {
+                        Log.d("Memory", "Attempting to embed and save new memory...")
+                        val vector = Director.getEmbedding(newMemory.text, BuildConfig.OPENAI_API_KEY)
+                        val firstMsgId = result.messages.firstOrNull()?.id ?: UUID.randomUUID().toString()
+                        val allMsgIds = result.messages.mapNotNull { it.id }
+
+                        // Create the standalone memory object
+                        val memDoc = TaggedMemory(
+                            id = firstMsgId,
+                            slotId = nextSlotId, // Link it to the character
+                            tags = newMemory.tags,
+                            text = newMemory.text,
+                            messageIds = allMsgIds,
+                            embedding = vector
+                        )
+
+                        // Push directly to the subcollection and AWAIT the confirmation
+                        FirebaseFirestore.getInstance()
+                            .collection("sessions").document(sessionId)
+                            .collection("character_memories").document(firstMsgId)
+                            .set(memDoc)
+                            .await() // <--- THIS FORCES THE SYSTEM TO WAIT FOR UPLOAD
+
+                        Log.d("Memory", "SUCCESS: Vector memory saved safely to subcollection!")
+                    } catch (e: Exception) {
+                        Log.e("Memory", "CRITICAL ERROR saving memory to Firestore: ${e.message}", e)
+                    }
+                }
+
+                // 10. Actions & System Messages
+                val systemMessagesFromActions = handleRPGActionList(result.actions)
+
+                val staggeredSystemMessages = systemMessagesFromActions.mapIndexed { index, sysMsg ->
+                    sysMsg.copy(
+                        id = UUID.randomUUID().toString(), // FORCE a new ID for the roll
+                        // Push the roll's timestamp AFTER the dialogue so it shows up at the bottom
+                        timestamp = Timestamp(Date(baseTimeMs + ((enrichedMessages.size + index + 1) * 100)))
+                    )
+                }
+
+                // 11. Final Save & UI Update
+                previousSpeakerId = nextSlotId
+
+
+
+                // Sync the ENRICHED AI message and the Dice roll into one list
+                val allMessagesToSave = enrichedMessages.toMutableList()
+                allMessagesToSave.addAll(systemMessagesFromActions)
 
                 withContext(Dispatchers.Main) {
                     setSlotTyping(sessionId, nextSlotId, false)
 
-                    // IMPORTANT: If the Narrator just spoke, do we want to auto-trigger an NPC reaction?
-                    // Example: Narrator says "The guard notices you." -> Trigger Guard next.
-                    // Logic: If sender was Narrator, force one more round.
-                    val sender = result.messages.firstOrNull()?.senderId
-
-                    // Save Messages
-                    saveMessagesSequentially(result.messages, sessionId, chatId)
+                    // Save to Firestore sequentially
+                    saveMessagesSequentially(allMessagesToSave, sessionId, chatId)
 
                     if (activationRound < maxActivationRounds) {
-                        // If Narrator spoke, maybe give the player a chance to react?
-                        // Or if NPC spoke, keep going.
+                        val sender = result.messages.firstOrNull()?.senderId
                         if (sender == "narrator") {
-                            // Narrator usually passes back to player, unless immediate danger.
                             updateButtonState(ButtonState.SEND)
                         } else {
                             val updatedHistory = chatAdapter.getMessages()
                             processOnTableRPGRound("", updatedHistory)
-                            setSlotTyping(sessionId, nextSlotId, false)
                         }
                     } else {
                         updateButtonState(ButtonState.SEND)
-
-                        setSlotTyping(sessionId, nextSlotId, false)
                     }
                 }
 
@@ -2757,21 +3524,26 @@ class MainActivity : AppCompatActivity() {
         dialog.show()
     }
 
+    // In MainActivity.kt
     private fun saveSessionProfile(sessionProfile: SessionProfile, sessionId: String) {
         val db = FirebaseFirestore.getInstance()
+
+        // Explicitly cast to List one last time before the write
+        val rosterAsList = sessionProfile.slotRoster.toList()
+
         db.collection("sessions")
             .document(sessionId)
-            .set(sessionProfile, SetOptions.merge())
+            .update("slotRoster", rosterAsList) // Force the Array type
             .addOnSuccessListener {
-                Log.d("Firestore", "Session saved: $sessionId")
-            }
-            .addOnFailureListener { e ->
-                Log.e("Firestore", "Failed to save session: $e")
+                Log.d("Firestore", "MainActivity updated roster safely")
             }
     }
 
     private fun interruptAILoop() {
         aiJob?.cancel()
+        lifecycleScope.launch {
+            setSlotTyping(sessionId, nextSlotId, false)
+        }
     }
 
     private fun loadSessionHistory() {
@@ -2796,35 +3568,35 @@ class MainActivity : AppCompatActivity() {
     }
 
     // 1. Update the loop
-    fun handleRPGActionList(actions: List<Action>) {
+    fun handleRPGActionList(actions: List<Action>): List<ChatMessage> {
+        val generatedMessages = mutableListOf<ChatMessage>()
         for (action in actions) {
             when (action.type) {
                 "roll_dice" -> {
-                    handleDiceRoll(action.slot, action.stat, action.mod)
+                    val rollMsg = handleDiceRoll(action.slot, action.stat, action.mod)
+                    if (rollMsg != null) generatedMessages.add(rollMsg)
                 }
-                "health_change" -> {
-                    handleHealthChange(action.slot, action.mod)
-                }
-                "status_effect" -> {
-                    handleStatusEffect(action.slot, action.stat, action.mod)
-                }
+                "health_change" -> handleHealthChange(action.slot, action.mod)
+                "status_effect" -> handleStatusEffect(action.slot, action.stat, action.mod)
                 "new_npc" -> {
                     action.npc?.let { npcData ->
-                        handleNewNPC(npcData)
+                        val npcMsg = handleNewNPC(npcData)
+                        if (npcMsg != null) generatedMessages.add(npcMsg)
                     }
                 }
                 "advance_act" -> {
-                    advanceStoryAct()
+                    // If advanceStoryAct creates a message, collect it here.
                 }
             }
         }
+        return generatedMessages
     }
 
     // 2. Add the handler function
-    fun handleNewNPC(data: NewNPCData) {
+    fun handleNewNPC(data: NewNPCData): ChatMessage? { // <-- 1. Added return type
         if (sessionProfile.slotRoster.size >= 20) {
             Log.d("NPC_GEN", "Roster full, ignoring new NPC.")
-            return
+            return null // <-- 2. Return null instead of just 'return'
         }
 
         // Generate a new SlotProfile
@@ -2852,7 +3624,7 @@ class MainActivity : AppCompatActivity() {
             sfwOnly = data.sfwOnly,
             // Defaults
             memories = emptyList(),
-            outfits = emptyList(), // No images for AI gen chars yet
+            outfits = emptyList(),
             currentOutfit = "",
             relationships = emptyList(),
             hp = 10,
@@ -2867,6 +3639,8 @@ class MainActivity : AppCompatActivity() {
         // Save to Firestore
         saveSessionProfile(sessionProfile, sessionId)
 
+        Log.d("NPC_GEN", "Created new NPC: ${data.name} in ${data.lastActiveArea}")
+
         // Notify UI (optional system message)
         val sysMsg = ChatMessage(
             id = UUID.randomUUID().toString(),
@@ -2876,13 +3650,15 @@ class MainActivity : AppCompatActivity() {
             visibility = true,
             messageType = "event"
         )
-        SessionManager.sendMessage(chatId, sessionId, sysMsg)
 
-        Log.d("NPC_GEN", "Created new NPC: ${data.name} in ${data.lastActiveArea}")
+        // 3. Return the message to the main loop instead of sending it directly!
+        return sysMsg
     }
 
-    fun handleDiceRoll(slotId: String, statName: String, extraMod: Int) {
-        val slotProfile = sessionProfile.slotRoster.find { it.slotId == slotId } ?: return
+    // 1. Add ": ChatMessage?" to the end of the function signature
+    fun handleDiceRoll(slotId: String, statName: String, extraMod: Int): ChatMessage? {
+        // 2. Return null instead of just 'return'
+        val slotProfile = sessionProfile.slotRoster.find { it.slotId == slotId } ?: return null
 
         // Look up the stat value from the stats map using the lowercase key
         val statValue = slotProfile.stats[statName.lowercase()] ?: 0
@@ -2892,10 +3668,12 @@ class MainActivity : AppCompatActivity() {
         val total = d20 + statMod + extraMod
         val area = slotProfile.lastActiveArea
         val location = slotProfile.lastActiveLocation
+
         // Post result to chat
         val rollMessage = "${slotProfile.name} rolled $d20 + $statName (mod $statMod)" +
                 (if (extraMod != 0) " + $extraMod (extra)" else "") +
                 ". Total: $total"
+
         val chatMessage = ChatMessage(
             id = UUID.randomUUID().toString(),
             senderId = slotId,
@@ -2908,31 +3686,64 @@ class MainActivity : AppCompatActivity() {
             visibility = true,
             messageType = "roll"
         )
-        SessionManager.sendMessage(chatId, sessionId, chatMessage)
-        Log.d("airoll","this hsould post: $chatMessage")
+
+        Log.d("airoll","this should post: $chatMessage")
+
+        // 3. REMOVE SessionManager.sendMessage(...) and RETURN the message instead!
+        return chatMessage
     }
 
     fun handleHealthChange(slotId: String, hpChange: Int) {
-        val targetSlot = sessionProfile.slotRoster.find { it.slotId == slotId }
-        if (targetSlot != null) {
-            targetSlot.hp += hpChange
-            // Optional: clamp HP to min/max, update UI, etc.
-            Log.d("RPG", "${targetSlot.name} HP changed by $hpChange, now ${targetSlot.hp}")
+        var hpChanged = false
+        var newHp = 0
+        var charName = ""
+
+        val updatedRoster = sessionProfile.slotRoster.map { slot ->
+            if (slot.slotId == slotId) {
+                hpChanged = true
+                charName = slot.name
+                newHp = slot.hp + hpChange
+                // Optional: Clamp HP so it doesn't go below 0 or above maxHp
+                if (newHp < 0) newHp = 0
+                if (newHp > slot.maxHp) newHp = slot.maxHp
+
+                slot.copy(hp = newHp)
+            } else slot
+        }
+
+        if (hpChanged) {
+            sessionProfile = sessionProfile.copy(slotRoster = updatedRoster)
+            saveSessionProfile(sessionProfile, sessionId)
+            Log.d("RPG", "$charName HP changed by $hpChange, now $newHp")
         }
     }
 
     fun handleStatusEffect(slotId: String, effect: String, mod: Int) {
-        val targetSlot = sessionProfile.slotRoster.find { it.slotId == slotId }
-        if (targetSlot != null) {
-            if (mod > 0) {
-                if (!targetSlot.statusEffects.contains(effect)) { // <--- Prevent duplicates
-                    targetSlot.statusEffects.add(effect)
-                    Log.d("RPG", "${targetSlot.name} gained status effect: $effect")
+        var effectChanged = false
+        var charName = ""
+
+        val updatedRoster = sessionProfile.slotRoster.map { slot ->
+            if (slot.slotId == slotId) {
+                effectChanged = true
+                charName = slot.name
+
+                // Create a mutable copy of their current effects
+                val newEffects = slot.statusEffects.toMutableList()
+
+                if (mod > 0) {
+                    if (!newEffects.contains(effect)) newEffects.add(effect)
+                } else {
+                    newEffects.remove(effect)
                 }
-            } else {
-                targetSlot.statusEffects.remove(effect)
-                Log.d("RPG", "${targetSlot.name} lost status effect: $effect")
-            }
+
+                slot.copy(statusEffects = newEffects)
+            } else slot
+        }
+
+        if (effectChanged) {
+            sessionProfile = sessionProfile.copy(slotRoster = updatedRoster)
+            saveSessionProfile(sessionProfile, sessionId)
+            Log.d("RPG", "$charName status effect updated: $effect (mod: $mod)")
         }
     }
 
@@ -2986,59 +3797,49 @@ class MainActivity : AppCompatActivity() {
 
     fun checkMessageLimit(onLimitCheckPassed: () -> Unit) {
         val user = FirebaseAuth.getInstance().currentUser
-        if (user == null) return // Should not happen if logged in
+        if (user == null) {
+            // Fallback for safety
+            onLimitCheckPassed()
+            return
+        }
 
         val userRef = FirebaseFirestore.getInstance().collection("users").document(user.uid)
 
-        db.runTransaction { transaction ->
-            val snapshot = transaction.get(userRef)
+        // Just do a simple get(), no transaction needed for a read!
+        userRef.get()
+            .addOnSuccessListener { snapshot ->
+                if (!snapshot.exists()) {
+                    // First time user, they pass
+                    onLimitCheckPassed()
+                    return@addOnSuccessListener
+                }
 
-            // Handle case where UserProfile doc might not exist yet (lazy creation)
-            val isPremium = snapshot.getBoolean("isPremium") ?: false
-            if (isPremium) return@runTransaction true // Premium users always pass
+                val isPremium = snapshot.getBoolean("isPremium") ?: false
+                if (isPremium) {
+                    onLimitCheckPassed()
+                    return@addOnSuccessListener
+                }
 
-            val lastDate = snapshot.getString("lastMessageDate") ?: ""
+                val lastDate = snapshot.getString("lastMessageDate") ?: ""
+                val sdf = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault())
+                val today = sdf.format(java.util.Date())
 
-            // Use SimpleDateFormat for API 23 compatibility
-            val sdf = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault())
-            val today = sdf.format(java.util.Date())
+                val currentCount = if (lastDate == today) {
+                    snapshot.getLong("dailyMessageCount") ?: 0
+                } else {
+                    0
+                }
 
-            val currentCount = if (lastDate == today) {
-                // It's the same day, use stored count (default to 0 if null)
-                snapshot.getLong("dailyMessageCount") ?: 0
-            } else {
-                // New day (or no date stored), reset to 0
-                0
+                if (currentCount >= FREE_DAILY_LIMIT) {
+                    showPaywallDialog() // They hit the limit
+                } else {
+                    onLimitCheckPassed() // They pass
+                }
             }
-
-            // Check if limit reached
-            if (currentCount >= FREE_DAILY_LIMIT) {
-                return@runTransaction false // Fail
+            .addOnFailureListener { e ->
+                Log.e("LimitCheck", "Failed to check limit, failing open", e)
+                onLimitCheckPassed() // Let them play if network fails
             }
-
-            // Increment count and update date
-            transaction.set(
-                userRef,
-                mapOf(
-                    "dailyMessageCount" to currentCount + 1,
-                    "lastMessageDate" to today
-                ),
-                SetOptions.merge() // Merge so we don't wipe name/bio if they exist
-            )
-            return@runTransaction true // Pass
-
-        }.addOnSuccessListener { allowed ->
-            if (allowed) {
-                onLimitCheckPassed()
-            } else {
-                showPaywallDialog()
-            }
-        }.addOnFailureListener { e ->
-            Log.e("LimitCheck", "Failed to check limit", e)
-            // Fail open: If internet blips, let them play to avoid frustration?
-            // Or fail closed: onLimitCheckPassed() to allow.
-            onLimitCheckPassed()
-        }
     }
 
     // 3. The Dialog
@@ -3089,6 +3890,9 @@ class MainActivity : AppCompatActivity() {
         var isOnTable = false
         var isAboveTable = false
         var isOneonOne = false
+        val activeSlotId = sessionProfile.userMap[userId]?.activeSlotId
+        Log.d("Entry_mode", "${sessionProfile.chatMode}")
+        previousSpeakerId = activeSlotId!!
         val rpgSettingsJson = sessionProfile.modeSettings["rpg"] as? String
         if (!rpgSettingsJson.isNullOrBlank() && rpgSettingsJson.trim().startsWith("{")) {
             try {
@@ -3097,12 +3901,12 @@ class MainActivity : AppCompatActivity() {
                     "ontable" -> isOnTable = true
                     "abovetable" -> isAboveTable = true
                 }
-                when (sessionProfile.chatMode){
-                    "ONEONONE" -> isOneonOne = true
-                }
             } catch (e: Exception) {
                 Log.e("RPG", "Failed to parse rpgSettingsJson: $rpgSettingsJson", e)
             }
+        }
+        if (sessionProfile.chatMode == "ONEONONE"){
+            isOneonOne = true
         }
         val slotIdsList = sessionProfile.slotRoster.joinToString(", ") { it.slotId }
         if (messages.isEmpty() && !initialGreeting.isNullOrBlank()) {
@@ -3131,23 +3935,28 @@ class MainActivity : AppCompatActivity() {
                 activationRound = 0
                 processOneonOneRound(userInput, listOf(greetingMessage))
             }else{
-                    Log.d("ai_cycle", "proccessing normal roleplay")
+                Log.d("ai_cycle", "proccessing normal roleplay")
 
-                    activationRound = 0
-                    processActivationRound(userInput, listOf(greetingMessage))
+                activationRound = 0
+                processActivationRound(userInput, listOf(greetingMessage))
             }
         } else {
             if (isOnTable) {
-                Log.d("ai_cycle", "proccessing isOnTable")
+                Log.d("ai_cycle", "proccessing On Table")
                 activationRound = 0
                 maxActivationRounds = 2
                 processOnTableRPGRound(userInput, messages)
             }else if (isAboveTable){
-                Log.d("ai_cycle", "proccessing isAboveTable")
+                Log.d("ai_cycle", "proccessing Above Table")
                 activationRound = 0
                 maxActivationRounds = 2
                 processAboveTableRound(userInput, messages)
-            } else {
+            } else if (isOneonOne) {
+                Log.d("ai_cycle", "proccessing OneonOne")
+                activationRound = 0
+                maxActivationRounds = 1
+                processOneonOneRound(userInput, messages)
+            }else{
                 Log.d("ai_cycle", "proccessing normal roleplay")
                 activationRound = 0
                 processActivationRound(userInput, messages)
@@ -3162,7 +3971,6 @@ class MainActivity : AppCompatActivity() {
             Log.d("MessageCreation", "Created message: $msg")
             delay(msg.delay.toLong())
             SessionManager.sendMessage(chatId, sessionId, msg)
-            // The listener will handle updating the UI and personal histories
         }
     }
 
@@ -3198,38 +4006,31 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    fun setSlotTyping(sessionId: String, slotId: String, typing: Boolean) {
-        val db = FirebaseFirestore.getInstance()
-        val sessionRef = db.collection("sessions").document(sessionId)
-
-        sessionRef.get()
-            .continueWithTask { task ->
-                val sessionProfile = task.result?.toObject(SessionProfile::class.java)
-                    ?: return@continueWithTask Tasks.forException(IllegalStateException("No session"))
-                val updatedSlotRoster = sessionProfile.slotRoster.map { slot ->
-                    if (slot.slotId == slotId) slot.copy(typing = typing) else slot
-                }
-                sessionRef.update("slotRoster", updatedSlotRoster)
-
-            }
-            .addOnSuccessListener {
-                Log.d("Typing", "Typing status for $slotId set to $typing")
-            }
-            .addOnFailureListener { e ->
-                Log.e("Typing", "Failed to set typing status for $slotId: $e")
-            }
-        updateTypingIndicator()
+    // In MainActivity.kt
+    suspend fun setSlotTyping(sessionId: String, slotId: String, typing: Boolean) {
+        val updatedRoster = sessionProfile.slotRoster.map {
+            if (it.slotId == slotId) it.copy(typing = typing) else it
+        }
+        try {
+            db.collection("sessions").document(sessionId)
+                .update("slotRoster", updatedRoster.toList())
+                .await() // WAIT for the server to acknowledge
+        } catch (e: Exception) {
+            Log.e("Typing", "Failed to set typing: ${e.message}")
+        }
     }
 
 
     fun updateTypingIndicator() {
+        if (!::typingIndicatorBar.isInitialized) return
+
         typingIndicatorBar.removeAllViews()
         val typingSlots = sessionProfile.slotRoster.filter { it.typing == true }
         if (typingSlots.isEmpty()) {
-            typingIndicatorBar.visibility = View.GONE
+            typingIndicatorBar?.visibility = View.GONE
             return
         }
-        typingIndicatorBar.visibility = View.VISIBLE
+        typingIndicatorBar?.visibility = View.VISIBLE
 
         for (slot in typingSlots) {
             val box = TextView(this)
@@ -3260,66 +4061,58 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    fun assignAvatarSlot(senderId: String, avatarSlotAssignments: MutableMap<Int, String?>, avatarSlotLocked: BooleanArray, slotProfiles: List<SlotProfile>) {
+    fun assignAvatarSlot(
+        senderId: String,
+        avatarSlotAssignments: MutableMap<Int, String?>,
+        avatarSlotLocked: BooleanArray,
+        slotProfiles: List<SlotProfile>
+    ) {
         val maxSlots = avatarSlotAssignments.size
 
-        // Check if sender is already in a locked slot
+        // 1. STABILITY CHECK:
         val currentIndex = avatarSlotAssignments.entries.find { it.value == senderId }?.key ?: -1
-        if (currentIndex >= 0 && avatarSlotLocked[currentIndex]) {
-            // Already in a locked slot, do nothing
+
+        if (currentIndex != -1) {
             return
         }
 
-        // Look up sender profile
+        // 2. CHECK: Does sender even have poses?
         val senderProfile = slotProfiles.find { it.slotId == senderId }
         val hasPose = senderProfile?.outfits?.any { it.poseSlots.isNotEmpty() } == true
+        if (!hasPose) return
 
-        if (!hasPose) {
-            // Sender has no poses, don't assign them to any avatar slot!
-            Log.d("avatardebug", "Sender $senderId has no poses; not assigning to avatar slots.")
-            return
-        }
+        // 3. COLLECT THE "FLOATERS"
+        val floatingChars = mutableListOf<String>()
 
-        avatarSlotAssignments.entries.forEach { (idx, value) ->
-            if (value == senderId) avatarSlotAssignments[idx] = null
-        }
+        for (i in 0 until maxSlots) {
+            val charId = avatarSlotAssignments[i]
 
-        // Check if slot 0 is locked
-        if (avatarSlotLocked[0]) {
-            // Slot 0 is locked, can't move sender here. Just make sure they're in their current slot.
-            if (currentIndex < 0) {
-                // Sender not shown, find a free slot that's not locked
-                for (i in 1 until maxSlots) {
-                    if (!avatarSlotLocked[i] && avatarSlotAssignments[i] == null) {
-                        avatarSlotAssignments[i] = senderId
-                        return
-                    }
-                }
-                // No unlocked slot available, do nothing
-            }
-            // Else: already in a slot (not 0), but 0 is locked, do nothing.
-            return
-        }
+            // If locked, they stay.
+            if (avatarSlotLocked[i]) continue
 
-        // Slot 0 is not locked
-        if (currentIndex == 0) return // Sender is already in slot 0
+            // Note: We don't need to check `if (charId == senderId)` here anymore
+            // because we already returned at Step 1 if the sender was present.
 
-        // Shift everyone (except locked) up one (3->2, 2->1, 1->0) to make room for sender at slot 0
-        for (i in (maxSlots - 1) downTo 1) {
-            if (!avatarSlotLocked[i]) {
-                avatarSlotAssignments[i] = if (avatarSlotLocked[i - 1]) avatarSlotAssignments[i] else avatarSlotAssignments[i - 1]
+            if (charId != null) {
+                floatingChars.add(charId)
             }
         }
-        // Place sender in slot 0
-        avatarSlotAssignments[0] = senderId
 
-        // Remove sender from old slot if needed
-        if (currentIndex > 0) avatarSlotAssignments[currentIndex] = null
-    }
+        // 4. BUILD THE NEW LINEUP (Newcomer gets Slot 0)
+        val newLineup = ArrayDeque<String>()
+        newLineup.add(senderId)
+        newLineup.addAll(floatingChars)
 
-    fun removeAvatarFromSlots(slotId: String, avatarSlotAssignments: MutableMap<Int, String?>) {
-        val key = avatarSlotAssignments.entries.find { it.value == slotId }?.key
-        if (key != null) avatarSlotAssignments[key] = null
+        // 5. FILL THE UNLOCKED SLOTS
+        for (i in 0 until maxSlots) {
+            if (avatarSlotLocked[i]) continue
+
+            if (newLineup.isNotEmpty()) {
+                avatarSlotAssignments[i] = newLineup.removeFirst()
+            } else {
+                avatarSlotAssignments[i] = null
+            }
+        }
     }
 
     fun assignSlotToUser(userId: String, slotId: String) {
@@ -3358,94 +4151,104 @@ class MainActivity : AppCompatActivity() {
         avatarSlotAssignments: MutableMap<Int, String?>
     ) {
         if (isDestroyed || isFinishing) return
-        Log.d("avatardebug", "updating: $avatarSlotAssignments")
+        // Log.d("avatardebug", "updating: $avatarSlotAssignments") // Uncomment if debugging needed
 
-        // Find player's area/location once
+        // 1. Initialize removal list
+        val toRemove = mutableListOf<Int>()
+
+        // 2. Determine Target Location (Spying vs Player Location)
         val playerSlot = slotProfiles.find { it.slotId == mySlotId }
-        val playerArea = playerSlot?.lastActiveArea
-        val playerLocation = playerSlot?.lastActiveLocation
-
-        val targetArea = spyingArea ?: slotProfiles.find { it.slotId == mySlotId }?.lastActiveArea
-        val targetLocation = spyingLocation ?: slotProfiles.find { it.slotId == mySlotId }?.lastActiveLocation
+        val targetArea = spyingArea ?: playerSlot?.lastActiveArea
+        val targetLocation = spyingLocation ?: playerSlot?.lastActiveLocation
 
         for ((index, slotId) in avatarSlotAssignments) {
             val view = avatarViews[index]
+
+            // --- PRELIMINARY CHECKS ---
             if (slotId == null) {
-                Glide.with(this).clear(view)
-                view.setImageResource(R.drawable.silhouette)
-                view.visibility = View.INVISIBLE
-                continue // Use 'continue' instead of 'return@forEach' inside a for loop
+                hideAvatar(view)
+                continue
             }
 
             val slotProfile = slotProfiles.find { it.slotId == slotId }
             if (slotProfile == null) {
-                Glide.with(this).clear(view)
-                view.setImageResource(R.drawable.silhouette)
-                view.visibility = View.INVISIBLE
+                hideAvatar(view)
                 continue
             }
 
-            // Must be in the same place as the player
-            if (slotProfile.lastActiveArea != targetArea ||
-                slotProfile.lastActiveLocation != targetLocation
-            ) {
-                Log.d(
-                    "avatardebug",
-                    "${slotProfile.name} is at ${slotProfile.lastActiveArea}/${slotProfile.lastActiveLocation}, " +
-                            "player $mySlotId is at $playerArea/$playerLocation — hiding"
-                )
-                removeAvatarFromSlots(slotId, avatarSlotAssignments)
-                Glide.with(this).clear(view)
-                view.setImageResource(R.drawable.silhouette)
-                view.visibility = View.INVISIBLE
+            // --- LOCATION CHECK ---
+            // Must be in the same place as the target/player
+            // (Using trim/ignoreCase for safety)
+            val charArea = slotProfile.lastActiveArea?.trim()
+            val charLoc = slotProfile.lastActiveLocation?.trim()
+            val tArea = targetArea?.trim()
+            val tLoc = targetLocation?.trim()
+
+            if (!charArea.equals(tArea, true) || !charLoc.equals(tLoc, true)) {
+                // Character is in a different room -> Mark for removal from slot map & Hide
+                toRemove.add(index)
+                hideAvatar(view)
                 continue
             }
 
-            val poseName = slotProfile.pose?.trim().orEmpty()
-            Log.d("avatardebug", "${slotProfile.name} wants pose='$poseName'")
+            // --- POSE LOGIC START ---
 
-            if (poseName.isBlank() || poseName.equals("clear", true) || poseName.equals("none", true)) {
-                Glide.with(this).clear(view)
-                view.setImageResource(R.drawable.silhouette)
-                view.visibility = View.INVISIBLE
+            val requestedPose = slotProfile.pose?.trim().orEmpty()
+
+            // 1. EXPLICIT HIDE CHECK
+            if (requestedPose.equals("clear", true) ||
+                requestedPose.equals("none", true) ||
+                requestedPose.equals("hide", true)) {
+                hideAvatar(view)
                 continue
             }
 
-            // --- Robust outfit & pose resolution ---
+            // 2. RESOLVE OUTFIT
             val outfits = slotProfile.outfits.orEmpty()
             val currentOutfitName = slotProfile.currentOutfit?.trim().orEmpty()
 
-            // try exact (case-insensitive) match; else first outfit
+            // Find the outfit object (or default to first if name doesn't match)
             val chosenOutfit = outfits.firstOrNull { it.name.trim().equals(currentOutfitName, true) }
                 ?: outfits.firstOrNull()
 
-            // pose candidates: chosen outfit if present, else all outfits
-            val poseSlots = (chosenOutfit?.poseSlots ?: outfits.flatMap { it.poseSlots }).orEmpty()
+            // Gather all possible images (preferring the chosen outfit's list)
+            val poseCandidates = (chosenOutfit?.poseSlots ?: outfits.flatMap { it.poseSlots }).orEmpty()
 
-            // find the pose (case-insensitive)
-            val poseSlot = poseSlots.firstOrNull { it.name.trim().equals(poseName, true) }
+            // 3. FIND THE IMAGE (The Priority Chain)
 
-            // Extra debug to confirm why things hide
-            Log.d(
-                "avatardebug",
-                "slot=${slotProfile.slotId} currentOutfit='${slotProfile.currentOutfit}' " +
-                        "outfits=${outfits.map { it.name }} chosen='${chosenOutfit?.name}' " +
-                        "poses=${poseSlots.map { it.name }} hit='${poseSlot?.name}' url='${poseSlot?.uri}'"
-            )
+            // A. Try Exact Match (e.g., "Angry" == "Angry")
+            var finalPoseSlot = poseCandidates.firstOrNull { it.name.trim().equals(requestedPose, true) }
 
-            val imageUrl = poseSlot?.uri
+            // B. Fallback: If no match found (or pose was blank), use the FIRST available image.
+            //    This ensures the character is visible even if the AI hallucinates a pose name
+            //    or if it's the very first turn.
+            if (finalPoseSlot == null) {
+                finalPoseSlot = poseCandidates.firstOrNull()
+            }
+
+            // --- RENDER ---
+            val imageUrl = finalPoseSlot?.uri
             if (!imageUrl.isNullOrBlank()) {
                 Glide.with(this)
                     .load(imageUrl)
-                    .placeholder(R.drawable.silhouette)
+                    .placeholder(R.drawable.silhouette) // Keep silhouette while loading
                     .into(view)
                 view.visibility = View.VISIBLE
             } else {
-                Glide.with(this).clear(view)
-                view.setImageResource(R.drawable.silhouette)
-                view.visibility = View.INVISIBLE
+                // 4. LAST RESORT: No images exist at all for this character
+                hideAvatar(view)
             }
         }
+
+        // 3. Remove displaced characters from the map logic
+        toRemove.forEach { avatarSlotAssignments[it] = null }
+    }
+
+    // Helper to keep code clean
+    private fun hideAvatar(view: ImageView) {
+        Glide.with(this).clear(view)
+        view.setImageResource(R.drawable.silhouette)
+        view.visibility = View.INVISIBLE
     }
 
     private suspend fun deleteMessagesAfter(sessionId: String, afterTimestamp: Timestamp): List<String> {
@@ -3482,30 +4285,25 @@ class MainActivity : AppCompatActivity() {
         return deletedIds
     }
 
-    private fun deleteMemoriesFromSession(deletedMessageIds: List<String>) {
+    private suspend fun deleteMemoriesFromSession(deletedMessageIds: List<String>) {
         if (deletedMessageIds.isEmpty()) return
 
-        var hasChanges = false
-        val updatedRoster = sessionProfile.slotRoster.map { slot ->
-            val originalSize = slot.memories.size
-            // Keep memory ONLY if its ID is NOT in deleted list AND it doesn't contain a deleted message ID
-            val filteredMemories = slot.memories.filterNot { mem ->
-                deletedMessageIds.contains(mem.id) || mem.messageIds.any { it in deletedMessageIds }
-            }
+        val db = FirebaseFirestore.getInstance()
+        val memoryRef = db.collection("sessions").document(sessionId).collection("character_memories")
 
-            if (filteredMemories.size != originalSize) {
-                hasChanges = true
-                slot.copy(memories = filteredMemories)
-            } else {
-                slot
+        for (msgId in deletedMessageIds) {
+            try {
+                // Find any memory that lists this deleted message ID in its array
+                val snapshot = memoryRef.whereArrayContains("messageIds", msgId).get().await()
+
+                for (doc in snapshot.documents) {
+                    doc.reference.delete().await()
+                }
+            } catch (e: Exception) {
+                Log.e("MemoryClean", "Failed to delete memory for msg: $msgId", e)
             }
         }
-
-        if (hasChanges) {
-            sessionProfile = sessionProfile.copy(slotRoster = updatedRoster)
-            saveSessionProfile(sessionProfile, sessionId)
-            Log.d("MemoryClean", "Deleted memories associated with messages: $deletedMessageIds")
-        }
+        Log.d("MemoryClean", "Cleaned up memories associated with messages: $deletedMessageIds")
     }
 
     private suspend fun saveEditedMessageAndDeleteFollowing(message: ChatMessage, position: Int): List<String> {
@@ -3582,8 +4380,9 @@ class MainActivity : AppCompatActivity() {
         val activeSlotId = sessionProfile.userMap[userId]?.activeSlotId ?: return
         if (lastTypingState == isTyping) return // Prevent redundant writes
         lastTypingState = isTyping
-
-        setSlotTyping(sessionId, activeSlotId, isTyping)
+        lifecycleScope.launch {
+            setSlotTyping(sessionId, activeSlotId, isTyping)
+        }
     }
 
 //   private fun updateLocationCharRecycler(area: Area, location: LocationSlot?) {
@@ -3699,15 +4498,15 @@ class MainActivity : AppCompatActivity() {
                 if (!historyLoaded) return@runOnUiThread
                 val currentMessageId = newMessage.id ?: return@runOnUiThread
 
-                            Log.d("messageupdating", "$currentMessageId")
-                            if (processedMessageIds.contains(currentMessageId)) {
-                                Log.d("MessageFilter", "Skipping duplicate message: $currentMessageId")
-                                return@runOnUiThread
-                            }
-                            processedMessageIds.add(currentMessageId)
-                            if (processedMessageIds.size > 20) { // Prevent memory leak, keep the last 20-50
-                                processedMessageIds.remove(processedMessageIds.first())
-                            }
+                Log.d("messageupdating", "$currentMessageId")
+                if (processedMessageIds.contains(currentMessageId)) {
+                    Log.d("MessageFilter", "Skipping duplicate message: $currentMessageId")
+                    return@runOnUiThread
+                }
+                processedMessageIds.add(currentMessageId)
+                if (processedMessageIds.size > 20) { // Prevent memory leak, keep the last 20-50
+                    processedMessageIds.remove(processedMessageIds.first())
+                }
 
                 // VISIBILITY LOGIC
                 val playerSlot = sessionProfile.slotRoster.find { it.slotId == mySlotId }
@@ -3715,31 +4514,64 @@ class MainActivity : AppCompatActivity() {
                 // If I am Narrator/Spying, use that. If I am Player, use my body.
                 // If I am Narrator and spyingArea is null (rare due to auto-spy), default to "view all" or "view none"?
                 // Currently defaults to null (view none), which is why Auto-Spy is crucial.
-                val currentArea = spyingArea ?: playerSlot?.lastActiveArea
-                val currentLocation = spyingLocation ?: playerSlot?.lastActiveLocation
+                val currentArea = spyingArea ?: playerSlot?.lastActiveArea?.trim()
+                val currentLocation = spyingLocation ?: playerSlot?.lastActiveLocation?.trim()
 
                 val isRelevantToView = (newMessage.area == currentArea && newMessage.location == currentLocation)
-
                 if (isRelevantToView) {
                     chatAdapter.addMessage(newMessage)
                     chatRecycler.scrollToPosition(chatAdapter.itemCount - 1)
                 }
 
-                // OUTFIT / POSE UPDATES
-                if (!newMessage.outfit.isNullOrBlank() || !newMessage.pose.isNullOrEmpty()) {
-                    val updatedRoster = sessionProfile.slotRoster.map { slot ->
-                        var newSlot = slot
-                        if (slot.slotId == newMessage.senderId && !newMessage.outfit.isNullOrBlank()) {
-                            if (slot.outfits.any { it.name.equals(newMessage.outfit, ignoreCase = true) }) {
-                                newSlot = newSlot.copy(currentOutfit = newMessage.outfit)
+                if (!newMessage.outfit.isNullOrBlank() || !newMessage.pose.isNullOrBlank()) {
+                    val db = FirebaseFirestore.getInstance()
+                    val sessionRef = db.collection("sessions").document(sessionId)
+                    val senderId = newMessage.senderId
+
+                    sessionRef.get()
+                        .continueWithTask { task ->
+                            val session = task.result?.toObject(SessionProfile::class.java)
+                                ?: return@continueWithTask Tasks.forException(IllegalStateException("No session"))
+
+                            val updatedRoster = session.slotRoster.map { slot ->
+                                if (slot.slotId == senderId) {
+                                    var updatedSlot = slot
+
+                                    // 1. Update Outfit if valid and changed
+                                    if (!newMessage.outfit.isNullOrBlank() &&
+                                        !newMessage.outfit.equals("null", ignoreCase = true) &&
+                                        !newMessage.outfit.equals(slot.currentOutfit, ignoreCase = true)) {
+
+                                        val outfitExists = slot.outfits.any { it.name.equals(newMessage.outfit, ignoreCase = true) }
+                                        if (outfitExists) {
+                                            updatedSlot = updatedSlot.copy(currentOutfit = newMessage.outfit)
+                                        }
+                                    }
+
+                                    // 2. Update Pose
+                                    if (!newMessage.pose.isNullOrBlank() &&
+                                        !newMessage.pose.equals(slot.pose, ignoreCase = true)) {
+                                        updatedSlot = updatedSlot.copy(pose = newMessage.pose)
+                                    }
+
+                                    updatedSlot
+                                } else {
+                                    slot
+                                }
                             }
+
+                            // Use toList() to prevent potential HashMap issues
+                            sessionRef.update("slotRoster", updatedRoster.toList())
                         }
-                        if (!newMessage.pose.isNullOrEmpty() && newMessage.pose.containsKey(slot.slotId)) {
-                            newSlot = newSlot.copy(pose = newMessage.pose[slot.slotId] ?: slot.pose)
+                        .addOnSuccessListener {
+                            // Re-sync local sessionProfile to reflect the Firestore change
+                            val updateSlot = sessionProfile.slotRoster.find { it.slotId == senderId }
+                            Log.d("pose_debug", "Persistence success for ${updateSlot?.name}: Outfit=${newMessage.outfit}, Pose=${newMessage.pose}")
+                            updateAvatarsFromSlots(sessionProfile.slotRoster, avatarSlotAssignments)
                         }
-                        newSlot
-                    }
-                    sessionProfile = sessionProfile.copy(slotRoster = updatedRoster)
+                        .addOnFailureListener { e ->
+                            Log.e("pose_debug", "Failed to persist visual update: $e")
+                        }
                 }
 
                 updateButtonState(ButtonState.SEND)
@@ -3915,6 +4747,7 @@ class MainActivity : AppCompatActivity() {
     // --- MOVE MAP ADAPTER (Put this class inside MainActivity or separate file) ---
     inner class MoveMapAdapter(
         private val items: List<MoveMapItem>,
+        private val onHeaderClick: (Area) -> Unit,
         private val onCharacterClick: (SlotProfile) -> Unit,
         private val onLocationClick: (Area, LocationSlot) -> Unit,
         private val onSpyClick: (Area, LocationSlot) -> Unit
@@ -3949,10 +4782,21 @@ class MainActivity : AppCompatActivity() {
 
         override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
             val item = items[position]
+
             if (holder is LocationViewHolder && item is MoveMapItem.LocationRow) {
                 holder.bind(item)
             } else if (item is MoveMapItem.Header) {
-                (holder.itemView as TextView).text = "AREA: ${item.area.name}"
+                val textView = holder.itemView as TextView
+                val isExpanded = expandedAreaIds.contains(item.area.id)
+
+                // Add a visual indicator for expansion state
+                val icon = if (isExpanded) "[-] " else "[+] "
+                textView.text = "$icon AREA: ${item.area.name}"
+
+                // Trigger the toggle logic in MainActivity
+                textView.setOnClickListener {
+                    onHeaderClick(item.area)
+                }
             }
         }
 

@@ -218,6 +218,7 @@ class CreatedListActivity : BaseActivity() {
                                         if (fullProfile != null) {
                                             val intent = Intent(this, ChatCreationActivity::class.java)
                                             intent.putExtra("CHAT_EDIT_ID", preview.id)
+                                            intent.putExtra("CHAT_EDIT_ORIGINALID", preview.originalId)
                                             intent.putExtra("CHAT_PROFILE_JSON", Gson().toJson(fullProfile))
                                             startActivityForResult(intent, 1010)
                                         } else {
@@ -288,7 +289,7 @@ class CreatedListActivity : BaseActivity() {
 
         db.collection("chats")
             .whereEqualTo("author", currentUserId)
-            .orderBy("timestamp", Query.Direction.DESCENDING)
+            .orderBy("updateTimestamp", Query.Direction.DESCENDING)
             .get()
             .addOnSuccessListener { snap ->
                 val previews = snap.documents.mapNotNull { doc ->
@@ -299,6 +300,7 @@ class CreatedListActivity : BaseActivity() {
                         val char2 = characterMap[char2Id]
                         ChatPreview(
                             id = p.id,
+                            originalId = p.originalId,
                             rawJson = Gson().toJson(p),
                             title = p.title,
                             description = p.description,
@@ -331,12 +333,14 @@ class CreatedListActivity : BaseActivity() {
 
         db.collection("characters")
             .whereEqualTo("author", currentUserId)
+            .orderBy("lastTimestamp", Query.Direction.DESCENDING)
             .get()
             .addOnSuccessListener { snap ->
                 val previews = snap.documents.mapNotNull { doc ->
                     val cp = doc.toObject<CharacterProfile>() ?: return@mapNotNull null
                     CharacterPreview(
                         id = cp.id,
+                        originalId = cp.originalId ?: cp.id,
                         name = cp.name,
                         summary = cp.summary.orEmpty(),
                         avatarUri = cp.avatarUri,
@@ -362,6 +366,7 @@ class CreatedListActivity : BaseActivity() {
                                 Log.d("Characterhubactivity", "it has an id of: ${preview.id}")
                                 // Note: Keeping your specific keys for Characters
                                 putExtra("CHARACTER_ID", preview.id)
+                                putExtra("CHAR_EDIT_ORIGINAL_ID", preview.originalId)
                                 putExtra("CHARACTER_PROFILES_JSON", preview.rawJson)
                             })
                         }

@@ -2,7 +2,10 @@ package com.example.RealmsAI
 
 import android.content.Intent
 import android.os.Bundle
+import android.view.LayoutInflater
 import android.view.View
+import android.view.View.VISIBLE
+import android.view.ViewGroup
 import android.widget.*
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
@@ -10,10 +13,10 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.example.RealmsAI.models.CharacterProfile
+import com.example.RealmsAI.models.PoseSlot
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.gson.Gson
-import java.util.UUID
 
 class CharacterProfileActivity : AppCompatActivity() {
 
@@ -21,9 +24,11 @@ class CharacterProfileActivity : AppCompatActivity() {
     private lateinit var nameView: TextView
     private lateinit var sfwBadge: ImageView
     private lateinit var authorView: TextView
+    private lateinit var originalAuthorView: TextView
     private lateinit var personalityView: TextView
     private lateinit var physicalView: TextView
     private lateinit var physicalDescView: TextView
+    private lateinit var outfitSpinner: Spinner
     private lateinit var outfitsRecycler: RecyclerView
     private lateinit var sessionButton: Button
     private lateinit var saveButton: Button
@@ -50,6 +55,7 @@ class CharacterProfileActivity : AppCompatActivity() {
         nameView = findViewById(R.id.characterProfileName)
         sfwBadge = findViewById(R.id.characterProfileSfwBadge)
         authorView = findViewById(R.id.characterProfileAuthor)
+        originalAuthorView = findViewById(R.id.characterOriginalProfileAuthor)
         personalityView = findViewById(R.id.characterProfilePersonality)
         physicalView = findViewById(R.id.characterProfilePhysical)
         physicalDescView = findViewById(R.id.characterProfilePhysicalDesc)
@@ -60,6 +66,7 @@ class CharacterProfileActivity : AppCompatActivity() {
         ratingBar = findViewById(R.id.userRatingBar)
         ratingStats = findViewById(R.id.ratingStatsText)
         rateButton = findViewById(R.id.rateButton)
+        outfitSpinner = findViewById(R.id.characterProfileOutfitSpinner)
 
 
         // 3. Load Character Data
@@ -183,6 +190,42 @@ class CharacterProfileActivity : AppCompatActivity() {
                     authorView.setOnClickListener(null)
                 }
 
+                // Original Author (as clickable link)
+                if ( profile.id != profile.originalId)
+                {
+                    db.collection("characters").document(profile.originalId).get()
+                        .addOnSuccessListener { doc ->
+                            val originalCharacterProfile = doc.toObject(CharacterProfile::class.java)
+                            val authorId = originalCharacterProfile?.author ?: return@addOnSuccessListener
+                            db.collection("users").document(authorId).get()
+                                .addOnSuccessListener { userDoc ->
+                                    val handle = userDoc.getString("handle")
+                                    originalAuthorView.visibility = VISIBLE
+                                    originalAuthorView.text =
+                                        "Original by ${if (!handle.isNullOrBlank()) "@$handle" else "(unknown)"}"
+                                    originalAuthorView.setOnClickListener {
+                                        if (!originalCharacterProfile.private) {
+                                            val intent = Intent(this, CharacterProfileActivity::class.java)
+                                            intent.putExtra("characterId", originalCharacterProfile.id)
+                                            startActivity(intent)
+                                        } else {
+                                            Toast.makeText(this, "Original character is set to Private.", Toast.LENGTH_SHORT).show()
+                                            val intent = Intent(this, DisplayProfileActivity::class.java)
+                                            intent.putExtra("userId", originalCharacterProfile.author)
+                                            startActivity(intent)
+                                        }
+                                    }
+                                }.addOnFailureListener {
+                                    originalAuthorView.text = "Original by (unknown)"
+                                    originalAuthorView.setOnClickListener(null)
+                                }
+
+                        }.addOnFailureListener {
+                            originalAuthorView.text = "Original character not found"
+                            originalAuthorView.setOnClickListener(null)
+                        }
+                }
+
                 // Personality
                 personalityView.text = "Personality: ${profile.personality}"
 
@@ -200,20 +243,35 @@ class CharacterProfileActivity : AppCompatActivity() {
                 physicalDescView.text = profile.physicalDescription
 
                 // Outfits
-                val visibleOutfits = (profile.outfits ?: emptyList())
-                    .map { outfit ->
-                        outfit.copy(
-                            poseSlots = outfit.poseSlots
-                                ?.filter { !it.nsfw }   // hide NSFW
-                                ?.toMutableList()
-                                ?: mutableListOf()
-                        )
-                    }
-                    .filter { it.poseSlots?.isNotEmpty() == true }
-                outfitsRecycler.layoutManager = LinearLayoutManager(this)
-                outfitsRecycler.adapter = OutfitDisplayAdapter(visibleOutfits)
-                outfitsRecycler.isNestedScrollingEnabled = false
+                val allOutfits = profile.outfits ?: emptyList()
 
+                if (allOutfits.isNotEmpty()) {
+                    // 1. Setup Spinner
+                    val outfitNames = allOutfits.map { it.name }
+                    val spinnerAdapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, outfitNames)
+                    spinnerAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+                    outfitSpinner.adapter = spinnerAdapter
+
+                    // 2. Setup RecyclerView as GRID
+                    outfitsRecycler.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
+                    outfitsRecycler.isNestedScrollingEnabled = false
+
+                    // 3. Selection Listener
+                    outfitSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+                        override fun onItemSelected(parent: AdapterView<*>, view: View?, position: Int, id: Long) {
+                            val selectedOutfit = allOutfits[position]
+                            // Filter NSFW if needed
+                            val validPoses = selectedOutfit.poseSlots?.filter { !it.nsfw } ?: emptyList()
+
+                            // Use our NEW inner adapter
+                            outfitsRecycler.adapter = PoseGridAdapter(validPoses)
+                        }
+                        override fun onNothingSelected(parent: AdapterView<*>) {}
+                    }
+                } else {
+                    findViewById<View>(R.id.outfitHeaderContainer).visibility = View.GONE
+                    outfitsRecycler.visibility = View.GONE
+                }
                 // Go to session
                 sessionButton.setOnClickListener {
                     val gson = Gson()
@@ -371,5 +429,40 @@ class CharacterProfileActivity : AppCompatActivity() {
         } catch (e: Exception) {
             Toast.makeText(this, "No email client found.", Toast.LENGTH_SHORT).show()
         }
+
+    }
+
+    inner class PoseGridAdapter(private val poses: List<PoseSlot>) :
+        RecyclerView.Adapter<PoseGridAdapter.GridHolder>() {
+
+        inner class GridHolder(view: View) : RecyclerView.ViewHolder(view) {
+            val image: ImageView = view.findViewById(R.id.pose_image)
+            val label: TextView = view.findViewById(R.id.pose_name)
+        }
+
+        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): GridHolder {
+            val view = LayoutInflater.from(parent.context)
+                .inflate(R.layout.pose_list_item, parent, false) // Uses our new XML
+            return GridHolder(view)
+        }
+
+        override fun onBindViewHolder(holder: GridHolder, position: Int) {
+            val pose = poses[position]
+
+            holder.label.text = pose.name
+
+            if (!pose.uri.isNullOrBlank()) {
+                Glide.with(this@CharacterProfileActivity)
+                    .load(pose.uri)
+                    .placeholder(R.drawable.placeholder_avatar)
+                    .into(holder.image)
+            } else {
+                holder.image.setImageResource(R.drawable.placeholder_avatar)
+            }
+
+            // Optional: Add click listener here to view full screen
+        }
+
+        override fun getItemCount() = poses.size
     }
 }

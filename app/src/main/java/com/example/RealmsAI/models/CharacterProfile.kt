@@ -5,6 +5,7 @@ import com.google.firebase.Timestamp
 
 data class CharacterProfile(
     val id                 : String              = "",
+    val originalId         : String              = "",
     val name               : String              = "",
     val personality        : String              = "",
     val privateDescription : String              = "",
@@ -13,7 +14,7 @@ data class CharacterProfile(
     val greeting           : String              = "",
     val author             : String              = "",
     val tags               : List<String>        = emptyList(),
-    val universe: String = "",
+    val universe           : String              = "",
     val emotionTags        : Map<String, String> = emptyMap(),
     val avatarResId        : Int?                = null,
     @SerializedName("avatarUri")
@@ -32,21 +33,21 @@ data class CharacterProfile(
     val physicalDescription: String              = "",
     val abilities          : String              = "",
     val gender             : String              = "",
-    val relationships      : List<Relationship> = emptyList(),
-    val bubbleColor        : String = "#FFFFFF",
-    val textColor          : String = "#000000",
-    val sfwOnly            : Boolean = true,
-    val private            : Boolean = false,
+    val relationships      : List<Relationship>  = emptyList(),
+    val bubbleColor        : String              = "#FFFFFF",
+    val textColor          : String              = "#000000",
+    val sfwOnly            : Boolean             = true,
+    val private            : Boolean             = false,
     val linkedToMap        : Map<String, List<CharacterLink>> = emptyMap(),
-    val profileType        : String = "bot",
-    val ratingCount: Int = 0,
-    val ratingSum: Double = 0.0,
-    val exampleDialogue: List<DialogueExample> = emptyList()
+    val profileType        : String              = "bot",
+    val ratingCount        : Int                 = 0,
+    val ratingSum          : Double              = 0.0,
+    val exampleDialogue    : List<DialogueExample> = emptyList()
 )
 
 data class CharacterLink(
-    var targetId: String,   // the linked character
-    var type: String,       // e.g. "transformation", "sidekickTo", etc.
-    var trigger: String,    // e.g. "when he plays games"
-    var notes: String = ""  // optional notes
+    var targetId: String,
+    var type: String,
+    var trigger: String,
+    var notes: String = ""
 )

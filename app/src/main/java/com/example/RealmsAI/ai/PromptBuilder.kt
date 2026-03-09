@@ -390,10 +390,12 @@ object PromptBuilder {
     fun buildRoleplayPrompt(
         slotProfile: SlotProfile,
         sessionProfile: SessionProfile,
+        personality: String,
         modeSettings: Map<String, Any>,
         sessionSummary: String,
         sceneSlotIds: List<String>,
-        condensedCharacterInfo: Map<String, Map<String, Any?>>,
+        condensedCharacterInfo: String,
+        currentScene: String,
         chatHistory: String,
         memories: Map<String, List<TaggedMemory>>,
         poses: List<String>,
@@ -411,8 +413,8 @@ object PromptBuilder {
 
         val examples = slotProfile.exampleDialogue
         val dialogueBlock = if (examples.isNotEmpty()) {
-            "EXAMPLE DIALOGUE (Mimic this style):\n" +
-                    examples.joinToString("\n") { "User: ${it.prompt}\n${slotProfile.name}: ${it.response}" }
+            "EXAMPLE DIALOGUE (You MUST Mimic this style, cadence, word choice, punctuation and demeanor):\n" +
+                    examples.joinToString("\n") { "Prompt: ${it.prompt}\nresponse to mimic: ${it.response}" }
         } else ""
 
         val globalInstStr = if (sessionProfile.globalInstructions.isNotEmpty()) {
@@ -436,11 +438,16 @@ object PromptBuilder {
                 - Combine the action and dialogue into a SINGLE message. Do NOT split them.
             - Use vivid narration for **only your own** actions, emotions, or perceptions (never for other characters).
             - Use immersive sensory description (sight, sound, smell, etc) to make the world feel alive.
-            - Always continue naturally from the chat history.
-            - Adapt your tone and mood to match the player: be playful, flirty, serious, etc, as appropriate.
             - If the scene is slow, inject a twist (emotional, narrative, or environmental) but always keep it relevant.
             - Never break character or output system messages.  
-            - Keep your reply under 500 characters.
+            - Keep your reply under 300 characters.
+            
+            IMPORTANT PACING RULES:
+            - Always continue naturally from the chat history.
+            - Context First: Even if your 'Secret Description' contains intense or specific desires, these are suppressed unless the user invites them.
+            - Mirroring: If the user is being platonic, professional, or formal, you MUST remain platonic and professional.
+            - Escalation: Only escalate tension or intimacy if the current Relationship Level allows it AND the user has clearly initiated that energy in the current scene.
+
             
             - **OUTFIT CHANGES:**
                 - You can change your character's outfit if the context demands it (e.g., putting on "Swimwear" at the beach, or "Sleepwear" at night).
@@ -449,12 +456,10 @@ object PromptBuilder {
                 - If you are NOT changing outfits, omit the field or leave it null.
 
             - **POSING:**
-                - For every message, output a pose for every nearby character (by slotId), including the sender.
-                - Each slotId can have only one pose at a time.
+                - For every message, output a pose for your character
                 - Always use poses, even during narrator messages.
-                - Choose poses ONLY from the list of AVAILABLE POSES FOR NEARBY CHARACTERS.
+                - Choose poses ONLY from the list of POSES.
                 - You can change a character’s pose if it makes sense for the scene or message.
-                - To clear or remove a character’s pose, set it to "clear", "none", or "" (empty string).
                 
             - **MEMORIES:**
                 - If the message is important add a new memory:
@@ -472,10 +477,7 @@ object PromptBuilder {
               "senderId": "${slotProfile.slotId}",
               "text": "<Limit to 500 characters>",
               "outfit": "NameOfOutfit", 
-              "pose": {
-                 "slotId_of_sender": "angry",
-                 "slotId_of_nearby_char": "fear"
-              }
+              "pose": "angry"
             }
           ],
           "new_memory": {
@@ -498,8 +500,7 @@ object PromptBuilder {
             - Eye/Hair Color: ${slotProfile.eyeColor} ${slotProfile.hairColor}
             - Pronouns: ${slotProfile.gender}
             - Condensed Summary: ${slotProfile.summary}
-            - Personality: ${slotProfile.personality}
-            - Secret Description: ${slotProfile.privateDescription}
+            - Personality: $personality
             - Appearance: ${slotProfile.physicalDescription}
             - Abilities: ${slotProfile.abilities}
             - Current Outfit: ${slotProfile.currentOutfit}
@@ -525,19 +526,11 @@ object PromptBuilder {
         - Description: $locationDescription
         
         NEARBY CHARACTERS:
-        ${
-            if (sceneSlotIds.isEmpty()) "None"
-            else sceneSlotIds.joinToString(", ")
-        }
+        $currentScene
     
-        CONDENSED INFO FOR NEARBY CHARACTERS:
+        CONDENSED INFO FOR ALL CHARACTERS:
         $condensedCharacterInfo
-         - NEVER make up new poses or use "neutral" unless it is explicitly in their list.
-         - NEVER add a pose for ${
-            if (sceneSlotIds.isEmpty()) "None"
-            else sceneSlotIds.filter { slotProfile.profileType=="player" }.joinToString(" $, ")
-        }
-            
+                    
         ---
         RECENT CHAT HISTORY:
         $chatHistory
@@ -765,17 +758,21 @@ object PromptBuilder {
 
     fun buildDiceRoll(): String {
         return """
-        - Whenever your character attempts an action that may have a chance of success or failure (e.g. fighting, sneaking, persuading, leaping, dodging), you must roll dice to determine the outcome.
-        - Do not assume the result — the Game Master will narrate what happens after the roll.
-        - Only include the roll once per action — not per message.
-        - Never describe the result of your own roll. Wait for the Game Master (GM) to narrate what happens.
-        At the end of each message, if you need to Roll a dice add "actions" into the extra fields section of your output:
-        {
-          "actions": [
-            { "type": "roll_dice", "slot": "SLOTID", "stat": "STATNAME", "mod": MODIFIER }
-          ]
-        }
-        """.trimIndent()
+    # DICE ROLL RULES (HIGH-STAKES ONLY):
+    - ONLY roll dice for actions involving HIGH RISK, PHYSICAL DIFFICULTY, or ACTIVE RESISTANCE (e.g., attacking an enemy, picking a lock, dodging a trap, or lying to a suspicious guard).
+    - DO NOT roll dice for casual conversation, stating opinions, normal flirting, or basic movements.
+    - DO NOT roll for "persuasion" just because you are talking. Only roll persuasion if you are actively trying to manipulate, interrogate, or command a hostile/unwilling target.
+    - Do not assume the result — the Game Master will narrate what happens after the roll.
+    - Only include the roll once per action — not per message.
+    - Never describe the result of your own roll. Wait for the Game Master (GM) to narrate what happens.
+    
+    If (and ONLY if) a high-stakes roll is required, add "actions" into the extra fields section of your JSON output:
+    {
+      "actions": [
+        { "type": "roll_dice", "slot": "SLOTID", "stat": "STATNAME", "mod": MODIFIER }
+      ]
+    }
+    """.trimIndent()
     }
 
     fun buildNPCGeneration(areas: List<Area>): String {
@@ -860,45 +857,55 @@ object PromptBuilder {
     ): String {
         if (slotProfile.vnRelationships.isEmpty()) {
             return """
-            INFORMATION ON YOUR CONNECTIONS TO OTHER CHARACTERS:
-            
-            You have no special relationship levels set with other characters.
-        """.trimIndent()
+        INFORMATION ON YOUR CONNECTIONS TO OTHER CHARACTERS:
+        
+        You have no special relationship levels set with other characters.
+    """.trimIndent()
         }
 
         // Build one block per relationship (slot-key aware)
         val relationshipsText = slotProfile.vnRelationships.values.joinToString("\n\n") { rel ->
             val toName = nameForSlotKey(rel.toSlotKey, sessionProfile.slotRoster)
             val currentLevelObj = rel.levels.getOrNull(rel.currentLevel)
+            val currentLevel = rel.currentLevel
+            val higestLevelObj = rel.levels.size
             val personality = currentLevelObj?.personality?.takeIf { it.isNotBlank() } ?: "(No description)"
+
+            // WE INJECT THE EXACT SLOT KEY HERE AS "Target ID"
             """
-                With $toName:
-                - Relationship Level Description: $personality
-                - What raises the relationship: ${rel.upTriggers}
-                - What can harm the relationship: ${rel.downTriggers}
-            """.trimIndent()
+            Target: $toName
+            Target ID: ${rel.toSlotKey}
+            Level: $currentLevel / $higestLevelObj
+            *** CRITICAL BEHAVIOR OVERRIDE ***
+                        When interacting with, speaking to, or thinking about $toName, you MUST adopt the following attitude. This OVERRIDES any conflicting traits in your base personality:
+                        "$personality"
+            - What raises the relationship: ${rel.upTriggers}
+            - What can harm the relationship: ${rel.downTriggers}
+        """.trimIndent()
         }
 
         return """
-        INFORMATION ON YOUR CONNECTIONS TO OTHER CHARACTERS:
-        
-        $relationshipsText
-        
-        At the end of each message, If a message in the RECENT CHAT HISTORY meets the upTrigger or downTrigger for any relationship (based off of previous messages in Recent Chat History)  add "relationship" into the "EXTRA FIELDS" section of your output
-        - Your relationship section MUST be formatted like this:
-        {
-          "relationship": [
-            { 
-                ["toId:"1234, "change:"+0]
-                ["toId:"5678, "change:"+1]
-                ["toId:"1237, "change:"-1]
-            }
-          ]
-        }
-        with: 
-        toId being the relationships id
-        change being the number of points from -3 to +3
-    """.trimIndent()
+    INFORMATION ON YOUR CONNECTIONS TO OTHER CHARACTERS:
+    
+    $relationshipsText
+    
+    This is chat is a slower burn. If you don't have information on your disposition towards the character, keep it neutral.  
+    
+    At the end of each message, if a message in the RECENT CHAT HISTORY meets the upTrigger or downTrigger for any relationship, add "relationship" into the "EXTRA FIELDS" section of your output.
+    
+    - You MUST use the exact "Target ID" provided above for the "toId" field.
+    - Your relationship section MUST be strictly formatted as valid JSON like this:
+    {
+      "relationship": [
+        { "toId": "character1", "change": 1 },
+        { "toId": "character4", "change": -2 }
+      ]
+    }
+    
+    with: 
+    toId: the exact Target ID of the character (e.g., "character1")
+    change: the number of points from -3 to +3
+""".trimIndent()
     }
 
     fun buildMurderSeedingPrompt(

@@ -39,11 +39,22 @@ class AreaAdapter(
     override fun onBindViewHolder(holder: VH, position: Int) {
         val area = areas[position]
 
-        holder.nameEt.setText(area.name)
-        holder.nameEt.isEnabled = !readonly
-        holder.nameEt.setOnFocusChangeListener { _, hasFocus ->
-            if (!hasFocus) area.name = holder.nameEt.text.toString()
+        holder.nameEt.tag?.let { oldWatcher ->
+            holder.nameEt.removeTextChangedListener(oldWatcher as android.text.TextWatcher)
         }
+
+        holder.nameEt.setText(area.name)
+
+        // 2. Create and ATTACH a new listener, and store it in the tag
+        val newWatcher = object : android.text.TextWatcher {
+            override fun afterTextChanged(s: android.text.Editable?) {
+                area.name = s?.toString() ?: ""
+            }
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+        }
+        holder.nameEt.addTextChangedListener(newWatcher)
+        holder.nameEt.tag = newWatcher
 
         // Color styling
         val color = areaColors?.get(area.id) ?: Color.RED
@@ -80,8 +91,8 @@ class AreaAdapter(
         holder.addLocationBtn.setOnClickListener {
             // 1. LIMIT CHECK
             // (Assuming 'area.locations' is the list you are displaying)
-            if (area.locations.size >= 10) {
-                Toast.makeText(holder.itemView.context, "Max 10 locations per area allowed.", Toast.LENGTH_SHORT).show()
+            if (area.locations.size >= 20) {
+                Toast.makeText(holder.itemView.context, "Max 20 locations per area allowed.", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
 

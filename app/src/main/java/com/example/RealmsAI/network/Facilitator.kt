@@ -7,6 +7,7 @@ import java.util.UUID
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import com.example.RealmsAI.network.ApiClients
+import com.example.RealmsAI.network.MixtralEngine
 
 
 object Facilitator {
@@ -52,11 +53,16 @@ object Facilitator {
             }
         }
 
-    suspend fun callMixtralApi(prompt: String, key: String): String = withContext(Dispatchers.IO) {
-        try {
+    suspend fun callMixtralApi(prompt: String, apiKey: String, model: String = "z-ai"): String {
+        return try {
             Log.d("Facilitator", "[Mixtral] Character Prompt:\n$prompt")
-            val engine = com.example.RealmsAI.network.MixtralEngine(ApiClients.mixtral)
-            engine.getBotOutput(prompt)
+
+            // 1. Create the instance
+            val engine = MixtralEngine(ApiClients.mixtral)
+
+            // 2. Call the method ON THE INSTANCE (engine.), not the Class Name
+            engine.getBotOutput(prompt, model)
+
         } catch (ex: Exception) {
             Log.e("Facilitator", "Error calling Mixtral API", ex)
             ""

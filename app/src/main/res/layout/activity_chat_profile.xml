@@ -25,18 +25,35 @@
             android:layout_marginStart="24dp"
             android:layout_marginEnd="24dp"/>
 
-        <!-- Author -->
-        <TextView
-            android:id="@+id/chatProfileAuthor"
+        <LinearLayout
+            android:id="@+id/authorLayout"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="by @author"
-            android:textSize="14sp"
-            android:textColor="#3974D3"
-            android:textStyle="italic"
+            android:orientation="vertical"
             app:layout_constraintTop_toBottomOf="@id/chatProfileTitle"
-            app:layout_constraintStart_toStartOf="@id/chatProfileTitle"
-            android:layout_marginTop="8dp"/>
+            app:layout_constraintStart_toStartOf="@id/chatProfileTitle">
+            <!-- Author -->
+            <TextView
+                android:id="@+id/chatProfileAuthor"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="by @author"
+                android:textSize="14sp"
+                android:textColor="#3974D3"
+                android:textStyle="italic"
+                android:layout_marginTop="8dp"/>
+
+            <TextView
+                android:id="@+id/chatOriginalProfileAuthor"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Original by @author"
+                android:textSize="14sp"
+                android:textColor="#3974D3"
+                android:textStyle="italic"
+                android:visibility="gone"
+                android:layout_marginTop="8dp"/>
+        </LinearLayout>
 
         <!-- SFW Badge -->
         <ImageView
@@ -62,8 +79,8 @@
             android:text="start session"
             android:textSize="10dp"
             android:maxLines="1"
-            app:layout_constraintTop_toBottomOf="@id/chatProfileAuthor"
-            app:layout_constraintStart_toStartOf="@id/chatProfileAuthor"
+            app:layout_constraintTop_toBottomOf="@id/authorLayout"
+            app:layout_constraintStart_toStartOf="@id/authorLayout"
             android:layout_marginEnd="24dp"
             android:minWidth="100dp"
             android:backgroundTint="#3974D3"

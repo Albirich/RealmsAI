@@ -290,6 +290,7 @@ class ChatCollectionActivity : AppCompatActivity() {
         val previews = selectedCharacters.map {
             CharacterPreview(
                 id = it.id,
+                originalId = it.originalId,
                 name = it.name,
                 summary = it.summary.orEmpty(),
                 avatarUri = it.avatarUri,

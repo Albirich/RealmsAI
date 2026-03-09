@@ -45,6 +45,7 @@ class CharacterCreationActivity : AppCompatActivity() {
     private lateinit var wardrobeButton: MaterialButton
     private lateinit var bubbleColorSpinner: Spinner
     private lateinit var textColorSpinner: Spinner
+    private lateinit var colorExample: TextView
     private lateinit var submitBtn: MaterialButton
     private lateinit var addAreaButton: Button
 
@@ -73,11 +74,13 @@ class CharacterCreationActivity : AppCompatActivity() {
     private var outfitsList: List<Outfit> = emptyList()
     private var relationships: List<Relationship> = emptyList()
     private val bubblecolorOptions = listOf(
+        "Black" to "#000000",
         "Blue" to "#2196F3",
         "Green" to "#4CAF50",
         "Orange" to "#FF9800",
         "Pink" to "#e86cbe",
         "Purple" to "#c778f5",
+        "Red" to "#ce0202",
         "White" to "#FFFFFF",
         "Yellow" to "#FFEB3B"
     )
@@ -88,7 +91,8 @@ class CharacterCreationActivity : AppCompatActivity() {
         "Orange" to "#cd6a00",
         "Pink" to "#E91E63",
         "Purple" to "#A200FF",
-        "Red" to "#ce0202",
+        "Red" to "#970606",
+        "White" to "#e3dfdf",
         "Yellow" to "#cdd54b"
     )
 
@@ -115,21 +119,89 @@ class CharacterCreationActivity : AppCompatActivity() {
 
     // The Scenario Bank
     private val scenarioPrompts = listOf(
-        "You are accused of a crime you didn't commit.",
-        "A stranger offers you a rare flower.",
+        // Flirty / cute
+        "Someone you like catches you staring—then smirks.",
+        "You accidentally brush their hand and neither of you pulls away.",
+        "They compliment you in a way that feels way too personal.",
+        "You’re forced to share a small space—shoulder to shoulder.",
+        "They lean in like they’re about to kiss you… then whisper a secret instead.",
+        "They offer to fix something on you (hair, collar, glove) and take their time.",
+        "A friend teases you about them—and it hits a little too close to home.",
+        "They call you by a nickname you’ve never heard before… and it works.",
+        "You catch them smiling at you when they think you aren’t looking.",
+        "You dance with them—awkward at first, then dangerously natural.",
+        
+        // Social / comedy
         "You trip and fall in front of your crush.",
         "Someone insults your outfit.",
-        "You find a lost child in the market.",
+        "A friend dares you to do something humiliating in public.",
+        "You accidentally call someone the wrong name—right to their face.",
+        "You laugh at the worst possible moment.",
+        "A stranger mistakes you for someone famous.",
+        "You walk into the wrong room like you own it—everyone stares.",
+        "You spill a drink on an important person.",
+        "Your voice cracks mid-speech and the room goes quiet.",
+        "Someone challenges you to a staring contest and won’t back down.",
+
+        // Tension / confrontation
+        "You are accused of a crime you didn't commit.",
         "You are cornered by an enemy in an alley.",
-        "A merchant tries to overcharge you significantly.",
-        "You wake up in a strange place with no memory.",
-        "Your best friend betrays you.",
-        "You are asked to lead a dangerous mission.",
-        "You discover a hidden treasure chest.",
-        "Someone confesses their love to you.",
-        "You are challenged to a duel.",
+        "A rival publicly claims you’re a fraud.",
+        "A guard demands to search your belongings—now.",
+        "Someone threatens someone you care about unless you cooperate.",
+        "You’re challenged to a duel in front of a crowd.",
+        "A mercenary offers protection… for an ugly price.",
+        "You catch someone following you—and they don’t deny it.",
+        "A friend asks you to lie for them, and it could ruin you.",
+        "You’re offered a deal that feels like a trap.",
+
+        // Moral dilemmas
         "You see someone stealing bread to survive.",
-        "A mysterious figure hands you a sealed letter."
+        "A merchant tries to overcharge you significantly.",
+        "You find a lost child in the market.",
+        "You discover someone’s secret that could destroy them.",
+        "You can save one person, but it means abandoning another.",
+        "You find a purse of money—clearly stolen.",
+        "You catch a friend doing something unforgivable.",
+        "Someone begs you for help, but helping them is illegal.",
+        "You’re asked to punish someone who might be innocent.",
+        "A powerful person offers you favor in exchange for silence.",
+
+        // Mystery / intrigue
+        "A mysterious figure hands you a sealed letter.",
+        "You wake up in a strange place with no memory.",
+        "You discover a hidden treasure chest.",
+        "You overhear a conversation you were never meant to hear.",
+        "A note appears with your name on it—and no one admits writing it.",
+        "You find a symbol carved into your door overnight.",
+        "Someone you trust won’t meet your eyes and keeps changing the subject.",
+        "A stranger knows something about your past that they shouldn’t.",
+        "You’re invited to a meeting at midnight—no details given.",
+        "You’re offered information… but only if you answer a riddle first.",
+
+        // Relationships / emotional pressure
+        "Someone confesses their love to you.",
+        "Your best friend betrays you.",
+        "Someone you hurt in the past returns—changed.",
+        "A friend asks, 'Do you actually trust me?'",
+        "You realize you’re jealous—and you hate that you are.",
+        "You’re forced to work with someone you can’t stand.",
+        "Someone gives you a gift that feels loaded with meaning.",
+        "You’re asked to forgive someone who hasn’t apologized.",
+        "A friend tells you they’re leaving for good—today.",
+        "Someone you admire is disappointed in you.",
+
+        // Adventure / mission hooks
+        "You are asked to lead a dangerous mission.",
+        "You’re hired for a job, but the client won’t reveal their identity.",
+        "A map falls into your hands with one location circled in red.",
+        "A storm forces you to take shelter somewhere you shouldn’t be.",
+        "You find a key that fits nothing you own.",
+        "A stranger offers you a rare flower.",
+        "You witness something impossible—and no one believes you.",
+        "You’re offered power if you swear an oath you can’t undo.",
+        "You arrive too late: the place is destroyed and it’s your fault somehow.",
+        "A ticking sound starts coming from your bag—and you didn’t pack anything that ticks."
     )
 
     private lateinit var sfwSwitch: Switch
@@ -191,6 +263,30 @@ class CharacterCreationActivity : AppCompatActivity() {
         textadapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
         textColorSpinner.adapter = textadapter
 
+        colorExample = findViewById(R.id.colorExample)
+
+        // --- Bubble Color Spinner Logic ---
+        bubbleColorSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                val hexColor = bubblecolorOptions[position].second
+                colorExample.setBackgroundColor(android.graphics.Color.parseColor(hexColor))
+            }
+            override fun onNothingSelected(parent: AdapterView<*>?) {}
+        }
+        // Set default to White (Index 7)
+        bubbleColorSpinner.setSelection(7)
+        // Also initialize the example view to match the white background
+        colorExample.setBackgroundColor(android.graphics.Color.parseColor("#FFFFFF"))
+
+        // --- Text Color Spinner Logic ---
+        textColorSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                val hexColor = textcolorOptions[position].second
+                colorExample.setTextColor(android.graphics.Color.parseColor(hexColor))
+            }
+            override fun onNothingSelected(parent: AdapterView<*>?) {}
+        }
+
         // Preset avatar
         avatarView.setImageResource(R.drawable.placeholder_avatar)
 
@@ -206,12 +302,12 @@ class CharacterCreationActivity : AppCompatActivity() {
 
         // Generate Random Scenarios
         generateDialogueBtn.setOnClickListener {
-            // Pick 3 random prompts
-            val randomPrompts = scenarioPrompts.shuffled().take(3)
+            // Pick 5 random prompts
+            val randomPrompts = scenarioPrompts.shuffled().take(5)
             randomPrompts.forEach { prompt ->
                 addDialogueRow(prompt, "")
             }
-            Toast.makeText(this, "Added 3 scenarios. Fill in the responses!", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Added scenarios. Fill in the responses!", Toast.LENGTH_SHORT).show()
         }
 
         // Add Empty Row
@@ -286,7 +382,7 @@ class CharacterCreationActivity : AppCompatActivity() {
             val isVisible = physicalSection.visibility == View.VISIBLE
             physicalSection.visibility = if (isVisible) View.GONE else View.VISIBLE
             physicalToggle.setImageResource(
-                if (isVisible) R.drawable.ic_expand_more else R.drawable.ic_expand_less
+                if (isVisible) R.drawable.ic_expand_more_white else R.drawable.ic_expand_less_white
             )
             val root = findViewById<ConstraintLayout>(R.id.charCreate)
             val cs = ConstraintSet()
@@ -306,6 +402,7 @@ class CharacterCreationActivity : AppCompatActivity() {
 
         // --- Edit support: Fill from profile if present ---
         val editCharId = intent.getStringExtra("CHAR_EDIT_ID")
+        val editOriginalId = intent.getStringExtra("CHAR_EDIT_ORIGINAL_ID")
         val charJson = intent.getStringExtra("CHAR_PROFILE_JSON")
         if (editCharId != null && !charJson.isNullOrBlank()) {
             val profile = Gson().fromJson(charJson, CharacterProfile::class.java)
@@ -366,9 +463,27 @@ class CharacterCreationActivity : AppCompatActivity() {
             val abilities = abilitiesEt.text.toString().trim()
             val universe = universeEt.text.toString().trim()
 
+
+            physicalDescEt.filters = arrayOf(android.text.InputFilter.LengthFilter(100))
             // 2. Basic Validation
             if (name.isEmpty()) return@setOnClickListener toast("Name required")
             if (originalAvatarUrl.isNullOrBlank() && !avatarChanged) return@setOnClickListener toast("Pick an avatar")
+            if (name.length > 40) return@setOnClickListener toast("Name too long (Max 40)")
+            if (bio.length > 80) return@setOnClickListener toast("Summary too long (Max 80)")
+            if (personality.length > 1000) return@setOnClickListener toast("Personality too long (Max 1000)")
+            if (privateDesc.length > 400) return@setOnClickListener toast("Private info too long (Max 400)")
+            if (backstory.length > 1000) return@setOnClickListener toast("Backstory too long (Max 1000)")
+            if (greeting.length > 200) return@setOnClickListener toast("Greeting too long (Max 200)")
+
+            val dialogueList = mutableListOf<String>()
+            for (i in 0 until dialogueContainer.childCount) {
+                val row = dialogueContainer.getChildAt(i) as? EditText
+                val text = row?.text.toString().trim()
+                if (text.isNotEmpty()) {
+                    if (text.length > 500) return@setOnClickListener toast("Dialogue row ${i+1} is too long")
+                    dialogueList.add(text)
+                }
+            }
 
             // 3. Define the actual save action (to be called after checks pass)
             val performSave = { isPrivateOverride: Boolean? ->
@@ -379,7 +494,7 @@ class CharacterCreationActivity : AppCompatActivity() {
 
                 showProgressDialog()
                 saveCharacterAndReturnToHub(
-                    editCharId,
+                    editCharId, editOriginalId,
                     name, bio, personality, privateDesc, backstory, soloScenario, greeting,
                     age, height, weight, eyeColor, hairColor, physicalDesc, abilities, gender,
                     bubbleColor, textColor, universe
@@ -551,6 +666,7 @@ class CharacterCreationActivity : AppCompatActivity() {
 
     private fun saveCharacterAndReturnToHub(
         editCharId: String?,
+        editOriginalId: String?,
         name: String,
         summary: String,
         personality: String,
@@ -572,6 +688,7 @@ class CharacterCreationActivity : AppCompatActivity() {
 
     ) {
         val charId = editCharId ?: System.currentTimeMillis().toString()
+        val originalId = editOriginalId ?: charId
         val currentUserId = FirebaseAuth.getInstance().currentUser?.uid ?: ""
         val storage = FirebaseStorage.getInstance().reference
         val firestore = FirebaseFirestore.getInstance()
@@ -589,19 +706,22 @@ class CharacterCreationActivity : AppCompatActivity() {
             com.google.android.gms.tasks.Tasks.whenAllSuccess<Any>(deletedTasks + poseUploadTasks)
                 .addOnSuccessListener { results ->
                     val poseTriples = results.filterIsInstance<Triple<String, String, String>>()
-                    // Map of outfitName -> Map<poseName, url>
-                    val outfitsMap = mutableMapOf<String, MutableMap<String, String>>()
-                    for ((outfitName, poseName, url) in poseTriples) {
-                        val poseMap = outfitsMap.getOrPut(outfitName) { mutableMapOf() }
-                        poseMap[poseName] = url
-                    }
-                    // Update poseSlots with uploaded URLs (leave remote URLs as-is)
+
+                    // 1. Group the results by Outfit Name
+                    val uploadedPosesByOutfit = poseTriples.groupBy { it.first } // Triple.first is Outfit Name
+
+                    // 2. Reconstruct the list preserving original order
                     val updatedOutfits = outfitsList.map { outfit ->
-                        val poseMap = outfitsMap[outfit.name] ?: emptyMap()
+                        // Find all uploaded poses belonging to THIS outfit name
+                        val thisOutfitUploads = uploadedPosesByOutfit[outfit.name] ?: emptyList()
+                        val poseUrlMap = thisOutfitUploads.associate { it.second to it.third } // poseName -> url
+
                         val updatedPoseSlots = outfit.poseSlots.map { poseSlot ->
-                            val uploadedUrl = poseMap[poseSlot.name]
+                            val uploadedUrl = poseUrlMap[poseSlot.name]
+                            // If we just uploaded it, use the new URL; otherwise keep the original (remote or local)
                             if (uploadedUrl != null) poseSlot.copy(uri = uploadedUrl) else poseSlot
                         }.toMutableList()
+
                         outfit.copy(poseSlots = updatedPoseSlots)
                     }
                     val dialogueList = mutableListOf<DialogueExample>()
@@ -619,6 +739,7 @@ class CharacterCreationActivity : AppCompatActivity() {
                     val isEdit = editCharId != null
                     val commonFields: Map<String, Any?> = mapOf(
                         "id" to charId,
+                        "originalId" to originalId,
                         "name" to name,
                         "summary" to summary,
                         "personality" to personality,
@@ -811,6 +932,7 @@ class CharacterCreationActivity : AppCompatActivity() {
             .setCancelable(false)
             .show()
     }
+
     private fun dismissProgressDialog() {
         progressDialog?.dismiss()
         progressDialog = null
@@ -880,6 +1002,8 @@ class CharacterCreationActivity : AppCompatActivity() {
         privateSwitch.isChecked = profile.private
         bubbleColorSpinner.setSelection(bubblecolorOptions.indexOfFirst { it.second == profile.bubbleColor }.takeIf { it >= 0 } ?: 0)
         textColorSpinner.setSelection(textcolorOptions.indexOfFirst { it.second == profile.textColor }.takeIf { it >= 0 } ?: 0)
+        colorExample.setBackgroundColor(android.graphics.Color.parseColor(profile.bubbleColor))
+        colorExample.setTextColor(android.graphics.Color.parseColor(profile.textColor))
     }
 
     fun makeEditTextScrollable(editText: EditText) {

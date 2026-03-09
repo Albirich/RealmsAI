@@ -1,67 +1,99 @@
 
+CHANGELOG: Release Update
+
+Session Harmonization - Characters are now changed when a session is started to fit the lore and description of the session.
+    - looks at session description and secret description
+    - adds information about other characters in session
+    - prioritizes information from the session over the character profile
+
+Character Sheets - Added character sheets to all chat sessions
+    - added description, personality, and backstory to charactersheet.
+    - added an expandable mature traits and secrets section if the session isnt sfw only.
+
+Session Title - Added option to change the title of the session to make the session history activity more understandable.
+
+Chat Messages - Lowered the opacity on chat boxes.
+
 
 ----ROADMAP----
 
-🏁 The Realms AI Release Roadmap
-Phase 1: Safety & Compliance (Google Play Requirements)
-[✓✓✓] 1. Report System Logic: Wire up the existing Report buttons in ✓Chat, ✓Character, and ✓User profiles to save a report to Firestore for moderation.
-
-[✓] 2. Blocking System: Allow users to block others so they don't see their content in Hubs.
-
-[✓] 3. EULA & ToS: Add the "I agree to the Terms of Service" checkbox on the Sign-Up screen.
-
-[✓] 4. Account Deletion: Add the "Delete Account" button in Settings (Required by Google).
-
-Phase 2: Economy & Limits (Cost Control)
-[✓✓✓] 5. Hard Limits (Creation): Restrict ✓Dialogue Examples, ✓Character Counts, and ✓Location Counts to save tokens.
-
-[✓] 6. Message Counter UI: Show "X/Y Messages Left" in the Options Menu and Profile.
-
-[ ] 7. Google Play Billing: Implement the actual subscription connection (The Paywall).
-
-Phase 3: Social & Polish (Engagement)
-[✓] 8. Rating System: Allow users to Rate (1-5 stars) Chats and Characters to sort the Hub by "Top Rated."
-
-[✓] 9. Badges: Add logic to display "Beta Tester," "Founder," and "Premium" badges on profiles.
-
-[ ] 10. Tutorial/Info: (You are handling this) Add info tooltips.
+[] subscriptions
 
 ✓
 
-### 4.5. The "Crystal" Collectibles (Procedural Art)
 
-* **Concept:** Replace preview cards with generated aesthetic crystals.
-* **The Seed System:** An 8-digit seed (e.g., `00004444`) determines the look.
-* **Quadrants:** 4 sectors, each with random point values/shapes.
-* **Cracks/Flaws:** Overlay textures that can align to form shapes (hearts, skulls, etc.) or just look cool.
-* **Rarity:** "Clean" crystals vs. specific matching patterns.
+Phase 1: The "Power User" Update (v1.1)
+    Theme: Control & Stability.
 
-### 4.75. Extra Options
-* **Model:** choose a model. temperature, top P, top K, etc
-* **Host:** kick user, promote user to host
-* **NPC:** create or delete npc. halt npc generation
-* **Archive:** Delete/archive session.
+    Architect Visuals (The Aasimar Update):
 
-### 4.78 Syntax Parsing
-* `<Thoughts>`: Visible to user (grey/italics), hidden from other characters.
-* `~Whisper~`: Targeted message parsing so only specific characters hear it.
+        Variant Outfits: Support for "Sharingan-style" visual description stacking (Base Outfit + Variant Delta).
 
-## 4.83 Linked characters
+        Architect Triggers: Dedicated changeTrigger fields to tell the AI exactly when to swap outfits or activate variants.
 
-### 4.875. Node map
+        Visual NSFW Pruning: Top-level NSFW flags for Outfits/Variants to keep AI choices within session boundaries.
 
-* **Area:** a map for areas in the chat creation
-* **location:** a map for locations in the background gallery when making an area.
+    God Mode (Director Mode Pro):
+
+        Full edit power over session data.
+
+        Characters recognize God Mode inputs as "Fate" or "GM" rather than a player persona.
+
+    Session Management (Extra Options):
+
+        Host Tools: Kick/promote users in multiplayer lobbies.
+
+        Archive: Clean up the Hub by archiving or deleting old sessions.
+
+        Manual NPC Controls: Create/delete NPCs on the fly or halt the "New NPC" generation loop.
+
+    Lore Books (v1): Basic keyword-triggered world info (Factions, Locations) to optimize token usage.
+
+    AI Auto-Complete: The "Magic Wand" in Creator Studio to finish descriptions for lazy architects.
+
+Phase 2: The "Immersion" Update (v1.2)
+    Theme: Atmosphere & Parsing.
+
+    Syntax Parsing:
+
+        <Thoughts>: Rendered as Italics/Grey text; hidden from NPC prompts but visible to users.
+
+        ~Whisper~: Logic to target specific characters in the prompt for private dialogue.
+
+    VFX System (Visual Effects): Support for GIF/WebP overlays.
+
+    Visual Layering: "Aura" (anchored to sprite) vs. "Environment" (full-screen effects like rain or petals).
+
+    Living Engine: the ai controls background locations and characters within.
+
+    LLM Fine-Tuning: Expose Model choice, Temperature, Top P, and Top K settings per session.
+
+    Audience Mode: "Ghost" spectators who can watch public sessions in real-time.
+
+Phase 3: The "Crystal" Aesthetics Update (v1.3)
+    Theme: Visual Proceduralism.
+
+        "Crystal" Collectibles:
+
+            Seed System: 8-digit hash-based crystals constructed at runtime using layered Custom Views.
+
+            Flaw System: Texture overlays (hearts/skulls) based on rarity or character traits.
+
+        Node Maps:
+
+            Area/Location Maps: Visualizing background galleries and area connections in Creator Studio.
+
+            Creator News Feed: "Follow" system and a dedicated tab for new releases from top Architects.
+
+Phase 4: The "VTT & Studio" Expansion (v1.4+)
+    Theme: The Ecosystem.
+
+        Character Links (Dynamic Roster): Logic to [Summon] or [Switch] characters mid-session to keep UI clean.
+
+        AI VTT: Digital battlemaps and inventory management integration.
+
+        VN Studio: Integrated tools for generative backgrounds and poses.
+
+        World Builder: Advanced procedural map and dungeon creation logic.
 
 
-* **Implementation:** A custom View or layered ImageView that constructs the crystal at runtime based on the character's hash or a random ID.
-
-### 5. The Ecosystem (Long Term)
-
-* **AI VTT:** Battlemaps and inventory.
-* **VN Studio:** Asset generation tools.
-* **World Builder:** Map creation logic.
-
----
-
-We are in a great spot. When you are ready to start **2.5 (Persona & Outfits)** or **4.5 (Crystals)**, just ping me. Good luck with the dev work!

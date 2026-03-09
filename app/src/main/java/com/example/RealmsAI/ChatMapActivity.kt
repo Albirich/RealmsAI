@@ -127,12 +127,12 @@ class ChatMapActivity : AppCompatActivity() {
                     if (loadedAreas.any { it.name == pickedArea.name }) {
                         Toast.makeText(this, "Area already added.", Toast.LENGTH_SHORT).show()
                     } else
-                    if (loadedAreas.size >= 8) {
-                        Toast.makeText(this, "Max 8 Areas allowed per Chat.", Toast.LENGTH_SHORT).show()
+                    if (loadedAreas.size >= 10) {
+                        Toast.makeText(this, "Max 10 Areas allowed per Chat.", Toast.LENGTH_SHORT).show()
                     } else {
                         val newArea = pickedArea.copy(
-                            id = java.util.UUID.randomUUID().toString(),
-                            creatorId = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid ?: "",
+                            id = pickedArea.id.ifBlank { java.util.UUID.randomUUID().toString() },
+                            creatorId = FirebaseAuth.getInstance().currentUser?.uid ?: "",
                             locations = pickedArea.locations.map { it.copy(id = java.util.UUID.randomUUID().toString()) }.toMutableList()
                         )
                         loadedAreas.add(newArea)

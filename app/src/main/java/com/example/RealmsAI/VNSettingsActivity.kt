@@ -141,7 +141,7 @@ class VNSettingsActivity : AppCompatActivity() {
         val infoButtonvnSettings: ImageButton = findViewById(R.id.infoButtonvnsettings)
         infoButtonvnSettings.setOnClickListener {
             AlertDialog.Builder(this@VNSettingsActivity)
-                .setTitle("Main Character Mode")
+                .setTitle("Character Levels")
                 .setMessage("Click on a character to open the relationship levels.\n Sets how the character acts with and around other characters.")
                 .setPositiveButton("OK", null)
                 .show()
@@ -224,8 +224,10 @@ class VNSettingsActivity : AppCompatActivity() {
     private fun healVnSettingsForRoster() {
         if (selectedCharacters.isEmpty()) return
 
-        // Valid slot keys for current roster size: character1..characterN
-        val validKeys = ModeSettings.SlotKeys.ALL.take(selectedCharacters.size).toSet()
+        // FIX: Generate valid keys dynamically up to the roster size (No hard limit of 4!)
+        val validKeys = (0 until selectedCharacters.size).map { index ->
+            ModeSettings.SlotKeys.fromPosition(index)
+        }.toSet()
 
         // Compute (and persist) a valid main char id/key if in main-char mode
         val mainKey: String? = if (vnSettings.mainCharMode) {
@@ -308,15 +310,7 @@ class VNSettingsActivity : AppCompatActivity() {
             return
         }
 
-        val rosterIds = characterIds.toSet()
-        val saved = vnSettings.mainCharId
-
-        // Already valid? keep it
-        if (saved != null && saved in rosterIds) return
-
-        // Try to extract slot index from either placeholder format:
-        // 1) "placeholder-slot-4-<ts>" (slot number is 4 → index 3)
-        // 2) "placeholder:3:<ts>"      (index is 3 → index 3)
+        // 1. Define the helper function FIRST so it can be called later
         fun extractIndexFromPlaceholder(id: String?): Int? {
             if (id.isNullOrBlank()) return null
 
@@ -335,12 +329,24 @@ class VNSettingsActivity : AppCompatActivity() {
             return null
         }
 
-        val slotIndex = extractIndexFromPlaceholder(saved)
-        val fallbackId = slotIndex
-            ?.let { idx -> selectedCharacters.getOrNull(idx)?.id }
-            ?: selectedCharacters.first().id
+        // 2. Safely check the saved ID
+        val saved = vnSettings.mainCharId
 
-        vnSettings.mainCharId = fallbackId
+        if (!saved.isNullOrEmpty()) {
+            val slotIndex = extractIndexFromPlaceholder(saved)
+
+            // Only overwrite the ID if it was actually a placeholder
+            if (slotIndex != null) {
+                val fallbackId = selectedCharacters.getOrNull(slotIndex)?.id
+                    ?: selectedCharacters.first().id
+                vnSettings.mainCharId = fallbackId
+            }
+            // If slotIndex is null, it's a real character ID. We leave it exactly as it is!
+
+        } else {
+            // Only default to the first character if no main character was ever set
+            vnSettings.mainCharId = selectedCharacters.first().id
+        }
     }
 
 
@@ -350,10 +356,14 @@ class VNSettingsActivity : AppCompatActivity() {
         if (requestCode == EDIT_RELATIONSHIP_CODE && resultCode == RESULT_OK && data != null) {
             val updatedJson = data.getStringExtra("UPDATED_RELATIONSHIP_JSON")
             val updatedRel = Gson().fromJson(updatedJson, VNRelationship::class.java)
+
             // Save to the correct board
             val relBoard = vnSettings.characterBoards.getOrPut(updatedRel.fromSlotKey) { mutableMapOf() }
             relBoard[updatedRel.toSlotKey] = updatedRel
-            setupRelationshipBoards(mainCharModeCheck.isChecked)
+
+            // FIX: Force the adapter to refresh. If you add checkmarks or badges later,
+            // this ensures they appear immediately without having to back out!
+            relationshipBoardList.adapter?.notifyDataSetChanged()
         }
     }
 }

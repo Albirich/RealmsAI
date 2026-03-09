@@ -271,6 +271,17 @@ class RPGSettingsActivity : AppCompatActivity() {
             rpgSettings.characters = characterAdapter.getCharacters().toMutableList()
             rpgSettings.acts = actAdapter.getActs().toMutableList()
 
+            // Inside saveRpgSettingsButton.setOnClickListener
+            val finalActs = actAdapter.getActs()
+            if (finalActs.any { it.summary.length > 1000 || it.goal.length > 100 }) {
+                Toast.makeText(this, "One of your Acts exceeds the character limit.", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            val finalCharacters = characterAdapter.getCharacters()
+            if (finalCharacters.any { it.equipment.size > 10 }) {
+                Toast.makeText(this, "One of your Characters equipment exceeds the 10 item limit.", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
             // validate via roles if murder is on
             if (murderSettings.enabled && !validateMurderByRoles(rpgSettings, murderSettings)) {
                 Toast.makeText(this, "Assign exactly one TARGET and at least one VILLAIN, or enable Random Killer.", Toast.LENGTH_LONG).show()

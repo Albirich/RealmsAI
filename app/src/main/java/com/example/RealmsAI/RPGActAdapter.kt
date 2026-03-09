@@ -36,6 +36,8 @@ class RPGActAdapter(
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         val act = acts[position]
 
+        holder.summaryEdit.filters = arrayOf(android.text.InputFilter.LengthFilter(1000))
+        holder.goalEdit.filters = arrayOf(android.text.InputFilter.LengthFilter(100))
         holder.header.text = "ACT ${position + 1}"
 
         // Expand/collapse logic (optional)

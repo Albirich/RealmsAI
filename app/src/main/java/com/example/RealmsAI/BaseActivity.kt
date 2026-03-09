@@ -118,6 +118,7 @@ open class BaseActivity : AppCompatActivity() {
 
                 ChatPreview(
                     id           = profile.id,
+                    originalId   = profile.originalId,
                     title        = profile.title,
                     description  = profile.description,
                     avatar1ResId = res1,

@@ -12,6 +12,7 @@ data class SessionProfile(
     val sessionId: String = "",
     val chatId: String = "",
     val title: String = "",
+    val sessionTitle: String = "",
     val sessionDescription: String = "",
     val chatMode: String = "SANDBOX",
     val startedAt: Timestamp? = null,
@@ -19,10 +20,12 @@ data class SessionProfile(
     val sessionSummary: String = "",
     var relationships: List<Relationship> = emptyList(),
     val secretDescription: String? = null,
-
+    val initialGreeting: String? = null,
+    var aiModel: String = "DeepSeek V3.2",
     var userMap: Map<String, SessionUser> = emptyMap(),
     val userAssignments: Map<String, String> = emptyMap(),
     val userList: List<String> = emptyList(),
+    val characterIds: List<String> = emptyList(),
 
     var slotRoster: List<SlotProfile> = emptyList(),
 
@@ -67,6 +70,7 @@ data class SlotProfile(
     val name: String = "",
     val summary: String = "",
     val personality: String = "",
+    val backstory: String = "",
     val memories: List<TaggedMemory> = emptyList(),
     val privateDescription: String = "",
     val abilities: String = "",
@@ -90,13 +94,14 @@ data class SlotProfile(
     val sfwOnly: Boolean = true,
     val profileType: String = "bot",
     var statusEffects: MutableList<String> = mutableListOf(),
-    val lastActiveArea: String? = null,
-    val lastActiveLocation: String? = null,
+    val lastActiveArea: String? = "null",
+    val lastActiveLocation: String? = "null",
     var lastSynced: com.google.firebase.Timestamp? = null,
     val pose: String? = null,
     val typing: Boolean = false,
     var moreInfo: String? = null,
     val instructions: List<Instruction> = emptyList(),
+    val userReplaced: Boolean = false,
     // -- RPG STUFF --
     var hiddenRoles: String? = "",
     val rpgClass: String = "",
@@ -106,11 +111,13 @@ data class SlotProfile(
     val maxHp: Int = 0,
     val defense: Int = 0,
     @get:Exclude var linkedTo: List<CharacterLink> = emptyList(),
-    // -- VN STUFF --
-    var vnRelationships: MutableMap<String, VNRelationship> = mutableMapOf()
+    var vnRelationships: MutableMap<String, VNRelationship> = mutableMapOf(),
+    val tags               : List<String>        = emptyList(),
+    val universe           : String              = "",
 )
 data class TaggedMemory(
     var id: String = "",
+    var slotId: String = "",
     var tags: List<String> = emptyList(),
     var text: String = "",
     var nsfw: Boolean = false,

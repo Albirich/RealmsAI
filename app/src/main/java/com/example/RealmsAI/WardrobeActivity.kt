@@ -40,6 +40,8 @@ class WardrobeActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_wardrobe)
 
+        outfitRecycler = findViewById(R.id.outfitsRecycler)
+
         val infoButtonWardrobePage: ImageButton = findViewById(R.id.infoButtonWardrobePage)
         infoButtonWardrobePage.setOnClickListener {
             AlertDialog.Builder(this@WardrobeActivity)

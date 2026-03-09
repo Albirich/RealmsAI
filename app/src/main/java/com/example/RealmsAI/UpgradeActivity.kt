@@ -2,12 +2,18 @@ package com.example.RealmsAI
 
 import android.os.Bundle
 import android.util.Log
+import android.widget.ArrayAdapter
 import android.widget.Button
+import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
+import com.example.RealmsAI.models.ModeSettings
+import com.example.RealmsAI.models.SlotProfile
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
+import com.google.gson.Gson
 
 class UpgradeActivity : BaseActivity() {
 
@@ -36,8 +42,17 @@ class UpgradeActivity : BaseActivity() {
 
         // Confirm Upgrade (Alpha Testing Mode)
         btnConfirm.setOnClickListener {
-            performAlphaUpgrade()
+            // performAlphaUpgrade()
+            upgradeDenialDialog()
         }
+    }
+
+    private fun upgradeDenialDialog() {
+        AlertDialog.Builder(this)
+            .setTitle("Upgrades Currently Unavailable")
+            .setMessage("RealmsAI is currently in a limited Beta phase! Premium subscriptions and upgrades are not open just yet.\n\nFor now, enjoy your daily free messages, and keep an eye out for the official launch announcement!")
+            .setPositiveButton("Got it", null)
+            .show()
     }
 
     private fun performAlphaUpgrade() {

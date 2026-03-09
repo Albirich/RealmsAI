@@ -7,6 +7,7 @@ import com.google.firebase.firestore.ServerTimestamp
 @IgnoreExtraProperties
 data class ChatProfile(
     val id: String = "",
+    val originalId: String = "",
     val title: String = "",
     val description: String = "",
     val secretDescription: String = "",
@@ -21,6 +22,7 @@ data class ChatProfile(
     val rating: Float = 0f,
     @ServerTimestamp
     val timestamp: Timestamp? = null,
+    val updateTimestamp: Timestamp? = null,
     val author: String = "",
     val tags: List<String> = emptyList(),
     val universe: String = "",

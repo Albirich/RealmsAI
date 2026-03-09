@@ -112,8 +112,17 @@ class CharacterRelationshipActivity : AppCompatActivity() {
             .setPositiveButton("Add") { _, _ ->
                 val toName = toNameEdit.text.toString().trim()
                 val type = RELATIONSHIP_TYPES[typeSpinner.selectedItemPosition]
-                val summary = summaryEdit.text.toString()
-                if (toName.isNotEmpty()) {
+                val summary = summaryEdit.text.toString().trim()
+
+                // --- ENFORCED VALIDATION ---
+                if (toName.isEmpty()) {
+                    Toast.makeText(this, "Please enter a name.", Toast.LENGTH_SHORT).show()
+                } else if (toName.length > 20) {
+                    Toast.makeText(this, "Name is too long (Max 20).", Toast.LENGTH_SHORT).show()
+                } else if (summary.length > 80) {
+                    Toast.makeText(this, "Summary is too long (Max 80).", Toast.LENGTH_SHORT).show()
+                } else {
+                    // Success: All limits respected
                     relationships.add(
                         Relationship(
                             fromId = "",
@@ -123,8 +132,6 @@ class CharacterRelationshipActivity : AppCompatActivity() {
                         )
                     )
                     adapter.notifyDataSetChanged()
-                } else {
-                    Toast.makeText(this, "Please enter a name.", Toast.LENGTH_SHORT).show()
                 }
             }
             .setNegativeButton("Cancel", null)

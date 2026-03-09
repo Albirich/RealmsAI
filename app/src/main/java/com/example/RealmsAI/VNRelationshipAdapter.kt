@@ -39,12 +39,13 @@ class VNRelationshipAvatarAdapter(
 
         val otherKey = slotKeyFor(char)
 
-        // Store by SLOT KEY and make VNRelationship use slot keys
-        val rel = relationshipBoardBySlot.getOrPut(otherKey) {
-            VNRelationship(fromSlotKey = otherKey, toSlotKey = mainSlotKey)
+        holder.avatarView.setOnClickListener {
+            // Move inside the click
+            val freshestRel = relationshipBoardBySlot.getOrPut(otherKey) {
+                VNRelationship(fromSlotKey = otherKey, toSlotKey = mainSlotKey)
+            }
+            onEdit(freshestRel, char)
         }
-
-        holder.avatarView.setOnClickListener { onEdit(rel, char) }
     }
 
     inner class AvatarViewHolder(view: View) : RecyclerView.ViewHolder(view) {
@@ -141,13 +142,14 @@ class VNRelAvatarAdapter_OthersToMain(
         }
         val otherKey = slotKeyFor(otherChar)
 
-        // from = otherKey, to = mainSlotKey
-        val fromMap = characterBoards.getOrPut(otherKey) { mutableMapOf() }
-        val rel = fromMap.getOrPut(mainSlotKey) {
-            VNRelationship(fromSlotKey = otherKey, toSlotKey = mainSlotKey)
+        holder.avatarView.setOnClickListener {
+            // Move inside the click so it always fetches fresh data
+            val fromMap = characterBoards.getOrPut(otherKey) { mutableMapOf() }
+            val freshestRel = fromMap.getOrPut(mainSlotKey) {
+                VNRelationship(fromSlotKey = otherKey, toSlotKey = mainSlotKey)
+            }
+            onEdit(freshestRel, otherChar)
         }
-
-        holder.avatarView.setOnClickListener { onEdit(rel, otherChar) }
     }
 
     inner class AvatarViewHolder(view: View) : RecyclerView.ViewHolder(view) {
@@ -180,7 +182,7 @@ class VNRelAvatarAdapter_FromFixed(
     override fun onBindViewHolder(holder: AvatarViewHolder, position: Int) {
         val toChar = otherCharacters[position]
         holder.nameView.text = toChar.name
-        val avatarUrl = toChar.avatarUri  // e.g. String? in CharacterProfile
+        val avatarUrl = toChar.avatarUri
         if (!avatarUrl.isNullOrEmpty()) {
             Glide.with(holder.avatarView.context)
                 .load(avatarUrl)
@@ -192,10 +194,13 @@ class VNRelAvatarAdapter_FromFixed(
         }
 
         val toKey = slotKeyFor(toChar)
-        val rel = perFromMap.getOrPut(toKey) {
-            VNRelationship(fromSlotKey = fromSlotKey, toSlotKey = toKey)
+        holder.avatarView.setOnClickListener {
+            // FIX: Use the variables native to this specific adapter
+            val freshestRel = perFromMap.getOrPut(toKey) {
+                VNRelationship(fromSlotKey = fromSlotKey, toSlotKey = toKey)
+            }
+            onEdit(freshestRel, toChar)
         }
-        holder.avatarView.setOnClickListener { onEdit(rel, toChar) }
     }
 
     inner class AvatarViewHolder(view: View) : RecyclerView.ViewHolder(view) {

@@ -140,7 +140,8 @@
         android:id="@+id/vnsettingsspacer"
         android:layout_width="match_parent"
         android:layout_height="50dp"
-        app:layout_constraintBottom_toBottomOf="parent"/>
+        app:layout_constraintBottom_toBottomOf="parent" />
+
     <!-- Save button -->
     <Button
         android:id="@+id/saveButton"

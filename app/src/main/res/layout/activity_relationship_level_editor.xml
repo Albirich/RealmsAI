@@ -4,145 +4,146 @@
     android:layout_width="match_parent"
     xmlns:tools="http://schemas.android.com/tools"
     android:fitsSystemWindows="true"
+    android:clipChildren="false"
     android:layout_height="match_parent">
-    <androidx.constraintlayout.widget.ConstraintLayout
-    xmlns:android="http://schemas.android.com/apk/res/android"
-    android:id="@+id/chatRoot"
-    android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:background="@color/deep_space_black"> <com.example.RealmsAI.StarfieldView
-    android:id="@+id/starfieldBackground"
-    android:layout_width="match_parent"
-    android:layout_height="match_parent" />
 
-    <ImageView
-        android:id="@+id/backgroundImageView"
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:id="@+id/chatRoot"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:scaleType="centerCrop"
-        android:alpha="1.0" />
-    <androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+        android:background="@color/deep_space_black">
+
+        <com.example.RealmsAI.StarfieldView
+            android:id="@+id/starfieldBackground"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+    <androidx.constraintlayout.widget.ConstraintLayout
         android:id="@+id/relationshipLevelRoot"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:padding="14dp"
-        android:orientation="vertical">
+        android:layout_height="wrap_content"
+        app:layout_constrainedHeight="true"
+        android:paddingHorizontal="14dp"
+        android:layout_marginTop="10dp"
+        app:layout_constraintVertical_bias="0.0"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toTopOf="@id/btnSaveLevel"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
 
         <ImageView
             android:id="@+id/relationshipoutline"
-            android:layout_width="0dp"
+            android:layout_width="match_parent"
             android:layout_height="0dp"
-            android:layout_marginTop="-10dp"
-            android:paddingTop="10dp"
-            app:layout_constraintTop_toTopOf="@id/upTriggerEdit"
-            app:layout_constraintBottom_toBottomOf="@id/startingpointscontainer"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintEnd_toEndOf="parent"
             android:src="@drawable/outline"
-            android:scaleType="fitXY"/>
-
-        <!-- Up Trigger -->
-        <EditText
-            android:id="@+id/upTriggerEdit"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:hint="What makes the level go UP? (max 100 chars)"
-            android:maxLength="100"
-            android:inputType="text"
-            android:layout_marginHorizontal="16dp"
+            android:scaleType="fitXY"
             app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintBottom_toTopOf="@id/downTriggerEdit"/>
+            app:layout_constraintEnd_toEndOf="parent" />
 
-        <!-- Down Trigger -->
-        <EditText
-            android:id="@+id/downTriggerEdit"
+        <androidx.constraintlayout.widget.ConstraintLayout
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginHorizontal="16dp"
-            android:hint="What makes the level go DOWN? (max 100 chars)"
-            android:maxLength="100"
-            android:inputType="text"
-            app:layout_constraintTop_toBottomOf="@id/upTriggerEdit"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintBottom_toTopOf="@id/levellist"/>
+            android:layout_height="match_parent"
+            android:layout_marginHorizontal="10dp">
 
-        <!-- Levels List -->
-        <TextView
-            android:id="@+id/levellist"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Relationship Levels:"
-            android:textStyle="bold"
-            android:paddingTop="16dp"
-            android:layout_marginHorizontal="16dp"
-            app:layout_constraintTop_toBottomOf="@id/downTriggerEdit"
-            app:layout_constraintEnd_toStartOf="parent"
-            app:layout_constraintBottom_toTopOf="@id/levelsRecycler"/>
+            <EditText
+                android:id="@+id/upTriggerEdit"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:hint="Up Trigger..."
+                android:paddingHorizontal="14dp"
+                app:layout_constraintTop_toTopOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toEndOf="parent" />
 
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/levelsRecycler"
-            android:layout_width="match_parent"
-            android:layout_height="150dp"
-            android:layout_marginBottom="8dp"
-            android:layout_marginHorizontal="16dp"
-            app:layout_constraintTop_toBottomOf="@id/levellist"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintBottom_toTopOf="@id/btnAddLevel"/>
+            <EditText
+                android:id="@+id/downTriggerEdit"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:hint="Down Trigger..."
+                android:paddingHorizontal="14dp"
+                app:layout_constraintTop_toBottomOf="@id/upTriggerEdit"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toEndOf="parent" />
 
-        <!-- Add Level Button -->
-        <Button
-            android:id="@+id/btnAddLevel"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginHorizontal="16dp"
-            android:text="Add Level"
-            app:layout_constraintTop_toBottomOf="@id/levelsRecycler"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintBottom_toTopOf="@id/startingpointscontainer"/>
-
-        <LinearLayout
-            android:id="@+id/startingpointscontainer"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:layout_marginHorizontal="16dp"
-            app:layout_constraintTop_toBottomOf="@id/btnAddLevel"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintBottom_toTopOf="@id/relationshiplevelspacer">
-        <!-- Current Level Picker -->
             <TextView
+                android:id="@+id/levellist"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Set Starting Points:"
-                android:paddingTop="16dp"/>
-            <EditText
-                android:id="@+id/startingPointsEdit"
-                android:layout_width="80dp"
-                android:layout_height="wrap_content"/>
-        </LinearLayout>
-        <ImageView
-            android:id="@+id/relationshiplevelspacer"
-            android:layout_width="match_parent"
-            android:layout_height="80dp"
-            app:layout_constraintTop_toBottomOf="@id/startingpointscontainer"/>
+                android:text="Relationship Levels:"
+                android:layout_marginTop="8dp"
+                android:paddingHorizontal="14dp"
+                app:layout_constraintTop_toBottomOf="@id/downTriggerEdit"
+                app:layout_constraintStart_toStartOf="parent" />
 
-        <!-- Save Button -->
-        <Button
-            android:id="@+id/btnSaveLevel"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Done"
-            android:layout_marginTop="16dp"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintBottom_toBottomOf="parent"/>
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/levelsRecycler"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                app:layout_constrainedHeight="true"
+                android:layout_marginVertical="8dp"
+                android:layout_marginHorizontal="16dp"
+                android:paddingHorizontal="14dp"
+                app:layout_constraintTop_toBottomOf="@id/levellist"
+                app:layout_constraintBottom_toTopOf="@id/startingpointscontainer"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toEndOf="parent" />
 
-</androidx.constraintlayout.widget.ConstraintLayout>
+            <LinearLayout
+                android:id="@+id/startingpointscontainer"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingBottom="16dp"
+                android:paddingHorizontal="14dp"
+                app:layout_constraintTop_toBottomOf="@id/levelsRecycler"
+                app:layout_constraintBottom_toBottomOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toStartOf="@+id/infoButtonRelationshipLevel">
 
-</androidx.constraintlayout.widget.ConstraintLayout>
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Set Starting Points:" />
+
+                <EditText
+                    android:id="@+id/startingPointsEdit"
+                    android:layout_width="80dp"
+                    android:layout_height="wrap_content" />
+
+                <Button
+                    android:id="@+id/btnAddLevel"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Add Level" />
+            </LinearLayout>
+            <include
+                android:id="@+id/infoButtonRelationshipLevel"
+                layout="@layout/info_button"
+                android:layout_width="25dp"
+                android:layout_height="25dp"
+                android:layout_marginStart="8dp"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintTop_toTopOf="@id/startingpointscontainer"
+                app:layout_constraintBottom_toBottomOf="@id/startingpointscontainer"
+                app:layout_constraintStart_toEndOf="@id/startingpointscontainer"
+                android:layout_gravity="center_vertical" />
+        </androidx.constraintlayout.widget.ConstraintLayout>
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+    <Button
+        android:id="@+id/btnSaveLevel"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Done"
+        android:layout_margin="16dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
 </androidx.constraintlayout.widget.ConstraintLayout>

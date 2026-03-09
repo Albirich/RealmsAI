@@ -33,6 +33,7 @@ class LocationAdapter(
     override fun onBindViewHolder(holder: VH, position: Int) {
         val location = locations[position]
 
+        holder.nameEt.text = null
         holder.nameEt.setText(location.name)
         holder.nameEt.setSelection(holder.nameEt.text.length)
         holder.nameEt.isEnabled = !readonly

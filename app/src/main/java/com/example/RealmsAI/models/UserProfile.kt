@@ -1,5 +1,7 @@
 package com.example.RealmsAI.models
 
+import com.google.firebase.firestore.PropertyName
+
 data class UserProfile(
     val handle: String? = null,
     val name: String = "",
@@ -10,9 +12,16 @@ data class UserProfile(
     val friends: List<String> = emptyList(),
     val pendingFriends: List<String> = emptyList(),
     val recentChats: List<String> = emptyList(),
-    val isPremium: Boolean = false,
     val dailyMessageCount: Int = 0,
     val blockedUsers: List<String> = emptyList(),
     val lastMessageDate: String? = null,
-    val badges: List<String> = emptyList()
+    val badges: List<String> = emptyList(),
+
+    @get:PropertyName("isPremium")
+    @set:PropertyName("isPremium")
+    var isPremium: Boolean = false,
+
+    @get:PropertyName("isDev")
+    @set:PropertyName("isDev")
+    var isDev: Boolean = false
 )
