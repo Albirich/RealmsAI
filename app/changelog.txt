@@ -1,18 +1,28 @@
+3.6 Linked characters 2 and Character card imports:
 
-CHANGELOG: Release Update
+added password reset button.
 
-Session Harmonization - Characters are now changed when a session is started to fit the lore and description of the session.
-    - looks at session description and secret description
-    - adds information about other characters in session
-    - prioritizes information from the session over the character profile
+Character Links:
+          Inseparable -  When posing places characters avatar in front or behind the linked character.
+                Characters will appear in the same slot as the linked character, NOT the other way around.
+                Link character from linked character to get it to work both ways.
+                When linking characters depth matters and must be the same throughout all links in a group.
+                Depth is 1, furthest back, to 4, closest forward.
+                You as a creator must adjust pose images in the cropper so they don't completely overlap.
 
-Character Sheets - Added character sheets to all chat sessions
-    - added description, personality, and backstory to charactersheet.
-    - added an expandable mature traits and secrets section if the session isnt sfw only.
+          Timeskip - Replace this character with the linked character, similar to switch but will be done for everyone with a timeskip link all at once.
+                Timeskip button is found under the options.
+                Use ONLY the number of years for the time skip.
+                Selecting a number of years to skip will skip everyone for that year and all years up to that point.
 
-Session Title - Added option to change the title of the session to make the session history activity more understandable.
+          Telepathy - Removed (will be readded when whispering feature is added in)
 
-Chat Messages - Lowered the opacity on chat boxes.
+Character import: In character creation a new button to import character cards. If a .png is used the avatar will be used, if a json is used there will be no avatar added.
+        Character profiles may have fields too large for our platform, may have to used and separated into our fields.
+
+Custom news post: You can now type out a custom post for your followers social tab
+
+In Session Character Sheets: Added the name of the user controlling the character/"AI Controlled"
 
 
 ----ROADMAP----
@@ -21,23 +31,11 @@ Chat Messages - Lowered the opacity on chat boxes.
 
 ✓
 
+    - advanceStoryAct
+    - enforceMonogamy
 
 Phase 1: The "Power User" Update (v1.1)
-    Theme: Control & Stability.
 
-    Architect Visuals (The Aasimar Update):
-
-        Variant Outfits: Support for "Sharingan-style" visual description stacking (Base Outfit + Variant Delta).
-
-        Architect Triggers: Dedicated changeTrigger fields to tell the AI exactly when to swap outfits or activate variants.
-
-        Visual NSFW Pruning: Top-level NSFW flags for Outfits/Variants to keep AI choices within session boundaries.
-
-    God Mode (Director Mode Pro):
-
-        Full edit power over session data.
-
-        Characters recognize God Mode inputs as "Fate" or "GM" rather than a player persona.
 
     Session Management (Extra Options):
 
@@ -47,26 +45,20 @@ Phase 1: The "Power User" Update (v1.1)
 
         Manual NPC Controls: Create/delete NPCs on the fly or halt the "New NPC" generation loop.
 
-    Lore Books (v1): Basic keyword-triggered world info (Factions, Locations) to optimize token usage.
 
-    AI Auto-Complete: The "Magic Wand" in Creator Studio to finish descriptions for lazy architects.
 
-Phase 2: The "Immersion" Update (v1.2)
+
+
+Phase 2: The "Immersion" Update
     Theme: Atmosphere & Parsing.
 
-    Syntax Parsing:
-
-        <Thoughts>: Rendered as Italics/Grey text; hidden from NPC prompts but visible to users.
-
-        ~Whisper~: Logic to target specific characters in the prompt for private dialogue.
+    AI Auto-Complete: The "Magic Wand" in Creator Studio to finish descriptions for lazy architects.
 
     VFX System (Visual Effects): Support for GIF/WebP overlays.
 
     Visual Layering: "Aura" (anchored to sprite) vs. "Environment" (full-screen effects like rain or petals).
 
     Living Engine: the ai controls background locations and characters within.
-
-    LLM Fine-Tuning: Expose Model choice, Temperature, Top P, and Top K settings per session.
 
     Audience Mode: "Ghost" spectators who can watch public sessions in real-time.
 
@@ -85,7 +77,7 @@ Phase 3: The "Crystal" Aesthetics Update (v1.3)
 
             Creator News Feed: "Follow" system and a dedicated tab for new releases from top Architects.
 
-Phase 4: The "VTT & Studio" Expansion (v1.4+)
+Phase 4: The "VTT & Studio" Expansion
     Theme: The Ecosystem.
 
         Character Links (Dynamic Roster): Logic to [Summon] or [Switch] characters mid-session to keep UI clean.
@@ -97,3 +89,5 @@ Phase 4: The "VTT & Studio" Expansion (v1.4+)
         World Builder: Advanced procedural map and dungeon creation logic.
 
 
+CONNECT TO BLUESTACKS
+C:\Users\meuch\AppData\Local\Android\Sdk\platform-tools\adb.exe connect 127.0.0.1:5555

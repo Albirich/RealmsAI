@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#121212"
+    android:padding="16dp">
+
+    <TextView
+        android:id="@+id/linkTitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Character Links"
+        android:textColor="@color/white"
+        android:textSize="24sp"
+        android:textStyle="bold"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <TextView
+        android:id="@+id/linkSubtitle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Warning: Links are one-way. If you want Character A to turn back into Character B, you must also add a link on Character B's profile!"
+        android:textColor="#FF9800"
+        android:textSize="14sp"
+        android:layout_marginTop="8dp"
+        app:layout_constraintTop_toBottomOf="@id/linkTitle" />
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/linksRecycler"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_marginTop="16dp"
+        android:layout_marginBottom="16dp"
+        app:layout_constraintTop_toBottomOf="@id/linkSubtitle"
+        app:layout_constraintBottom_toTopOf="@id/addLinkBtn" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/addLinkBtn"
+        android:layout_width="0dp"
+        android:layout_height="50dp"
+        android:text="Add New Link"
+        android:layout_marginEnd="8dp"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toStartOf="@id/saveLinksBtn"
+        app:layout_constraintBottom_toBottomOf="parent" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/saveLinksBtn"
+        android:layout_width="0dp"
+        android:layout_height="50dp"
+        android:text="Save"
+        android:layout_marginStart="8dp"
+        app:layout_constraintStart_toEndOf="@id/addLinkBtn"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent" />
+
+</androidx.constraintlayout.widget.ConstraintLayout>

@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="24dp">
+
+    <TextView
+        android:id="@+id/dicePromptText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Roll for Strength (+3)"
+        android:textSize="16sp"
+        android:textStyle="bold"
+        android:textColor="#CCCCCC"
+        android:layout_marginBottom="16dp"
+        android:textAlignment="center"/>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center">
+
+        <EditText
+            android:id="@+id/manualDiceInput"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:inputType="numberSigned"
+            android:hint="Final Total"
+            android:textSize="24sp"
+            android:textAlignment="center"
+            android:backgroundTint="#99CCFF"/>
+
+        <Button
+            android:id="@+id/btnRollFairly"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="🎲 Roll d20"
+            android:layout_marginStart="16dp"
+            android:backgroundTint="#333333"/>
+    </LinearLayout>
+</LinearLayout>

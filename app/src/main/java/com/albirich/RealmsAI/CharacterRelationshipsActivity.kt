@@ -1,0 +1,137 @@
+package com.albirich.RealmsAI
+
+import android.app.Activity
+import android.content.Intent
+import android.os.Bundle
+import android.widget.Button
+import android.widget.ImageButton
+import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
+import androidx.appcompat.app.AppCompatActivity
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
+import com.albirich.RealmsAI.models.RELATIONSHIP_TYPES
+import com.albirich.RealmsAI.models.Relationship
+import com.google.gson.Gson
+import kotlin.jvm.java
+
+class CharacterRelationshipActivity : AppCompatActivity() {
+
+    private val relationships = mutableListOf<Relationship>()
+    private lateinit var adapter: SimpleRelationshipAdapter
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_character_relationships)
+
+        val infoButtonCharRelationshipsPage: ImageButton = findViewById(R.id.infoButtonCharRelationshipsPage)
+        infoButtonCharRelationshipsPage.setOnClickListener {
+            AlertDialog.Builder(this@CharacterRelationshipActivity)
+                .setTitle("Relationships")
+                .setMessage("When choosing a character for the relationship you enter a name, this will allow any character with that name to be recognized by the AI.")
+                .setPositiveButton("OK", null)
+                .show()
+        }
+
+        // Set up RecyclerView
+        val recyclerView = findViewById<RecyclerView>(R.id.relationshipRecycler)
+        adapter = SimpleRelationshipAdapter(
+            relationships,
+            onDelete = { rel ->
+                relationships.remove(rel)
+                adapter.notifyDataSetChanged()
+            }
+        )
+        recyclerView.layoutManager = LinearLayoutManager(this)
+        recyclerView.adapter = adapter
+
+        // Load incoming relationships (if editing an existing character)
+        intent.getStringExtra("RELATIONSHIPS_JSON")?.let { json ->
+            if (json.isNotBlank()) {
+                relationships.clear()
+                relationships.addAll(
+                    Gson().fromJson(json, Array<Relationship>::class.java).toList()
+                )
+                adapter.notifyDataSetChanged()
+            }
+        }
+
+        // Add Relationship Button
+        findViewById<Button>(R.id.btnAddCharRelationship).setOnClickListener {
+            showAddRelationshipDialog()
+        }
+
+        // Done Button
+        findViewById<Button>(R.id.btnDone).setOnClickListener {
+            // Return to caller with relationships as JSON
+            val data = Intent().apply {
+                putExtra("RELATIONSHIPS_JSON", Gson().toJson(relationships))
+            }
+            setResult(Activity.RESULT_OK, data)
+            finish()
+        }
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+
+        if (requestCode == REQUEST_EDIT_RELATIONSHIP_LEVEL && resultCode == Activity.RESULT_OK) {
+            val updatedJson = data?.getStringExtra("UPDATED_RELATIONSHIP_JSON")
+            val index = data?.getIntExtra("REL_INDEX", -1) ?: -1
+
+            if (!updatedJson.isNullOrBlank() && index in relationships.indices) {
+                val updatedRel = Gson().fromJson(updatedJson, Relationship::class.java)
+                relationships[index] = updatedRel
+                adapter.notifyItemChanged(index)
+            }
+        }
+    }
+
+    companion object {
+        const val REQUEST_EDIT_RELATIONSHIP_LEVEL = 211
+    }
+
+    private fun showAddRelationshipDialog() {
+        val dialogView = layoutInflater.inflate(R.layout.dialog_add_relationship, null)
+        val toNameEdit = dialogView.findViewById<android.widget.EditText>(R.id.relationshipToNameEdit)
+        val typeSpinner = dialogView.findViewById<android.widget.Spinner>(R.id.relationshipTypeSpinner)
+        val summaryEdit = dialogView.findViewById<android.widget.EditText>(R.id.relationshipSummaryEdit)
+
+        typeSpinner.adapter = android.widget.ArrayAdapter(
+            this,
+            android.R.layout.simple_spinner_dropdown_item,
+            RELATIONSHIP_TYPES
+        )
+
+        AlertDialog.Builder(this)
+            .setTitle("Add Relationship")
+            .setView(dialogView)
+            .setPositiveButton("Add") { _, _ ->
+                val toName = toNameEdit.text.toString().trim()
+                val type = RELATIONSHIP_TYPES[typeSpinner.selectedItemPosition]
+                val summary = summaryEdit.text.toString().trim()
+
+                // --- ENFORCED VALIDATION ---
+                if (toName.isEmpty()) {
+                    Toast.makeText(this, "Please enter a name.", Toast.LENGTH_SHORT).show()
+                } else if (toName.length > 20) {
+                    Toast.makeText(this, "Name is too long (Max 20).", Toast.LENGTH_SHORT).show()
+                } else if (summary.length > 80) {
+                    Toast.makeText(this, "Summary is too long (Max 80).", Toast.LENGTH_SHORT).show()
+                } else {
+                    // Success: All limits respected
+                    relationships.add(
+                        Relationship(
+                            fromId = "",
+                            toName = toName,
+                            type = type,
+                            description = summary
+                        )
+                    )
+                    adapter.notifyDataSetChanged()
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+}

@@ -13,6 +13,7 @@
         android:id="@+id/outfitNameEditText"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:paddingHorizontal="10dp"
         app:layout_constraintTop_toTopOf="parent"
         android:hint="Outfit Name"/>
 
@@ -36,7 +37,8 @@
         app:layout_constraintTop_toBottomOf="@id/outfitNameEditText"
         android:scaleType="fitXY"
         android:layout_gravity="end"
-        android:layout_marginTop="8dp" />
+        android:layout_marginTop="8dp"
+        android:layout_marginEnd="5dp"/>
 
     <ImageButton
         android:id="@+id/deletePoseButton"
@@ -50,6 +52,115 @@
         android:scaleType="fitXY"
         android:layout_gravity="end"
         android:layout_marginStart="8dp"
+        android:layout_marginTop="8dp"
+        android:layout_marginEnd="5dp"/>
+
+    <Button
+        android:id="@+id/nsfwOutfitButton"
+        android:layout_width="wrap_content"
+        android:layout_height="0dp"
+        app:layout_constraintTop_toTopOf="@id/outfitNameEditText"
+        app:layout_constraintBottom_toBottomOf="@id/outfitNameEditText"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:text="nsfw"
+        android:scaleType="fitEnd"
+        android:padding="7dp"
+        android:src="@drawable/sfw_badge"/>
+
+    <EditText
+        android:id="@+id/outfitDescriptionEditText"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="10dp"
+        android:layout_marginEnd="10dp"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/poseRecycler"
+        app:layout_constraintEnd_toStartOf="@+id/variantAddBtn"
+        app:counterEnabled="true"
+        app:counterMaxLength="80"
+        android:textColor="@color/white"
+        app:helperTextTextColor="@color/white"
+        app:counterTextColor="@color/white"
+        android:hint="Describe the outfit so the AI \n knows how they look."/>
+
+    <TextView
+        android:id="@+id/transformationToggle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="+ Add Transformation Overrides"
+        android:textColor="@color/purple_500"
+        android:textStyle="bold"
+        android:padding="8dp"
+        app:layout_constraintTop_toBottomOf="@id/outfitDescriptionEditText"
+        app:layout_constraintStart_toStartOf="parent"
+        android:layout_marginTop="8dp" />
+
+    <LinearLayout
+        android:id="@+id/transformationContainer"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:visibility="gone"
+        app:layout_constraintTop_toBottomOf="@id/transformationToggle"
+        app:layout_constraintStart_toStartOf="parent"
+        android:layout_marginTop="4dp"
+        android:padding="8dp"
+        android:background="#1AFFFFFF"> <EditText
+        android:id="@+id/heightOverrideEt"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="New Height (Leave blank for default)"
+        android:textSize="14sp" />
+
+        <EditText
+            android:id="@+id/weightOverrideEt"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="New Weight (Leave blank for default)"
+            android:textSize="14sp" />
+
+        <EditText
+            android:id="@+id/eyeColorOverrideEt"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="New Eye Color (Leave blank for default)"
+            android:textSize="14sp" />
+
+        <EditText
+            android:id="@+id/hairColorOverrideEt"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="New Hair Color (Leave blank for default)"
+            android:textSize="14sp" />
+
+        <EditText
+            android:id="@+id/physicalDescOverrideEt"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="New Physical Description (Leave blank for default)"
+            android:minLines="2"
+            android:textSize="14sp" />
+    </LinearLayout>
+
+    <Button
+        android:id="@+id/variantAddBtn"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        app:layout_constraintStart_toEndOf="@id/outfitDescriptionEditText"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="@id/outfitDescriptionEditText"
+        app:layout_constraintBottom_toBottomOf="@id/outfitDescriptionEditText"
+        android:text="Variant"/>
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/variantRecycler"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        app:layout_constraintTop_toBottomOf="@id/outfitDescriptionEditText"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:flow_horizontalAlign="start"
+        android:layout_marginStart="20dp"
         android:layout_marginTop="8dp"/>
 
 </androidx.constraintlayout.widget.ConstraintLayout>

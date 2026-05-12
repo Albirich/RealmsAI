@@ -10,7 +10,7 @@
         android:id="@+id/chatRoot"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="@color/deep_space_black"> <com.example.RealmsAI.StarfieldView
+        android:background="@color/deep_space_black"> <com.albirich.RealmsAI.StarfieldView
         android:id="@+id/starfieldBackground"
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
@@ -98,12 +98,12 @@
         android:clipChildren="false"
         android:clipToPadding="false">
 
-        <!-- Back left (Bot 3) -->
-        <ImageView
-            android:id="@+id/botAvatar2ImageView"
+        <!-- Back left (Bot 2) -->
+        <FrameLayout
+            android:id="@+id/anchor2"
             android:layout_width="0dp"
             android:layout_height="0dp"
-            app:layout_constraintEnd_toStartOf="@id/botAvatar0ImageView"
+            app:layout_constraintEnd_toStartOf="@id/anchor0"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent"
             android:translationX="30dp"
@@ -112,14 +112,45 @@
             android:scaleType="fitCenter"
             android:src="@drawable/silhouette"
             android:alpha="0.80"
-            android:scaleX="-1" />
+            android:scaleX="-1"
+            android:clipChildren="false">
 
-        <!-- Back right (Bot 4) -->
-        <ImageView
-            android:id="@+id/botAvatar3ImageView"
+            <ImageView
+                android:id="@+id/anchor2_depth1"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="fitCenter"
+                android:src="@drawable/silhouette"/>
+
+            <ImageView
+                android:id="@+id/anchor2_depth2"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="fitCenter"
+                android:visibility="gone"/>
+
+            <ImageView
+                android:id="@+id/anchor2_depth3"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="fitCenter"
+                android:visibility="gone"/>
+
+            <ImageView
+                android:id="@+id/anchor2_depth4"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="fitCenter"
+                android:visibility="gone"/>
+
+        </FrameLayout>
+        <!-- Back right (Bot 3) -->
+
+        <FrameLayout
+            android:id="@+id/anchor3"
             android:layout_width="0dp"
             android:layout_height="0dp"
-            app:layout_constraintStart_toEndOf="@id/botAvatar1ImageView"
+            app:layout_constraintStart_toEndOf="@id/anchor1"
             android:translationX="-30dp"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintTop_toTopOf="parent"
@@ -127,11 +158,41 @@
             app:layout_constraintHeight_percent="0.70"
             android:scaleType="fitCenter"
             android:src="@drawable/silhouette"
-            android:alpha="0.80" />
+            android:alpha="0.80">
 
-        <!-- Front left (Bot 1) -->
-        <ImageView
-            android:id="@+id/botAvatar0ImageView"
+            <ImageView
+                android:id="@+id/anchor3_depth1"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="fitCenter"
+                android:src="@drawable/silhouette"/>
+
+            <ImageView
+                android:id="@+id/anchor3_depth2"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="fitCenter"
+                android:visibility="gone"/>
+
+            <ImageView
+                android:id="@+id/anchor3_depth3"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="fitCenter"
+                android:visibility="gone"/>
+
+            <ImageView
+                android:id="@+id/anchor3_depth4"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="fitCenter"
+                android:visibility="gone"/>
+
+        </FrameLayout>
+
+        <!-- Front left (Bot 0) -->
+        <FrameLayout
+            android:id="@+id/anchor0"
             android:layout_width="0dp"
             android:layout_height="0dp"
             android:translationX="-75dp"
@@ -141,11 +202,41 @@
             app:layout_constraintStart_toStartOf="parent"
             android:scaleType="fitCenter"
             android:scaleY="1"
-            android:src="@drawable/silhouette" />
+            android:src="@drawable/silhouette">
 
-        <!-- Front right (Bot 2) -->
-        <ImageView
-            android:id="@+id/botAvatar1ImageView"
+            <ImageView
+                android:id="@+id/anchor0_depth1"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="fitCenter"
+                android:src="@drawable/silhouette"/>
+
+            <ImageView
+                android:id="@+id/anchor0_depth2"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="fitCenter"
+                android:visibility="gone"/>
+
+            <ImageView
+                android:id="@+id/anchor0_depth3"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="fitCenter"
+                android:visibility="gone"/>
+
+            <ImageView
+                android:id="@+id/anchor0_depth4"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="fitCenter"
+                android:visibility="gone"/>
+
+        </FrameLayout>
+
+        <!-- Front right (Bot 1) -->
+        <FrameLayout
+            android:id="@+id/anchor1"
             android:layout_width="0dp"
             android:layout_height="0dp"
             android:translationX="75dp"
@@ -154,15 +245,45 @@
             app:layout_constraintHeight_percent="1"
             app:layout_constraintWidth_percent="1"
             android:scaleType="fitCenter"
-            android:src="@drawable/silhouette" />
+            android:src="@drawable/silhouette">
+
+            <ImageView
+                android:id="@+id/anchor1_depth1"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="fitCenter"
+                android:src="@drawable/silhouette"/>
+
+            <ImageView
+                android:id="@+id/anchor1_depth2"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="fitCenter"
+                android:visibility="gone"/>
+
+            <ImageView
+                android:id="@+id/anchor1_depth3"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="fitCenter"
+                android:visibility="gone"/>
+
+            <ImageView
+                android:id="@+id/anchor1_depth4"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="fitCenter"
+                android:visibility="gone"/>
+
+        </FrameLayout>
 
         <!-- Dice Image -->
         <ImageView
             android:id="@+id/diceImageView"
             android:layout_width="0dp"
             android:layout_height="0dp"
-            app:layout_constraintEnd_toStartOf="@id/botAvatar3ImageView"
-            app:layout_constraintStart_toEndOf="@id/botAvatar2ImageView"
+            app:layout_constraintEnd_toStartOf="@id/anchor3"
+            app:layout_constraintStart_toEndOf="@id/anchor2"
             app:layout_constraintTop_toTopOf="parent"
             android:layout_marginTop="125dp"
             android:src="@drawable/ic_dice"
@@ -694,7 +815,7 @@
                 android:id="@+id/modelLabel"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="AI Model:"
+                android:text="AI Model (ordered by openrouter rankings):"
                 android:textColor="#CCCCCC"
                 android:textStyle="bold"
                 app:layout_constraintTop_toTopOf="parent"
@@ -762,6 +883,16 @@
                 app:layout_constraintEnd_toEndOf="@id/RPGInstructions"
                 android:contentDescription="Enter director mode"/>
 
+            <Button
+                android:id="@+id/eventsBtn"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:text="Events"
+                android:layout_marginTop="16dp"
+                app:layout_constraintTop_toBottomOf="@id/directorBtn"
+                app:layout_constraintStart_toStartOf="@id/directorBtn"
+                app:layout_constraintEnd_toEndOf="@id/directorBtn"
+                android:contentDescription="Activate events"/>
 
             <Button
                 android:id="@+id/titleBtn"
@@ -769,9 +900,50 @@
                 android:layout_height="wrap_content"
                 android:text="Change Title"
                 android:layout_marginTop="16dp"
-                app:layout_constraintTop_toBottomOf="@id/directorBtn"
+                app:layout_constraintTop_toBottomOf="@id/eventsBtn"
                 app:layout_constraintStart_toStartOf="parent"
                 android:contentDescription="changes the title of the session"/>
+
+            <Button
+                android:id="@+id/pinnedMessagesBtn"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Pinned Msgs"
+                android:layout_marginTop="16dp"
+                app:layout_constraintTop_toBottomOf="@id/titleBtn"
+                app:layout_constraintStart_toStartOf="parent"
+                android:contentDescription="View pinned messages"/>
+
+
+            <Button
+                android:id="@+id/timeskipBtn"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="TimeSkip"
+                android:layout_marginTop="16dp"
+                app:layout_constraintTop_toBottomOf="@id/pinnedMessagesBtn"
+                app:layout_constraintStart_toStartOf="parent"
+                android:contentDescription="Time Skip links"/>
+
+            <Button
+                android:id="@+id/cloneBtn"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Branch Chat"
+                android:layout_marginTop="16dp"
+                app:layout_constraintTop_toBottomOf="@id/colorblindModeBtn"
+                app:layout_constraintStart_toStartOf="parent"
+                android:contentDescription="Create a clone"/>
+
+            <Button
+                android:id="@+id/colorblindModeBtn"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Colorblind: OFF"
+                android:layout_marginTop="16dp"
+                app:layout_constraintTop_toBottomOf="@id/cloneBtn"
+                app:layout_constraintStart_toStartOf="parent"
+                android:contentDescription="Toggle high contrast colorblind mode"/>
 
             <TextView
                 android:id="@+id/optionsMessageCounter"
@@ -784,6 +956,7 @@
                 android:layout_marginBottom="12dp"
                 app:layout_constraintTop_toTopOf="@id/resetTyping"
                 app:layout_constraintEnd_toEndOf="parent"/>
+
         </androidx.constraintlayout.widget.ConstraintLayout>
 
     </androidx.constraintlayout.widget.ConstraintLayout>

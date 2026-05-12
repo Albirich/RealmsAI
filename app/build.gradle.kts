@@ -14,28 +14,31 @@ plugins {
     id("com.google.gms.google-services")
 }
 
-
-
 android {
-    namespace   = "com.example.RealmsAI"
+    namespace   = "com.albirich.RealmsAI"
     compileSdk  = 35
 
+
     defaultConfig {
-        applicationId = "com.example.RealmsAI"
+        applicationId = "com.albirich.RealmsAI"
         minSdk        = 23
         targetSdk     = 35
-        versionCode   = 1
-        versionName   = "0.2.4"
+        versionCode   = 9
+        versionName   = "0.3.6"
 
         // grab your secrets
         val openaiKey  = localProps.getProperty("OPENAI_API_KEY",  "")
         val mixtralKey = localProps.getProperty("MIXTRAL_API_KEY",  "")
         val mixtralUrl = localProps.getProperty("MIXTRAL_URL",      "")
+        val mancerKey = localProps.getProperty("MANCER_API_KEY",  "")
+        val mancerUrl = localProps.getProperty("MANCER_URL",      "")
 
         // inject into BuildConfig
         buildConfigField("String", "OPENAI_API_KEY",  "\"$openaiKey\"")
         buildConfigField("String", "MIXTRAL_API_KEY", "\"$mixtralKey\"")
         buildConfigField("String", "MIXTRAL_URL",     "\"$mixtralUrl\"")
+        buildConfigField("String", "MANCER_API_KEY",  "\"$mancerKey\"")
+        buildConfigField("String", "MANCER_URL",      "\"$mancerUrl\"")
     }
 
     buildFeatures {
@@ -70,6 +73,10 @@ android {
         // you can hard-code or pull from your TOML’s versions
         kotlinCompilerExtensionVersion = "2.0.21"
     }
+
+    lint {
+        abortOnError; false
+    }
 }
 
 dependencies {
@@ -82,6 +89,7 @@ dependencies {
     debugImplementation("androidx.compose.ui:ui-tooling:1.6.0")
     implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
     implementation("com.squareup.okhttp3:okhttp:4.10.0")
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
 
 
     // AndroidX & UI
@@ -89,7 +97,7 @@ dependencies {
     implementation("com.google.android.material:material:1.11.0")
     implementation("androidx.recyclerview:recyclerview:1.2.1")
     implementation("androidx.constraintlayout:constraintlayout:2.1.4")
-    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.6.1")
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.6.2")
     implementation("androidx.activity:activity-ktx:1.7.2")
 
     // Use the Compose BOM to pull in consistent versions:

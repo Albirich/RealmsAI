@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools">
+    package="com.albirich.RealmsAI">
 
 
     <application
@@ -40,8 +40,6 @@
         <activity android:name=".SessionRelationshipActivity"/>
         <activity android:name=".ChatRelationshipActivity"/>
         <activity android:name=".CharacterRelationshipActivity"/>
-        <activity android:name=".BackgroundGalleryActivity"/>
-        <activity android:name=".CollectionActivity"/>
         <activity android:name=".ChatCollectionActivity"/>
         <activity android:name=".ChatMapActivity"/>
         <activity android:name=".DisplayProfileActivity"/>
@@ -52,6 +50,14 @@
         <activity android:name=".RelationshipLevelEditorActivity"/>
         <activity android:name=".VNSettingsActivity"/>
         <activity android:name=".UpgradeActivity"/>
+        <activity android:name=".EventsActivity"/>
+        <activity android:name=".AreaCreationActivity"/>
+        <activity android:name=".LorebookCreationActivity"/>
+        <activity android:name=".ChatLoreActivity"/>
+        <activity android:name=".NewsFeedActivity"/>
+        <activity android:name=".LorebookProfileActivity"/>
+        <activity android:name=".AreaProfileActivity"/>
+        <activity android:name=".CharacterLinkActivity"/>
 
 
 

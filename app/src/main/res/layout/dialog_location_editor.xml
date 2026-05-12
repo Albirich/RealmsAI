@@ -49,6 +49,8 @@
             android:hint="Location Name (e.g. The Tavern)"
             app:counterEnabled="true"
             app:counterMaxLength="20"
+            android:maxLength="20"
+            android:textColorHint="@color/black"
             android:inputType="textCapWords"
             android:layout_marginBottom="12dp"/>
 
@@ -60,8 +62,9 @@
             android:inputType="textMultiLine|textCapSentences"
             app:counterEnabled="true"
             app:counterMaxLength="100"
+            android:textColorHint="@color/black"
             android:minLines="3"
-            android:maxLength="200"
+            android:maxLength="100"
             android:gravity="top|start"
             android:layout_marginBottom="24dp"/>
 

@@ -38,7 +38,7 @@
         android:layout_height="wrap_content"
         android:padding="8dp"
         app:counterEnabled="true"
-        app:counterMaxLength="80"
+        app:counterMaxLength="150"
         app:helperText="A short description of the character. This is what will show on the preview.">
 
         <com.google.android.material.textfield.TextInputEditText

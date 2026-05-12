@@ -1,0 +1,543 @@
+package com.albirich.RealmsAI
+
+import android.content.Intent
+import android.os.Bundle
+import android.view.View
+import android.widget.Button
+import android.widget.ImageButton
+import android.widget.ImageView
+import android.widget.LinearLayout
+import android.widget.TextView
+import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
+import com.bumptech.glide.Glide
+import com.albirich.RealmsAI.SessionManager.findSessionForUser
+import com.albirich.RealmsAI.models.CharacterPreview
+import com.albirich.RealmsAI.models.CharacterProfile
+import com.albirich.RealmsAI.models.ChatProfile
+import com.albirich.RealmsAI.models.DirectMessage
+import com.albirich.RealmsAI.models.MessageStatus
+import com.albirich.RealmsAI.models.MessageType
+import com.albirich.RealmsAI.models.UserProfile
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FieldPath
+import com.google.firebase.firestore.FieldValue
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.gson.Gson
+
+class DisplayProfileActivity : BaseActivity() {
+
+    private lateinit var avatarView: ImageView
+    private lateinit var nameView: TextView
+    private lateinit var handleView: TextView
+    private lateinit var bioView: TextView
+    private lateinit var followButton: Button
+    private lateinit var addFriendButton: Button
+    private lateinit var optionsMenu: ImageButton
+    private lateinit var actionButtonsContainer: LinearLayout
+
+    private lateinit var picksRecycler: RecyclerView
+    private lateinit var charactersRecycler: RecyclerView
+    private lateinit var chatsRecycler: RecyclerView
+
+    private var targetUserId: String = ""
+    private var targetUserProfile: UserProfile? = null
+
+    private val db = FirebaseFirestore.getInstance()
+    private val currentUserId: String? get() = FirebaseAuth.getInstance().currentUser?.uid
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.profile_display)
+        setupBottomNav()
+
+        // 1. Get userId to display (could come from intent or deep link)
+        val profileUserId = intent.getStringExtra("userId") ?: run {
+            Toast.makeText(this, "No user specified!", Toast.LENGTH_SHORT).show()
+            finish()
+            return
+        }
+
+        targetUserId = intent.getStringExtra("userId") ?: return finish()
+        val myId = FirebaseAuth.getInstance().currentUser?.uid ?: ""
+
+        // 2. Bind views
+        avatarView = findViewById(R.id.displayProfileAvatar)
+        nameView = findViewById(R.id.displayProfileName)
+        handleView = findViewById(R.id.displayProfileHandle)
+        bioView = findViewById(R.id.displayProfileBio)
+        followButton = findViewById(R.id.displayFollowButton)
+        addFriendButton = findViewById(R.id.displayAddFriendButton)
+        optionsMenu = findViewById(R.id.displayOptionsMenu)
+        actionButtonsContainer = findViewById(R.id.displayActionButtons)
+
+        charactersRecycler = findViewById(R.id.displayCharactersRecyclerView)
+        chatsRecycler = findViewById(R.id.displayChatsRecyclerView)
+
+        charactersRecycler.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
+        chatsRecycler.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
+
+        // 3. Hide addFriend/report if viewing own profile
+        if (profileUserId == currentUserId) {
+            actionButtonsContainer.visibility = View.GONE
+            optionsMenu.visibility = View.GONE
+            followButton.visibility = View.GONE
+        }
+
+        // 4. Attach Click Listeners
+        addFriendButton.setOnClickListener {
+            val fromId = currentUserId ?: return@setOnClickListener
+            sendFriendRequest(fromId, targetUserId)
+        }
+
+        optionsMenu.setOnClickListener {
+            val myId = currentUserId ?: return@setOnClickListener
+            // This is the dialog we built yesterday! It acts as our menu.
+            showBlockOptionsDialog(myId)
+        }
+
+        // 4. Load profile data
+        loadProfile(profileUserId)
+    }
+
+    private fun loadProfile(userId: String) {
+        // 1. Safety Check: Prevent "Invalid document reference" crash
+        if (userId.isBlank()) {
+            Toast.makeText(this, "Invalid user ID.", Toast.LENGTH_SHORT).show()
+            finish()
+            return
+        }
+
+        db.collection("users").document(userId).get()
+            .addOnSuccessListener { doc ->
+                // 2. Safety Check: Prevent Glide from crashing if the user pressed the back button early
+                if (isDestroyed || isFinishing) return@addOnSuccessListener
+
+                val profile = doc.toObject(UserProfile::class.java)
+                if (profile == null) {
+                    Toast.makeText(this, "Profile not found.", Toast.LENGTH_SHORT).show()
+                    finish()
+                    return@addOnSuccessListener
+                }
+
+                // Provide fallback strings just in case the database fields are null
+                nameView.text = profile.name ?: "Unknown User"
+                handleView.text = if (!profile.handle.isNullOrBlank()) "@${profile.handle}" else ""
+                bioView.text = profile.bio ?: ""
+
+                if (!profile.iconUrl.isNullOrBlank()) {
+                    Glide.with(this).load(profile.iconUrl).into(avatarView)
+                } else {
+                    avatarView.setImageResource(R.drawable.placeholder_avatar)
+                }
+
+                // Load badges
+                loadBadges(profile)
+
+                // Load user's public characters
+                loadUserCharacters(userId)
+
+                // Load user's public chats
+                loadUserChats(userId)
+            }
+            .addOnFailureListener {
+                // Safety Check here too!
+                if (isDestroyed || isFinishing) return@addOnFailureListener
+
+                Toast.makeText(this, "Error loading profile.", Toast.LENGTH_SHORT).show()
+                finish()
+            }
+    }
+
+    private fun loadBadges(profile: UserProfile) {
+        val badgesContainer = findViewById<LinearLayout>(R.id.badgesContainer)
+        badgesContainer.removeAllViews() // Clear previous
+
+        val badgeList = profile.badges.toMutableList()
+
+        // Auto-add Premium badge if boolean is true
+        if (profile.isPremium && !badgeList.contains("premium")) {
+            badgeList.add(0, "premium")
+        }
+
+        badgeList.forEach { badgeType ->
+            val badgeIcon = ImageView(this)
+            val params = LinearLayout.LayoutParams(60, 60) // Size in pixels (~24dp)
+            params.setMargins(4, 0, 4, 0)
+            badgeIcon.layoutParams = params
+
+            // Map string -> Drawable Resource
+            val drawableId = when (badgeType.lowercase()) {
+                "founder" -> R.drawable.badge_founder  // You need this icon
+                "beta"    -> R.drawable.badge_beta     // You need this icon
+                "premium" -> R.drawable.badge_premium  // You need this icon
+                "verified"-> R.drawable.badge_verified    // Standard checkmark
+                else -> R.drawable.ic_star             // Fallback
+            }
+
+            badgeIcon.setImageResource(drawableId)
+
+            // Optional: Click to see what the badge is
+            badgeIcon.setOnClickListener {
+                Toast.makeText(this, "${badgeType.capitalize()} Badge", Toast.LENGTH_SHORT).show()
+            }
+
+            badgesContainer.addView(badgeIcon)
+        }
+    }
+
+
+    private fun sendFriendRequest(fromId: String, toId: String) {
+        val usersRef = db.collection("users")
+        val fromDoc = usersRef.document(fromId)
+        val toDoc = usersRef.document(toId)
+        toDoc.get().addOnSuccessListener { doc ->
+            val profile = doc.toObject(UserProfile::class.java)
+            if (profile != null) {
+                when {
+                    profile.friends.contains(fromId) -> {
+                        Toast.makeText(this, "You are already friends!", Toast.LENGTH_SHORT).show()
+                    }
+                    profile.pendingFriends.contains(fromId) -> {
+                        Toast.makeText(this, "Request already sent!", Toast.LENGTH_SHORT).show()
+                    }
+                    else -> {
+                        // Add fromId to pendingFriends in recipient profile
+                        toDoc.update("pendingFriends", profile.pendingFriends + fromId)
+                            .addOnSuccessListener {
+                                Toast.makeText(this, "Friend request sent!", Toast.LENGTH_SHORT).show()
+                                addFriendButton.isEnabled = false
+                                sendFriendRequestMessage(fromId, toId)
+                            }
+                            .addOnFailureListener {
+                                Toast.makeText(this, "Failed to send friend request.", Toast.LENGTH_SHORT).show()
+                            }
+                    }
+                }
+            } else {
+                Toast.makeText(this, "User not found.", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private fun sendFriendRequestMessage(fromId: String, toId: String) {
+        val db = FirebaseFirestore.getInstance()
+        val messagesCollection = db.collection("users").document(toId).collection("messages")
+
+        val newMessageRef = messagesCollection.document()
+        db.collection("users").document(fromId).get()
+            .addOnSuccessListener { fromDoc ->
+                val senderName = fromDoc.getString("name") ?: "(unknown)"
+                val message = DirectMessage(
+                    id = newMessageRef.id,
+                    from = fromId,
+                    to = toId,
+                    text = "You have a new friend request from: $senderName",
+                    timestamp = com.google.firebase.Timestamp.now(),
+                    status = MessageStatus.UNOPENED,
+                    type = MessageType.FRIEND_REQUEST
+                )
+                newMessageRef.set(message)
+                    .addOnSuccessListener {
+                        // Optional: Toast or log here if you want
+                    }
+                    .addOnFailureListener { e ->
+                        Toast.makeText(this, "Failed to notify user: ${e.message}", Toast.LENGTH_SHORT).show()
+                    }
+            }
+    }
+
+    private fun checkFollowStatus(myId: String, targetId: String) {
+        db.collection("users").document(myId).get().addOnSuccessListener { doc ->
+            if (isDestroyed || isFinishing) return@addOnSuccessListener
+
+            val myProfile = doc.toObject(UserProfile::class.java) ?: return@addOnSuccessListener
+
+            // Check if target is already in our following list
+            val isFollowing = myProfile.following.contains(targetId)
+
+            if (isFollowing) {
+                followButton.text = "Unfollow"
+                followButton.setBackgroundColor(getColor(android.R.color.darker_gray))
+            } else {
+                followButton.text = "Follow"
+                // Assuming you have a colors.xml value, otherwise use a hex color
+                followButton.setBackgroundColor(android.graphics.Color.parseColor("#8A2BE2"))
+            }
+
+            // Set the toggle action
+            followButton.setOnClickListener {
+                followButton.isEnabled = false // Prevent double-clicks
+                toggleFollow(myId, targetId, !isFollowing)
+            }
+        }
+    }
+
+    private fun toggleFollow(myId: String, targetId: String, follow: Boolean) {
+        val docRef = db.collection("users").document(myId)
+
+        if (follow) {
+            docRef.update("following", FieldValue.arrayUnion(targetId))
+                .addOnSuccessListener {
+                    Toast.makeText(this, "Followed!", Toast.LENGTH_SHORT).show()
+                    followButton.isEnabled = true
+                    checkFollowStatus(myId, targetId) // Refresh UI
+                }
+                .addOnFailureListener {
+                    followButton.isEnabled = true
+                }
+        } else {
+            docRef.update("following", FieldValue.arrayRemove(targetId))
+                .addOnSuccessListener {
+                    Toast.makeText(this, "Unfollowed.", Toast.LENGTH_SHORT).show()
+                    followButton.isEnabled = true
+                    checkFollowStatus(myId, targetId) // Refresh UI
+                }
+                .addOnFailureListener {
+                    followButton.isEnabled = true
+                }
+        }
+    }
+
+    private fun showBlockOptionsDialog(myId: String) {
+        val options = arrayOf("Block User", "Report & Block")
+
+        AlertDialog.Builder(this)
+            .setTitle("Block ${targetUserProfile?.handle ?: "User"}?")
+            .setItems(options) { dialog, which ->
+                when (which) {
+                    0 -> {
+                        // Option A: Just Block
+                        blockUser(myId)
+                        Toast.makeText(this, "User blocked.", Toast.LENGTH_SHORT).show()
+                        finish() // Close profile immediately
+                    }
+                    1 -> {
+                        // Option B: Report + Block
+                        showReportDialog(myId)
+                    }
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun showReportDialog(myId: String) {
+        val reasons = arrayOf("Inappropriate Content", "Harassment", "Spam / Bot", "Other")
+
+        AlertDialog.Builder(this)
+            .setTitle("Report & Block User")
+            .setSingleChoiceItems(reasons, -1) { dialog, which ->
+                val reason = reasons[which]
+                sendReport(myId, reason)
+                blockUser(myId)
+                dialog.dismiss()
+                Toast.makeText(this, "User reported and blocked.", Toast.LENGTH_LONG).show()
+                finish() // Close profile after blocking
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun sendReport(myId: String, reason: String) {
+        val reportBody = """
+            REPORT FILED
+            ----------------
+            Reporter ID: $myId
+            Reported User ID: $targetUserId
+            Reason: $reason
+            Date: ${java.util.Date()}
+            
+            REPORTED PROFILE DATA:
+            Handle: ${targetUserProfile?.handle}
+            Name: ${targetUserProfile?.name}
+            Bio: ${targetUserProfile?.bio}
+        """.trimIndent()
+
+        val emailIntent = Intent(Intent.ACTION_SEND).apply {
+            type = "message/rfc822"
+            putExtra(Intent.EXTRA_EMAIL, arrayOf("realmsai.report@gmail.com"))
+            putExtra(Intent.EXTRA_SUBJECT, "USER REPORT: $reason")
+            putExtra(Intent.EXTRA_TEXT, reportBody)
+        }
+
+        try {
+            startActivity(Intent.createChooser(emailIntent, "Send Report..."))
+        } catch (e: Exception) {
+            Toast.makeText(this, "No email client found.", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun blockUser(myId: String) {
+        // Add targetUserId to my 'blockedUsers' list
+        FirebaseFirestore.getInstance().collection("users").document(myId)
+            .update("blockedUsers", FieldValue.arrayUnion(targetUserId))
+            .addOnFailureListener {
+                // Fallback if field doesn't exist yet
+                FirebaseFirestore.getInstance().collection("users").document(myId)
+                    .update("blockedUsers", listOf(targetUserId))
+            }
+    }
+
+    // Loads only public characters authored by this user
+    private fun loadUserCharacters(userId: String) {
+        db.collection("characters")
+            .whereEqualTo("author", userId)
+            .whereEqualTo("private", false)
+            .get()
+            .addOnSuccessListener { snap ->
+                val list = snap.documents.mapNotNull { doc ->
+                    val cp = doc.toObject(CharacterProfile::class.java)?.copy(id = doc.id) ?: return@mapNotNull null
+                    CharacterPreview(
+                        id = cp.id,
+                        originalId = cp.originalId,
+                        name = cp.name,
+                        summary = cp.summary.orEmpty(),
+                        avatarUri = cp.avatarUri,
+                        avatarResId = cp.avatarResId ?: R.drawable.placeholder_avatar,
+                        author = cp.author,
+                        rawJson = Gson().toJson(cp)
+                    )
+                }
+                val adapter = CharacterPreviewAdapter(
+                    context = this,
+                    items = list,
+                    onClick = { preview ->
+                        startActivity(Intent(this, CharacterProfileActivity::class.java)
+                            .putExtra("characterId", preview.id))
+                    },
+                    itemLayoutRes = R.layout.profile_character_preview_item,
+                    onLongClick = { preview ->
+                        AlertDialog.Builder(this)
+                            .setTitle(preview.name)
+                            .setItems(arrayOf("Profile", "Creator")) { _, which ->
+                                when (which) {
+                                    0 -> startActivity(Intent(this, CharacterProfileActivity::class.java)
+                                        .putExtra("characterId", preview.id))
+                                    1 -> startActivity(Intent(this, DisplayProfileActivity::class.java)
+                                        .putExtra("userId", preview.author))
+                                }
+                            }
+                            .show()
+                    }
+                )
+                charactersRecycler.adapter = adapter
+            }
+            .addOnFailureListener { e ->
+                Toast.makeText(this, "Failed to load characters: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+    }
+
+    // Loads only public chats authored by this user
+    private fun loadUserChats(userId: String) {
+        db.collection("chats")
+            .whereEqualTo("author", userId)
+            .whereEqualTo("private", false)
+            .get()
+            .addOnSuccessListener { snap ->
+                val chatList = mutableListOf<ChatPreview>()
+                val characterRefs = mutableMapOf<String, CharacterProfile>()
+
+                // --- THE FIX: Filter out blank strings AND limit to 10 to prevent Firebase crashes! ---
+                val allCharacterIds = snap.documents.flatMap { doc ->
+                    (doc.get("characterIds") as? List<String>).orEmpty()
+                }.filter { it.isNotBlank() }.distinct().take(10)
+                // --------------------------------------------------------------------------------------
+
+                // Fetch all needed CharacterProfiles first!
+                if (allCharacterIds.isNotEmpty()) {
+                    db.collection("characters")
+                        .whereIn(FieldPath.documentId(), allCharacterIds)
+                        .get()
+                        .addOnSuccessListener { charSnap ->
+                            for (charDoc in charSnap.documents) {
+                                charDoc.toObject(CharacterProfile::class.java)?.let {
+                                    characterRefs[charDoc.id] = it
+                                }
+                            }
+                            // Now build chat previews
+                            for (doc in snap.documents) {
+                                val chatProfile = doc.toObject(ChatProfile::class.java)?.copy(id = doc.id) ?: continue
+                                val ids = chatProfile.characterIds
+                                val char1 = characterRefs[ids.getOrNull(0) ?: ""]
+                                val char2 = characterRefs[ids.getOrNull(1) ?: ""]
+
+                                chatList.add(
+                                    ChatPreview(
+                                        id = chatProfile.id,
+                                        originalId = chatProfile.id,
+                                        title = chatProfile.title,
+                                        description = chatProfile.description,
+                                        avatar1Uri = char1?.avatarUri.orEmpty(),
+                                        avatar2Uri = char2?.avatarUri.orEmpty(),
+                                        avatar1ResId = char1?.avatarResId ?: R.drawable.placeholder_avatar,
+                                        avatar2ResId = char2?.avatarResId ?: R.drawable.placeholder_avatar,
+                                        rating = chatProfile.rating,
+                                        timestamp = chatProfile.timestamp,
+                                        author = chatProfile.author,
+                                        tags = chatProfile.tags,
+                                        sfwOnly = chatProfile.sfwOnly,
+                                        chatProfile = chatProfile,
+                                        rawJson = Gson().toJson(chatProfile)
+                                    )
+                                )
+                            }
+                            val adapter = ChatPreviewAdapter(
+                                context = this,
+                                chatList = chatList,
+                                itemLayoutRes = R.layout.profile_chat_preview_item,
+                                onClick = { preview ->
+                                    val currentId = currentUserId
+                                    if (currentId == null) {
+                                        Toast.makeText(this, "You must be signed in to continue.", Toast.LENGTH_SHORT).show()
+                                    } else {
+                                        findSessionForUser(
+                                            chatId = preview.id,
+                                            userId = currentId,
+                                            onResult = { sessionId ->
+                                                startActivity(Intent(this, SessionLandingActivity::class.java).apply {
+                                                    putExtra("CHAT_ID", preview.id)
+                                                    putExtra("CHAT_PROFILE_JSON", preview.rawJson)
+                                                })
+                                            },
+                                            onError = {
+                                                startActivity(Intent(this, SessionLandingActivity::class.java).apply {
+                                                    putExtra("CHAT_ID", preview.id)
+                                                    putExtra("CHAT_PROFILE_JSON", preview.rawJson)
+                                                })
+                                            }
+                                        )
+                                    }
+                                },
+                                onLongClick = { preview ->
+                                    AlertDialog.Builder(this)
+                                        .setTitle(preview.title)
+                                        .setItems(arrayOf("Profile", "Creator")) { _, which ->
+                                            when (which) {
+                                                0 -> startActivity(Intent(this, ChatProfileActivity::class.java).putExtra("chatId", preview.id))
+                                                1 -> startActivity(Intent(this, DisplayProfileActivity::class.java).putExtra("userId", preview.author))
+                                            }
+                                        }
+                                        .show()
+                                }
+                            )
+                            chatsRecycler.adapter = adapter
+                        }
+                } else {
+                    // No characters in any chats, just show with empty adapter
+                    chatsRecycler.adapter = ChatPreviewAdapter(
+                        context = this,
+                        chatList = emptyList(),
+                        itemLayoutRes = R.layout.profile_chat_preview_item,
+                        onClick = { },
+                        onLongClick = { }
+                    )
+                }
+            }
+            .addOnFailureListener { e ->
+                Toast.makeText(this, "Failed to load chats: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+    }
+}

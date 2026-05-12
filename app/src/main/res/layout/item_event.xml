@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:padding="12dp"
+    android:layout_marginBottom="12dp"
+    android:background="@drawable/rounded_border">
+
+    <ImageButton
+        android:id="@+id/deleteEventBtn"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:src="@drawable/ic_delete"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <EditText
+        android:id="@+id/eventTitleEt"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:hint="Event Title (e.g., Demon Attack)"
+        android:textColor="@color/white"
+        android:textStyle="bold"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toStartOf="@id/deleteEventBtn" />
+
+    <EditText
+        android:id="@+id/eventDescriptionEt"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:hint="System Description (e.g., A giant demon is destroying the town. The characters must fight it or flee.)"
+        android:textColor="@color/white"
+        android:minLines="2"
+        android:gravity="top"
+        app:layout_constraintTop_toBottomOf="@id/eventTitleEt" />
+
+    <EditText
+        android:id="@+id/eventNarratorEt"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:hint="Narrator Message (e.g., *Suddenly, the ground shakes violently as a massive demon bursts through the cobblestone square!*)"
+        android:textColor="@color/white"
+        android:minLines="2"
+        android:gravity="top"
+        app:layout_constraintTop_toBottomOf="@id/eventDescriptionEt" />
+
+</androidx.constraintlayout.widget.ConstraintLayout>

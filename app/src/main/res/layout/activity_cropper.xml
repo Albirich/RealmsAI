@@ -36,7 +36,7 @@
         android:scaleType="fitCenter"
         android:src="@drawable/default_01" />
     <!-- 3. Height guidelines overlay (custom view, if you want lines/labels) -->
-    <com.example.RealmsAI.views.GuidelinesView
+    <com.albirich.RealmsAI.views.GuidelinesView
         android:id="@+id/guidelinesOverlay"
         android:layout_width="match_parent"
         android:layout_height="match_parent"

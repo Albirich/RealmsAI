@@ -13,7 +13,7 @@
         android:layout_height="match_parent"
         android:background="@color/deep_space_black">
 
-        <com.example.RealmsAI.StarfieldView
+        <com.albirich.RealmsAI.StarfieldView
             android:id="@+id/starfieldBackground"
             android:layout_width="match_parent"
             android:layout_height="match_parent" />

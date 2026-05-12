@@ -4,11 +4,26 @@
     android:layout_height="match_parent"
     android:fillViewport="true">
 
+
     <androidx.constraintlayout.widget.ConstraintLayout
         xmlns:android="http://schemas.android.com/apk/res/android"
         xmlns:app="http://schemas.android.com/apk/res-auto"
         android:layout_width="match_parent"
         android:layout_height="match_parent">
+
+        <com.albirich.RealmsAI.StarfieldView
+            android:id="@+id/starfieldBackground"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+
+        <ImageView
+            android:id="@+id/backgroundImageView"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scaleType="centerCrop"
+            android:alpha="1.0" />
+
+
         <!-- Title -->
         <TextView
             android:id="@+id/chatProfileTitle"
@@ -51,7 +66,6 @@
                 android:textSize="14sp"
                 android:textColor="#3974D3"
                 android:textStyle="italic"
-                android:visibility="gone"
                 android:layout_marginTop="8dp"/>
         </LinearLayout>
 
@@ -87,16 +101,30 @@
             android:textColor="#FFF"/>
 
         <ImageButton
-            android:id="@+id/chatProfileReportButton"
+            android:id="@+id/chatProfileShareButton"
             android:layout_width="40dp"
             android:layout_height="40dp"
             android:background="?attr/selectableItemBackgroundBorderless"
-            android:src="@drawable/ic_report"
-            android:scaleType="fitXY"
+            android:src="@android:drawable/ic_menu_share"
+            android:scaleType="fitCenter"
+            android:padding="8dp"
+            app:layout_constraintStart_toStartOf="@id/chatProfileReportButton"
+            app:layout_constraintBottom_toTopOf="@id/chatProfileReportButton"
+            app:layout_constraintEnd_toEndOf="@id/chatProfileReportButton"
+            android:contentDescription="Share Character"/>
+
+        <Button
+            android:id="@+id/chatProfileReportButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:backgroundTint="#AA0000"
+            android:text="Report"
+            android:textColor="#FFFFFF"
+            android:textSize="12sp"
             app:layout_constraintTop_toTopOf="@id/chatProfileSessionButton"
+            app:layout_constraintBottom_toBottomOf="@id/chatProfileSessionButton"
             app:layout_constraintEnd_toEndOf="parent"
-            android:layout_marginEnd="24dp"
-            android:contentDescription="Report user"/>
+            android:layout_marginEnd="24dp" />
 
         <ImageView
             android:id="@+id/layoutoutline"
