@@ -6,66 +6,174 @@ import android.widget.Button
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
+import com.android.billingclient.api.*
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 
 class UpgradeActivity : BaseActivity() {
 
+    private lateinit var billingClient: BillingClient
+    private var premiumProductDetails: ProductDetails? = null
+    private lateinit var btnConfirm: Button
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_upgrade)
 
-        // 2. Call your BaseActivity's navigation setup
         setupBottomNav()
 
         // --- BIND UI ELEMENTS ---
         val btnCancel = findViewById<Button>(R.id.cancel_button)
-        val btnConfirm = findViewById<Button>(R.id.confirm_upgrade_button)
+        btnConfirm = findViewById<Button>(R.id.confirm_upgrade_button)
         val oldPrice = findViewById<TextView>(R.id.priceText)
         oldPrice.paintFlags = oldPrice.paintFlags or android.graphics.Paint.STRIKE_THRU_TEXT_FLAG
 
-        // (We don't need to manually bind navHome/navAccount etc here
-        // because setupBottomNav() usually handles that for you!)
+        // Disable button initially until Google loads the product
+        btnConfirm.isEnabled = false
+        btnConfirm.text = "Loading..."
+
+        // --- SETUP BILLING ---
+        setupBillingClient()
 
         // --- BUTTON ACTIONS ---
-
-        // Cancel Button: Go back to previous screen
         btnCancel.setOnClickListener {
             finish()
         }
 
-        // Confirm Upgrade (Alpha Testing Mode)
         btnConfirm.setOnClickListener {
-            // performAlphaUpgrade()
-            upgradeDenialDialog()
+            if (premiumProductDetails != null) {
+                launchPurchaseFlow(premiumProductDetails!!)
+            } else {
+                Toast.makeText(this, "Still connecting to Google Play...", Toast.LENGTH_SHORT).show()
+            }
         }
     }
 
-    private fun upgradeDenialDialog() {
-        AlertDialog.Builder(this)
-            .setTitle("Upgrades Currently Unavailable")
-            .setMessage("RealmsAI is currently in a limited Beta phase! Premium subscriptions and upgrades are not open just yet.\n\nFor now, enjoy your daily free messages, and keep an eye out for the official launch announcement!")
-            .setPositiveButton("Got it", null)
-            .show()
+    // 1. INITIALIZE BILLING CLIENT & LISTEN FOR PURCHASES
+    private fun setupBillingClient() {
+        val purchasesUpdatedListener = PurchasesUpdatedListener { billingResult, purchases ->
+            if (billingResult.responseCode == BillingClient.BillingResponseCode.OK && purchases != null) {
+                for (purchase in purchases) {
+                    handlePurchase(purchase)
+                }
+            } else if (billingResult.responseCode == BillingClient.BillingResponseCode.USER_CANCELED) {
+                Log.d("Billing", "User canceled the purchase flow.")
+            } else {
+                Log.e("Billing", "Error during purchase: ${billingResult.debugMessage}")
+            }
+        }
+
+        billingClient = BillingClient.newBuilder(this)
+            .setListener(purchasesUpdatedListener)
+            .enablePendingPurchases()
+            .build()
+
+        connectToGooglePlay()
     }
 
-    private fun performAlphaUpgrade() {
+    // 2. CONNECT TO GOOGLE PLAY
+    private fun connectToGooglePlay() {
+        billingClient.startConnection(object : BillingClientStateListener {
+            override fun onBillingSetupFinished(billingResult: BillingResult) {
+                if (billingResult.responseCode == BillingClient.BillingResponseCode.OK) {
+                    Log.d("Billing", "Connected to Google Play. Querying products...")
+                    querySubscriptionProduct()
+                }
+            }
+
+            override fun onBillingServiceDisconnected() {
+                // Try to restart the connection on the next request to Google Play
+                Log.e("Billing", "Disconnected from Google Play.")
+            }
+        })
+    }
+
+    // 3. QUERY YOUR SPECIFIC PRODUCT ID
+    private fun querySubscriptionProduct() {
+        val queryProductDetailsParams = QueryProductDetailsParams.newBuilder()
+            .setProductList(
+                listOf(
+                    QueryProductDetailsParams.Product.newBuilder()
+                        .setProductId("realms_premium_monthly") // The ID you made in the console
+                        .setProductType(BillingClient.ProductType.SUBS)
+                        .build()
+                )
+            )
+            .build()
+
+        billingClient.queryProductDetailsAsync(queryProductDetailsParams) { billingResult, productDetailsList ->
+            if (billingResult.responseCode == BillingClient.BillingResponseCode.OK && productDetailsList.isNotEmpty()) {
+                // Save the product details and enable the buy button
+                premiumProductDetails = productDetailsList[0]
+
+                runOnUiThread {
+                    btnConfirm.isEnabled = true
+                    btnConfirm.text = "Confirm Upgrade"
+                    // Optional: You can extract the localized price here (e.g. "$9.99")
+                    // and dynamically set it on your UI if you want to!
+                }
+            } else {
+                Log.e("Billing", "No products found or error: ${billingResult.debugMessage}")
+                runOnUiThread {
+                    btnConfirm.text = "Unavailable"
+                }
+            }
+        }
+    }
+
+    // 4. LAUNCH THE GOOGLE PLAY BOTTOM SHEET
+    private fun launchPurchaseFlow(productDetails: ProductDetails) {
+        // Subscriptions require an offer token (even if you just have a base plan)
+        val offerToken = productDetails.subscriptionOfferDetails?.get(0)?.offerToken ?: return
+
+        val productDetailsParamsList = listOf(
+            BillingFlowParams.ProductDetailsParams.newBuilder()
+                .setProductDetails(productDetails)
+                .setOfferToken(offerToken)
+                .build()
+        )
+
+        val billingFlowParams = BillingFlowParams.newBuilder()
+            .setProductDetailsParamsList(productDetailsParamsList)
+            .build()
+
+        billingClient.launchBillingFlow(this, billingFlowParams)
+    }
+
+    // 5. HANDLE SUCCESSFUL PURCHASE & ACKNOWLEDGE IT
+    private fun handlePurchase(purchase: Purchase) {
+        if (purchase.purchaseState == Purchase.PurchaseState.PURCHASED) {
+
+            // Google REQUIRES you to acknowledge the purchase within 3 days, or they refund the user!
+            if (!purchase.isAcknowledged) {
+                val acknowledgePurchaseParams = AcknowledgePurchaseParams.newBuilder()
+                    .setPurchaseToken(purchase.purchaseToken)
+                    .build()
+
+                billingClient.acknowledgePurchase(acknowledgePurchaseParams) { billingResult ->
+                    if (billingResult.responseCode == BillingClient.BillingResponseCode.OK) {
+                        // Purchase is locked in! Give the user their perks.
+                        grantPremiumFeatures()
+                    }
+                }
+            } else {
+                // Already acknowledged (sometimes happens if restoring purchases)
+                grantPremiumFeatures()
+            }
+        }
+    }
+
+    // 6. UPDATE FIRESTORE (Your original logic!)
+    private fun grantPremiumFeatures() {
         val user = FirebaseAuth.getInstance().currentUser
         if (user == null) {
-            Toast.makeText(this, "Error: Not logged in", Toast.LENGTH_SHORT).show()
+            runOnUiThread { Toast.makeText(this, "Error: Not logged in", Toast.LENGTH_SHORT).show() }
             return
         }
-
-        val btnConfirm = findViewById<Button>(R.id.confirm_upgrade_button)
-        btnConfirm.isEnabled = false
-        btnConfirm.text = "Upgrading..."
 
         val db = FirebaseFirestore.getInstance()
         val userRef = db.collection("users").document(user.uid)
 
-        // PREPARE UPDATES
-        // 1. Set Premium to true
-        // 2. Add all 3 badges to the 'badges' array
         val updates = mapOf(
             "isPremium" to true,
             "badges" to com.google.firebase.firestore.FieldValue.arrayUnion("founder", "beta", "premium")
@@ -74,26 +182,22 @@ class UpgradeActivity : BaseActivity() {
         userRef.update(updates)
             .addOnSuccessListener {
                 Log.d("UpgradeActivity", "User ${user.uid} upgraded with badges.")
-                Toast.makeText(this, "Welcome, Founder! Badges added.", Toast.LENGTH_LONG).show()
-                finish()
+                runOnUiThread {
+                    Toast.makeText(this, "Welcome, Founder! Badges added.", Toast.LENGTH_LONG).show()
+                    finish() // Close the paywall
+                }
             }
             .addOnFailureListener { e ->
-                // Fallback: If the user doc doesn't exist yet (rare), create it with set()
                 userRef.set(updates, com.google.firebase.firestore.SetOptions.merge())
                     .addOnSuccessListener {
-                        Toast.makeText(this, "Welcome, Founder! Badges added.", Toast.LENGTH_LONG).show()
-                        finish()
+                        runOnUiThread {
+                            Toast.makeText(this, "Welcome, Founder! Badges added.", Toast.LENGTH_LONG).show()
+                            finish()
+                        }
                     }
                     .addOnFailureListener { retryEx ->
-                        Log.e("UpgradeActivity", "Upgrade failed", retryEx)
-                        Toast.makeText(this, "Upgrade failed: ${retryEx.message}", Toast.LENGTH_SHORT).show()
-                        btnConfirm.isEnabled = true
-                        btnConfirm.text = "Confirm Upgrade"
+                        Log.e("UpgradeActivity", "Firestore update failed", retryEx)
                     }
             }
     }
-
-    // If your BaseActivity requires you to define which nav item is selected:
-    // override fun getNavigationMenuItemId() = R.id.nav_none
-    // (Or whichever ID represents 'no selection' or 'settings' in your app)
 }

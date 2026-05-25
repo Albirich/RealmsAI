@@ -1,5 +1,7 @@
 package com.albirich.RealmsAI
 
+import EchoChatBottomSheet
+import EchoUpdateListener
 import android.app.Activity
 import android.content.ContentResolver
 import android.content.Intent
@@ -37,6 +39,7 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import androidx.lifecycle.lifecycleScope
+import com.albirich.RealmsAI.ai.Facilitator
 import com.albirich.RealmsAI.models.CharacterLink
 import com.albirich.RealmsAI.models.ScenarioEvent
 import kotlinx.coroutines.launch
@@ -79,6 +82,7 @@ class CharacterCreationActivity : AppCompatActivity() {
     private lateinit var notesEt: EditText
     private lateinit var greetingEt: EditText
     private lateinit var scenarioEt: EditText
+    private var currentCharacterId: String? = null
     // State
     private var progressDialog: AlertDialog? = null
     private var avatarUri: Uri? = null             // Only local uri if user picks new
@@ -270,6 +274,7 @@ class CharacterCreationActivity : AppCompatActivity() {
         generateDialogueBtn = findViewById(R.id.generateDialogueButton)
         addRowBtn = findViewById(R.id.addDialogueRowButton)
 
+        currentCharacterId = intent.getStringExtra("CHARACTER_ID")
 
         // Color spinners show names but store hex
         val bubbleadapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, bubblecolorOptions.map { it.first })
@@ -555,6 +560,7 @@ class CharacterCreationActivity : AppCompatActivity() {
         }
 
         val importCardBtn = findViewById<MaterialButton>(R.id.importCardButton)
+        val startWizardBtn = findViewById<ImageButton>(R.id.startWizardBtn)
 
         cardImportLauncher = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
             if (uri != null) {
@@ -565,6 +571,60 @@ class CharacterCreationActivity : AppCompatActivity() {
         importCardBtn.setOnClickListener {
             // Allow them to pick either a PNG image card or a raw JSON file
             cardImportLauncher.launch(arrayOf("image/png", "application/json"))
+        }
+
+        startWizardBtn.setOnClickListener {
+            val userId = FirebaseAuth.getInstance().currentUser?.uid ?: return@setOnClickListener
+
+            if (currentCharacterId == null) {
+                val db = FirebaseFirestore.getInstance()
+
+                // THE FIX: Try to use editCharId first.
+                // If editCharId is ALSO null, THEN generate a brand new ID.
+                currentCharacterId = editCharId ?: db.collection("users").document(userId)
+                    .collection("wizard_drafts").document().id
+            }
+
+            val draftId = currentCharacterId!!
+
+            // Grab whatever they already typed so Echo knows the current state
+            val currentState = getLatestFormState().mapValues { it.value.toString() }
+
+            // Launch the Bottom Sheet and pass the state
+            val chatSheet = EchoChatBottomSheet(draftId, currentState)
+
+            // Set up the listener so the Activity knows when Echo speaks
+            chatSheet.updateListener = object : EchoUpdateListener {
+                override fun onFieldsUpdated(newFields: EchoUpdatedFields) {
+                    // Echo just spoke! Update the UI instantly!
+                    newFields.name?.let { nameEt.setText(it) }
+                    newFields.age?.let { ageEt.setText(it) }
+                    newFields.backstory?.let { backstoryEt.setText(it) }
+                    newFields.summary?.let { bioEt.setText(it) }
+                    newFields.personality?.let { personalityEt.setText(it) }
+                    newFields.privateDescription?.let { privateDescEt.setText(it) }
+                    newFields.height?.let { heightEt.setText(it) }
+                    newFields.weight?.let { weightEt.setText(it) }
+                    newFields.eyeColor?.let { eyeColorEt.setText(it) }
+                    newFields.hairColor?.let { hairColorEt.setText(it) }
+                    newFields.physicalDescription?.let { physicalDescEt.setText(it) }
+                    newFields.abilities?.let { abilitiesEt.setText(it) }
+                    newFields.gender?.let { genderEt.setText(it) }
+                    newFields.backstory?.let { backstoryEt.setText(it) }
+                    newFields.soloScenario?.let { scenarioEt.setText(it) }
+                    newFields.greeting?.let { greetingEt.setText(it) }
+                    newFields.universe?.let { universeEt.setText(it) }
+
+                    val db = FirebaseFirestore.getInstance()
+                    db.collection("users").document(userId)
+                        .collection("wizard_drafts").document(draftId)
+                        .set(getLatestFormState(), com.google.firebase.firestore.SetOptions.merge())
+
+                    Toast.makeText(this@CharacterCreationActivity, "Echo updated the form!", Toast.LENGTH_SHORT).show()
+                }
+            }
+
+            chatSheet.show(supportFragmentManager, "EchoChat")
         }
 
         submitBtn.setOnClickListener {
@@ -630,7 +690,7 @@ class CharacterCreationActivity : AppCompatActivity() {
 
                     // 2. SAVE EACH OUTFIT AS ITS OWN DOCUMENT
                     val db = FirebaseFirestore.getInstance()
-                    val charIdToSave = editCharId ?: System.currentTimeMillis().toString()
+                    val charIdToSave = editCharId ?: currentCharacterId ?: System.currentTimeMillis().toString()
 
                     try {
                         // Use a Batch to save them all simultaneously
@@ -698,6 +758,29 @@ class CharacterCreationActivity : AppCompatActivity() {
 
 
     // Add this helper anywhere in CharacterCreationActivity
+
+    private fun getLatestFormState(): HashMap<String, Any> {
+        return hashMapOf(
+            "name"                to nameEt.text.toString(),
+            "age"                 to ageEt.text.toString(),
+            "summary"             to bioEt.text.toString(),
+            "personality"         to personalityEt.text.toString(),
+            "privateDescription"  to privateDescEt.text.toString(),
+            "height"              to heightEt.text.toString(),
+            "weight"              to weightEt.text.toString(),
+            "eyeColor"            to eyeColorEt.text.toString(),
+            "hairColor"           to hairColorEt.text.toString(),
+            "physicalDescription" to physicalDescEt.text.toString(),
+            "abilities"           to abilitiesEt.text.toString(), // Fixed the "ablities" typo!
+            "gender"              to genderEt.text.toString(),
+            "backstory"           to backstoryEt.text.toString(),
+            "soloScenario"        to scenarioEt.text.toString(),
+            "greeting"            to greetingEt.text.toString(),
+            "universe"            to universeEt.text.toString(),
+            "lastUpdated"         to com.google.firebase.firestore.FieldValue.serverTimestamp()
+        )
+    }
+
     private fun parseHeightToFeet(raw: String?): Float? {
         if (raw.isNullOrBlank()) return null
         val s = raw.trim().lowercase()
@@ -1276,42 +1359,141 @@ class CharacterCreationActivity : AppCompatActivity() {
 
     private fun applyCardDataToUI(jsonString: String, fileUri: Uri, mimeType: String) {
         try {
-            val card = Gson().fromJson(jsonString, TavernCard::class.java)
-            val data = card.data ?: return
-
-            // Map the imported fields to your EditTexts
-            nameEt.setText(data.name ?: "")
-
-
-            personalityEt.setText(data.description ?: "")
-            greetingEt.setText(data.first_mes ?: "")
-            scenarioEt.setText(data.scenario ?: "")
-            notesEt.setText(data.creator_notes ?: "")
-
-            // Parse message examples (Tavern formats this as a single string block like "<START>\n{{user}}: hi\n{{char}}: hello")
-            val examples = data.mes_example ?: ""
-            if (examples.isNotBlank()) {
-                // Clear existing UI dialogue rows first to avoid clutter
-                dialogueContainer.removeAllViews()
-
-                // Just dump the whole block into a single example row for them to edit
-                addDialogueRow("Example Block", examples)
-            }
-
-            // If they uploaded a PNG, automatically set it as the character's Avatar!
+            // 1. If they uploaded a PNG, set the Avatar immediately
             if (mimeType.contains("image")) {
                 avatarUri = fileUri
                 avatarChanged = true
                 avatarView.setImageURI(fileUri)
             }
 
-            Toast.makeText(this, "Character Card Imported!", Toast.LENGTH_SHORT).show()
+            // 2. Tell the user Echo is working (Long Toast so it stays on screen)
+            Toast.makeText(this, "Echo is analyzing the character card...", Toast.LENGTH_LONG).show()
+
+            // 3. Hand the raw data off to the AI
+            processImportWithEcho(jsonString)
 
         } catch (e: Exception) {
-            Toast.makeText(this, "Card format not recognized.", Toast.LENGTH_LONG).show()
-            Log.e("CardImport", "GSON mapping failed", e)
+            Toast.makeText(this, "Failed to read card data.", Toast.LENGTH_LONG).show()
+            Log.e("CardImport", "Error handling card", e)
         }
     }
+
+    private fun processImportWithEcho(rawCardJson: String) {
+        lifecycleScope.launch(Dispatchers.IO) {
+
+            val finalPrompt = """
+            You are an expert AI character creator. 
+            The user is importing a character card from an external format. 
+            Analyze the raw data and intelligently separate the information into the following JSON schema.
+            
+            RULES:
+              1. Extract specific physical traits (age, height, weight, eye color, hair color) into their own fields.
+              2. Any physical description that doesn't fit those specific fields goes into physicalDescription. This field MUST be less than 200 characters (200 characters).
+              3. Separate the character's history into 'backstory' (PG-13 only) (up to 1000 characters).
+              4. Separate their demeanor, traits, and philosophy into 'personality' (PG-13 only) (up to 1000 characters).
+              5. ANY mature, NSFW, or explicit information MUST be isolated and placed ONLY in the 'mature' field. This is any personality traits, interests, kinks, information about abuse or violence (up to 1000 characters).
+              6. Extract any skills, powers, or combat traits into 'abilities' (up to 400 characters).
+              7. Convert existing dialogue examples into an array of objects with "prompt" and "response" keys. Guess the context for the "prompt" if it is missing.
+              8. Use the first message to create a 'scenario' (up to 500 characters) setting up the general scenario for the chat, and a 'greeting' (up to 250 characters) setting up the scene to start the chat.
+                   
+            Output ONLY valid JSON. No conversational text.
+            
+            RAW CARD DATA TO PROCESS:
+            $rawCardJson
+        """.trimIndent()
+
+            try {
+                // Using low temp (0.1f) for strict JSON formatting
+                val apiResult = Facilitator.callMixtralApi(
+                    finalPrompt,
+                    BuildConfig.MIXTRAL_API_KEY,
+                    "acree",
+                    0.1f,
+                    40,
+                    0.9f
+                )
+
+                val responseText = apiResult.content
+
+                if (!responseText.isNullOrBlank()) {
+
+                    // 1. Log the raw output so we can see exactly what Echo said!
+                    Log.d("EchoImport", "RAW AI RESPONSE:\n$responseText")
+
+                    // 2. The Invincible Extractor: Find the first '{' and the last '}'
+                    val startIndex = responseText.indexOf('{')
+                    val endIndex = responseText.lastIndexOf('}')
+
+                    if (startIndex != -1 && endIndex != -1 && startIndex < endIndex) {
+                        val cleanJson = responseText.substring(startIndex, endIndex + 1)
+
+                        withContext(Dispatchers.Main) {
+                            // 3. Parse the perfectly clean JSON
+                            val echoData = Gson().fromJson(cleanJson, EchoExtractedCard::class.java)
+
+                            nameEt.setText(echoData.name ?: "")
+                            personalityEt.setText(echoData.personality ?: "")
+                            backstoryEt.setText(echoData.backstory ?: "")
+                            privateDescEt.setText(echoData.mature ?: "")
+                            greetingEt.setText(echoData.greeting ?: "")
+                            scenarioEt.setText(echoData.scenario ?: "")
+                            notesEt.setText(echoData.notes ?: "")
+
+                            ageEt.setText(echoData.age ?: "")
+                            heightEt.setText(echoData.height ?: "")
+                            weightEt.setText(echoData.weight ?: "")
+                            eyeColorEt.setText(echoData.eyeColor ?: "")
+                            hairColorEt.setText(echoData.hairColor ?: "")
+                            physicalDescEt.setText(echoData.physicalDescription ?: "")
+                            abilitiesEt.setText(echoData.abilities ?: "")
+
+                            dialogueContainer.removeAllViews()
+                            echoData.exampleDialogue?.forEach { dialogue ->
+                                addDialogueRow(dialogue.prompt, dialogue.response)
+                            }
+
+                            Toast.makeText(this@CharacterCreationActivity, "Echo successfully adapted the character!", Toast.LENGTH_SHORT).show()
+                        }
+                    } else {
+                        withContext(Dispatchers.Main) {
+                            Toast.makeText(this@CharacterCreationActivity, "Echo failed to format the data properly.", Toast.LENGTH_LONG).show()
+                            Log.e("EchoImport", "No JSON brackets found in response.")
+                        }
+                    }
+                }
+            }catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(this@CharacterCreationActivity, "Echo failed to parse the JSON.", Toast.LENGTH_LONG).show()
+                    Log.e("EchoImport", "AI Parsing failed", e)
+                }
+            }
+        }
+    }
+
+    // A simple data class to catch Echo's output
+    data class EchoExtractedCard(
+        val name: String?,
+        val personality: String?,
+        val backstory: String?,
+        val mature: String?,
+        val greeting: String?,
+        val scenario: String?,
+        val notes: String?,
+        val age: String?,
+        val height: String?,
+        val weight: String?,
+        val eyeColor: String?,
+        val hairColor: String?,
+        val physicalDescription: String?,
+        val abilities: String?,
+        val exampleDialogue: List<EchoDialogueMap>?
+    )
+
+    data class EchoDialogueMap(
+        val prompt: String,
+        val response: String
+    )
+
 
     private fun fillFormFromProfile(profile: CharacterProfile) {
         nameEt.setText(profile.name)
@@ -1460,4 +1642,37 @@ data class TavernCharacterData(
     val mes_example: String?,
     val scenario: String?,
     val creator_notes: String?
+)
+
+// The outer shell that catches Echo's exact response format
+data class EchoWizardResponse(
+    val message: String?,
+    val updatedFields: EchoUpdatedFields?
+)
+
+// The inner fields based on your System Prompt rules
+data class EchoUpdatedFields(
+    val name: String? = null,
+    val age: String? = null,
+    val height: String? = null,
+    val weight: String? = null,
+    val eyeColor: String? = null,
+    val hairColor: String? = null,
+    val gender: String? = null, // Includes pronouns per your prompt
+    val physicalDescription: String? = null,
+    val backstory: String? = null,
+    val personality: String? = null,
+    val privateDescription: String? = null, // The NSFW/Mature vault
+    val abilities: String? = null,
+    val soloScenario: String? = null,
+    val greeting: String? = null,
+    val summary: String? = null,
+    val exampleDialogue: List<EchoDialogueMap>? = null,
+    val universe:String? = null
+)
+
+// Re-using the dialogue map we built earlier!
+data class EchoDialogueMap(
+    val prompt: String,
+    val response: String
 )

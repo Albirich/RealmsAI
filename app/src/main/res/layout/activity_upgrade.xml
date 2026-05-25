@@ -56,7 +56,7 @@
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        android:text="Upgrade placeholder"
+        android:text="Unlock the Full Realms"
         android:textColor="@color/white"
         android:textAlignment="center"
         />
@@ -110,7 +110,7 @@
         app:layout_constraintStart_toEndOf="@id/priceText"
         android:paddingTop="8dp"
         android:layout_marginStart="8dp"
-        android:text="$10.99"
+        android:text="$9.99"
         android:textColor="#FFD700"
         android:textSize="20sp"
         android:textStyle="bold"/>
@@ -133,14 +133,14 @@
         android:layout_height="wrap_content"
         app:layout_constraintTop_toBottomOf="@id/freelisttitle"
         app:layout_constraintStart_toStartOf="@id/freelisttitle"
+        app:layout_constraintEnd_toStartOf="@id/paidlist"
         android:paddingEnd="-25dp"
         android:paddingBottom="15dp"
         android:text="
         \n- 70 daily messages
-        \n\n- up to 10 characters per chat
+        \n\n- 20 characters per chat
         \n\n- 5 private characters
-        \n 5 private chats
-        \n\n- 3 outfits per character"/>
+        \n 5 private chats"/>
 
     <TextView
         android:id="@+id/paidlist"
@@ -154,12 +154,13 @@
         android:paddingStart="10dp"
         android:text="
         \n- unlimited daily messages
-        \n\n- up to 20 characters per chat
+        \n\n- 50 characters per chat
         \n\n- unlimited private characters
         \n unlimited private chats
-        \n\n- 10 outfits per character
-        \n\n- RPG, VN, MurderMystery modes
-        \n\n- copy chats and characters to your collection"/>
+        \n\n- RPG and MurderMystery mode
+        \n\n- Visual novel Mode
+        \n\n- God Mode
+        \n\n- Living World Engine"/>
 
     <Button
         android:id="@+id/confirm_upgrade_button"

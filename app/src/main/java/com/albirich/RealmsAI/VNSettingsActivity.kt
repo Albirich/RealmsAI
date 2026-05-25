@@ -46,8 +46,18 @@ class VNSettingsActivity : AppCompatActivity() {
         characterIds = selectedCharacters.map { it.id }
 
         val currentSettingsJson = intent.getStringExtra("CURRENT_SETTINGS_JSON")
-        vnSettings = if (currentSettingsJson.isNullOrBlank()) VNSettings()
-        else Gson().fromJson(currentSettingsJson, VNSettings::class.java)
+
+        vnSettings = if (currentSettingsJson.isNullOrBlank()) {
+            VNSettings()
+        } else {
+            try {
+                Gson().fromJson(currentSettingsJson, VNSettings::class.java)
+            } catch (e: Exception) {
+                // If the JSON is corrupted or accidentally passed as a boolean, catch the error!
+                android.util.Log.e("VNSettingsActivity", "Failed to parse settings JSON: $currentSettingsJson", e)
+                VNSettings() // Fallback to safe defaults
+            }
+        }
 
         normalizeMainCharIdFromPlaceholder()
         healVnSettingsForRoster()

@@ -167,6 +167,7 @@ class MainActivity : AppCompatActivity() {
 
     private var activationRound = 0
     private var maxActivationRounds = 3
+    private var worldCounter = 0
 
     enum class ButtonState { SEND, INTERRUPT, WAITING }
     private var currentState: ButtonState = ButtonState.SEND
@@ -430,28 +431,39 @@ class MainActivity : AppCompatActivity() {
                 checkServerStatusBeforeSending {
                     checkMessageLimit {
                         lifecycleScope.launch {
-                            try {
-                                val deletedIds = saveEditedMessageAndDeleteFollowing(editedMessage, position)
-                                deleteFromSlotPersonalHistories(sessionId, deletedIds)
-                                deleteMemoriesFromSession(deletedIds)
 
-                                if (!mySlotId.isNullOrBlank()) {
-                                    addToPersonalHistoryFirestore(sessionId, mySlotId!!, editedMessage)
-                                }
+                            if (!sessionProfile.silent || isHost) {
+                                try {
+                                    val deletedIds =
+                                        saveEditedMessageAndDeleteFollowing(editedMessage, position)
+                                    deleteFromSlotPersonalHistories(sessionId, deletedIds)
+                                    deleteMemoriesFromSession(deletedIds)
 
-                                if (position < chatAdapter.itemCount) {
-                                    chatAdapter.removeMessagesFrom(position)
-                                    chatAdapter.insertMessageAt(position, editedMessage)
+                                    if (!mySlotId.isNullOrBlank()) {
+                                        addToPersonalHistoryFirestore(
+                                            sessionId,
+                                            mySlotId!!,
+                                            editedMessage
+                                        )
+                                    }
+
+                                    if (position < chatAdapter.itemCount) {
+                                        chatAdapter.removeMessagesFrom(position)
+                                        chatAdapter.insertMessageAt(position, editedMessage)
+                                    }
+                                    sendToAI(editedMessage.text)
+                                } catch (e: Exception) {
+                                    Log.e(TAG, "Error processing edit", e)
                                 }
-                                sendToAI(editedMessage.text)
-                            } catch (e: Exception) {
-                                Log.e(TAG, "Error processing edit", e)
+                            }else{
+                                lifecycleScope.launch(Dispatchers.Main) {
+                                    Toast.makeText(this@MainActivity, "Host has set the chat to silent.", Toast.LENGTH_SHORT).show()
+                                }
                             }
                         }
                     }
                 }
             },
-
             // --- 2. NEW: "INLINE EDIT" (Just change text, don't rewind) ---
             onInlineEditMessage = { editedMessage, position ->
                 lifecycleScope.launch {
@@ -467,10 +479,18 @@ class MainActivity : AppCompatActivity() {
                             // You might need to add this simple helper function to your ChatAdapter!
                             chatAdapter.updateMessageAt(position, editedMessage)
                         }
-                        Toast.makeText(this@MainActivity, "Message updated!", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(
+                            this@MainActivity,
+                            "Message updated!",
+                            Toast.LENGTH_SHORT
+                        ).show()
                     } catch (e: Exception) {
                         Log.e(TAG, "Error inline editing", e)
-                        Toast.makeText(this@MainActivity, "Failed to edit message.", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(
+                            this@MainActivity,
+                            "Failed to edit message.",
+                            Toast.LENGTH_SHORT
+                        ).show()
                     }
                 }
             },
@@ -1095,9 +1115,16 @@ class MainActivity : AppCompatActivity() {
             }
 
             takeControl.setOnClickListener {
+                val selectedPosition = characterSpinner.selectedItemPosition
                 val selectedSlot = presentSlots[characterSpinner.selectedItemPosition]
 
                 // --- GUARD CLAUSE ---
+
+                if (presentSlots.isEmpty() || selectedPosition < 0) {
+                    Toast.makeText(this, "No character available to control.", Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
+
                 if (selectedSlot.profileType == "player") {
                     Toast.makeText(this, "Character is already being controlled by a player", Toast.LENGTH_SHORT).show()
                     return@setOnClickListener
@@ -1168,8 +1195,8 @@ class MainActivity : AppCompatActivity() {
             modelSpinner.adapter = adapter
 
             // 1. Find the correct index FIRST
-            val currentId = sessionProfile.aiModel ?: "Grok 4.1" // Use your actual default
-            val currentKey = availableModels.entries.find { it.value == currentId }?.key ?: "Grok 4.1"
+            val currentId = sessionProfile.aiModel ?: "nvidia" // Use your actual default
+            val currentKey = availableModels.entries.find { it.value == currentId }?.key ?: "nvidia"
             val initialPosition = modelNames.indexOf(currentKey)
 
             // 2. Set the selection BEFORE the listener to avoid the "Loop of Death"
@@ -1179,10 +1206,10 @@ class MainActivity : AppCompatActivity() {
 
             modelSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
                 override fun onItemSelected(parent: AdapterView<*>, view: View?, position: Int, id: Long) {
-                    val selectedId = availableModels[modelNames[position]] ?: "Grok 4.1"
+                    val selectedId = availableModels[modelNames[position]] ?: "nvidia"
 
                     // Use a local variable to prevent race conditions during the save
-                    val currentIdInProfile = sessionProfile?.aiModel ?: "Grok 4.1"
+                    val currentIdInProfile = sessionProfile?.aiModel ?: "nvidia"
 
                     if (currentIdInProfile != selectedId) {
                         val sessionId = sessionId ?: return
@@ -1248,50 +1275,96 @@ class MainActivity : AppCompatActivity() {
                 showInstructionDialog()
             }
             val godMode = (sessionProfile.enabledModes.contains("god_mode"))
-            directorBtn.visibility = if (isHost && !godMode) View.VISIBLE else View.INVISIBLE
+            directorBtn.text = if (isHost && !godMode) {
+                "Director"
+            } else if (!sessionProfile.silent) {
+                "Silence"
+            } else {
+                "Unsilence"
+            }
 
             directorBtn.setOnClickListener {
-                val currentActiveSlot = sessionProfile.userMap[userId]?.activeSlotId
-                val isDirectorNow = currentActiveSlot == "narrator"
+                 if (godMode && isHost){
+                     val selectedSilence = !sessionProfile.silent
+                     val silenceMessage = if (selectedSilence) {
+                         "The Host has silenced the chat."
+                     } else {
+                         "The Host has unsilenced the chat."
+                     }
 
-                if (isDirectorNow) {
-                    // STOP Directing -> Show Picker (Existing Logic)
-                    showCharacterPickerDialog(sessionProfile.slotRoster) { selectedSlot ->
-                        // When picking a character, we should probably claim them as "player" too
-                        val updatedRoster = sessionProfile.slotRoster.map { slot ->
-                            if (slot.slotId == selectedSlot.slotId) slot.copy(profileType = "player") else slot
-                        }
-                        FirebaseFirestore.getInstance().collection("sessions").document(sessionId)
-                            .update("slotRoster", updatedRoster)
+                     db.collection("sessions").document(sessionId)
+                         .update("silent", selectedSilence)
+                         .addOnSuccessListener {
+                             Log.d("model_debug", "Firebase updated: $selectedSilence")
+                             Toast.makeText(this@MainActivity, "Silent mode = ${sessionProfile.silent}", Toast.LENGTH_SHORT).show()
+                             val timestamp = com.google.firebase.Timestamp.now()
+                             val newMessage = ChatMessage(
+                                 id = UUID.randomUUID().toString(),
+                                 senderId = "narrator",
+                                 displayName = "narrator",
+                                 area = "all",
+                                 location = "all",
+                                 text = silenceMessage,
+                                 timestamp = timestamp,
+                                 visibility = true,
+                                 messageType = "system"
+                             )
 
-                        updateUserActiveSlot(selectedSlot.slotId)
-                        mySlotId = selectedSlot.slotId
-                        Toast.makeText(this, "Returned to ${selectedSlot.name}", Toast.LENGTH_SHORT)
-                            .show()
-                    }
-                } else {
-                    // --- START Directing (UPDATED) ---
+                             // 5. Send to Firestore
+                             val activeSessionId = sessionProfile.sessionId
+                             val activeChatId = sessionProfile.chatId
+                             SessionManager.sendMessage(
+                                 activeChatId,
+                                 activeSessionId,
+                                 newMessage
+                             )
+                             // 6. Memory Check
+                             distributeMessageAndMemories(newMessage)
 
-                    // 1. Release your current character back to "bot" mode
-                    if (currentActiveSlot != null && currentActiveSlot != "narrator") {
-                        val updatedRoster = sessionProfile.slotRoster.map { slot ->
-                            if (slot.slotId == currentActiveSlot) {
-                                slot.copy(profileType = "bot") // <--- The Fix
-                            } else {
-                                slot
-                            }
-                        }
+                             directorBtn.text = if (!selectedSilence) {"Silence"} else {"Unsilence"}
+                         }
+                         .addOnFailureListener { e ->
+                             Log.e("model_debug", "Firebase failed to update", e)
+                         }
+                }else{
+                     val currentActiveSlot = sessionProfile.userMap[userId]?.activeSlotId
+                     val isDirectorNow = currentActiveSlot == "narrator"
 
-                        // Save the freed roster to Firestore
-                        FirebaseFirestore.getInstance().collection("sessions").document(sessionId)
-                            .update("slotRoster", updatedRoster)
-                    }
+                     if (isDirectorNow) {
+                         // STOP Directing -> Show Picker (Existing Logic)
+                         showCharacterPickerDialog(sessionProfile.slotRoster) { selectedSlot ->
+                             // When picking a character, we should probably claim them as "player" too
+                             val updatedRoster = sessionProfile.slotRoster.map { slot ->
+                                 if (slot.slotId == selectedSlot.slotId) slot.copy(profileType = "player") else slot
+                             }
+                             FirebaseFirestore.getInstance().collection("sessions").document(sessionId)
+                                 .update("slotRoster", updatedRoster)
 
-                    // 2. Become Narrator
-                    updateUserActiveSlot("narrator")
-                    mySlotId = "narrator"
-                    Toast.makeText(this, "Director Mode Active", Toast.LENGTH_LONG).show()
-                }
+                             updateUserActiveSlot(selectedSlot.slotId)
+                             mySlotId = selectedSlot.slotId
+                             Toast.makeText(this, "Returned to ${selectedSlot.name}", Toast.LENGTH_SHORT)
+                                 .show()
+                         }
+                     }
+                     else {
+                         if (currentActiveSlot != null && currentActiveSlot != "narrator") {
+                             val updatedRoster = sessionProfile.slotRoster.map { slot ->
+                                 if (slot.slotId == currentActiveSlot) {
+                                     slot.copy(profileType = "bot") // <--- The Fix
+                                 } else {
+                                     slot
+                                 }
+                             }
+
+                             // Save the freed roster to Firestore
+                             FirebaseFirestore.getInstance().collection("sessions").document(sessionId)
+                                 .update("slotRoster", updatedRoster)
+                         }
+                         updateUserActiveSlot("narrator")
+                         mySlotId = "narrator"
+                         Toast.makeText(this, "Director Mode Active", Toast.LENGTH_LONG).show()
+                     }
+                 }
             }
 
             cloneBtn.setOnClickListener {
@@ -1464,13 +1537,13 @@ class MainActivity : AppCompatActivity() {
             }
 
             // Initial UI state
-            colorblindModeBtn.text = if (isColorBlindMode) "Colorblind: ON" else "Colorblind: OFF"
+            // colorblindModeBtn.text = if (isColorBlindMode) "Colorblind: ON" else "Colorblind: OFF"
 
             colorblindModeBtn.setOnClickListener {
                 isColorBlindMode = !isColorBlindMode
 
                 // 1. Update Button UI
-                colorblindModeBtn.text = if (isColorBlindMode) "Colorblind: ON" else "Colorblind: OFF"
+                // colorblindModeBtn.text = if (isColorBlindMode) "Colorblind: ON" else "Colorblind: OFF"
 
                 // 2. Update Chat Adapter
                 chatAdapter.setColorBlindMode(isColorBlindMode)
@@ -1494,7 +1567,7 @@ class MainActivity : AppCompatActivity() {
                         val isPremium = doc.getBoolean("isPremium") ?: false
 
                         if (isPremium) {
-                            messageCounterTv.text = ""
+                            messageCounterTv.text = "Unlimited messages"
                             messageCounterTv.setTextColor(android.graphics.Color.parseColor("#FFD700")) // Gold
                         } else {
                             messageCounterTv.text = "Messages Today: $count / 70"
@@ -1551,8 +1624,14 @@ class MainActivity : AppCompatActivity() {
                 .setPositiveButton("Roll") { _, _ ->
                     val chosenStat = statNames[selectedStatIndex]
                     val extraMod = modifierInput.text.toString().toIntOrNull() ?: 0
-                    // Already have activeSlotId in scope
-                    handleDiceRoll(activeSlotId!!, chosenStat, extraMod)
+
+                    // Safely check if activeSlotId exists before rolling
+                    activeSlotId?.let { safeSlotId ->
+                        handleDiceRoll(safeSlotId, chosenStat, extraMod)
+                    } ?: run {
+                        // Optional: You can put a Toast here telling the user it failed to load
+                        Log.e("DiceRoll", "Tried to roll but activeSlotId was null!")
+                    }
                 }
                 .setNegativeButton("Cancel", null)
                 .show()
@@ -1562,51 +1641,58 @@ class MainActivity : AppCompatActivity() {
             Log.d("togglebutton debug", "resend button")
             val lastMessage = chatAdapter.getMessages()
                 .lastOrNull { it.senderId == sessionProfile.userMap[userId]?.activeSlotId }
-
-            if (lastMessage != null) {
-                checkServerStatusBeforeSending {
-                    checkMessageLimit {
-                        // Resend same text but with visibility=false and blank text
-                        val resendMsg = lastMessage.copy(
-                            id = "System",
-                            text = "",
-                            visibility = false,
-                            timestamp = com.google.firebase.Timestamp.now()
-                        )
-                        activationRound = 0
-                        SessionManager.sendMessage(chatId, sessionId, resendMsg)
-                        distributeMessageAndMemories(resendMsg)
-                        // (Optional: Trigger AI if you want this to start a new round)
-                        sendToAI("")
+            if (!sessionProfile.silent || isHost) {
+                if (lastMessage != null) {
+                    checkServerStatusBeforeSending {
+                        checkMessageLimit {
+                            // Resend same text but with visibility=false and blank text
+                            val resendMsg = lastMessage.copy(
+                                id = "System",
+                                text = "",
+                                visibility = false,
+                                timestamp = com.google.firebase.Timestamp.now()
+                            )
+                            activationRound = 0
+                            SessionManager.sendMessage(chatId, sessionId, resendMsg)
+                            distributeMessageAndMemories(resendMsg)
+                            // (Optional: Trigger AI if you want this to start a new round)
+                            sendToAI("")
+                        }
                     }
-                }
-            } else {
-                checkServerStatusBeforeSending {
-                    checkMessageLimit {
-                        val greetingText = sessionProfile.initialGreeting
-                        // Resend same text but with visibility=false and blank text
-                        if (greetingText!!.isNotBlank()) {
-                            lifecycleScope.launch {
-                                // Add greeting to each bot's personal history
-                                sessionProfile.slotRoster
-                                    .filter { it.profileType == "bot" }
-                                    .forEach { botSlot ->
-                                        val greetingMsg = ChatMessage(
-                                            id = UUID.randomUUID().toString(),
-                                            senderId = "system",
-                                            text = greetingText,
-                                            area = botSlot.lastActiveArea,
-                                            location = botSlot.lastActiveLocation,
-                                            timestamp = Timestamp.now(),
-                                            visibility = false
-                                        )
-                                        addToPersonalHistoryFirestore(sessionId, botSlot.slotId, greetingMsg)
-                                    }
+                } else {
+                    checkServerStatusBeforeSending {
+                        checkMessageLimit {
+                            val greetingText = sessionProfile.initialGreeting
+                            // Resend same text but with visibility=false and blank text
+                            if (greetingText!!.isNotBlank()) {
+                                lifecycleScope.launch {
+                                    // Add greeting to each bot's personal history
+                                    sessionProfile.slotRoster
+                                        .filter { it.profileType == "bot" }
+                                        .forEach { botSlot ->
+                                            val greetingMsg = ChatMessage(
+                                                id = UUID.randomUUID().toString(),
+                                                senderId = "system",
+                                                text = greetingText,
+                                                area = botSlot.lastActiveArea,
+                                                location = botSlot.lastActiveLocation,
+                                                timestamp = Timestamp.now(),
+                                                visibility = false
+                                            )
+                                            addToPersonalHistoryFirestore(
+                                                sessionId,
+                                                botSlot.slotId,
+                                                greetingMsg
+                                            )
+                                        }
+                                }
+                                sendToAI(greetingText)  // Send initial greeting to AI:contentReference[oaicite:2]{index=2}:contentReference[oaicite:3]{index=3}
                             }
-                            sendToAI(greetingText)  // Send initial greeting to AI:contentReference[oaicite:2]{index=2}:contentReference[oaicite:3]{index=3}
                         }
                     }
                 }
+            }else{
+                Toast.makeText(this, "Host has set the chat to silent.", Toast.LENGTH_SHORT).show()
             }
         }
 
@@ -1689,124 +1775,154 @@ class MainActivity : AppCompatActivity() {
 
         // Send button logic
         sendButton.setOnClickListener {
-            if (currentState == ButtonState.SEND) {
-                val text = messageEditText.text.toString().trim()
-                if (text.isNotEmpty()) {
+            if (!sessionProfile.silent || isHost) {
+                if (currentState == ButtonState.SEND) {
+                    val text = messageEditText.text.toString().trim()
+                    if (text.isNotEmpty()) {
 
-                    // 1. FIRST GATE: Is the AI awake?
-                    checkServerStatusBeforeSending {
+                        // 1. FIRST GATE: Is the AI awake?
+                        checkServerStatusBeforeSending {
 
-                        // 2. SECOND GATE: Do they have quota left?
-                        checkMessageLimit {
+                            // 2. SECOND GATE: Do they have quota left?
+                            checkMessageLimit {
 
-                            // --- DIRECTOR / SPY LOGIC START ---
-                            val isDirector = mySlotId == "narrator"
+                                // --- DIRECTOR / SPY LOGIC START ---
+                                val isDirector = mySlotId == "narrator"
 
-                            // 1. Determine Sender & Location
-                            val finalSenderId: String
-                            val finalDisplayName: String
-                            val targetArea: String?
-                            val targetLocation: String?
-                            val myChar = sessionProfile?.slotRoster?.find { it.slotId == mySlotId }
+                                // 1. Determine Sender & Location
+                                val finalSenderId: String
+                                val finalDisplayName: String
+                                val targetArea: String?
+                                val targetLocation: String?
+                                val myChar =
+                                    sessionProfile?.slotRoster?.find { it.slotId == mySlotId }
 
-                            if (isDirector) {
-                                // DIRECTOR MODE: Must rely on Spy variables
-                                if (spyingArea != null && spyingLocation != null) {
-                                    targetArea = spyingArea
-                                    targetLocation = spyingLocation
-                                    finalSenderId = "narrator"
-                                    finalDisplayName = "Narrator"
+                                if (isDirector) {
+                                    // DIRECTOR MODE: Must rely on Spy variables
+                                    if (spyingArea != null && spyingLocation != null) {
+                                        targetArea = spyingArea
+                                        targetLocation = spyingLocation
+                                        finalSenderId = "narrator"
+                                        finalDisplayName = "Narrator"
+                                    } else {
+                                        Toast.makeText(
+                                            this,
+                                            "Directors must SPY on a location to speak there.",
+                                            Toast.LENGTH_SHORT
+                                        ).show()
+                                        return@checkMessageLimit // Abort sending
+                                    }
                                 } else {
-                                    Toast.makeText(this, "Directors must SPY on a location to speak there.", Toast.LENGTH_SHORT).show()
-                                    return@checkMessageLimit // Abort sending
+                                    // REGULAR MODE: Use Player's physical location
+                                    // Safety check
+                                    if (myChar == null) {
+                                        Toast.makeText(
+                                            this,
+                                            "No character selected.",
+                                            Toast.LENGTH_SHORT
+                                        ).show()
+                                        return@checkMessageLimit
+                                    }
+                                    targetArea = myChar.lastActiveArea
+                                    targetLocation = myChar.lastActiveLocation
+                                    finalSenderId = mySlotId ?: ""
+                                    finalDisplayName = myChar.name
                                 }
-                            } else {
-                                // REGULAR MODE: Use Player's physical location
-                                // Safety check
-                                if (myChar == null) {
-                                    Toast.makeText(this, "No character selected.", Toast.LENGTH_SHORT).show()
-                                    return@checkMessageLimit
-                                }
-                                targetArea = myChar.lastActiveArea
-                                targetLocation = myChar.lastActiveLocation
-                                finalSenderId = mySlotId ?: ""
-                                finalDisplayName = myChar.name
-                            }
 
-                            // 2. Update UI State IMMEDIATELY so the app feels snappy
-                            updateButtonState(ButtonState.INTERRUPT)
-                            setPlayerTyping(false)
-                            activationRound = 0
-                            messageEditText.text.clear()
-                            ignoreTextWatcher = false
+                                // 2. Update UI State IMMEDIATELY so the app feels snappy
+                                updateButtonState(ButtonState.INTERRUPT)
+                                setPlayerTyping(false)
+                                activationRound = 0
+                                messageEditText.text.clear()
+                                ignoreTextWatcher = false
 
-                            // LAUNCH COROUTINE FOR VECTOR MATH & DB CALLS
-                            lifecycleScope.launch {
-                                var matchedPoseName: String? = null
+                                // LAUNCH COROUTINE FOR VECTOR MATH & DB CALLS
+                                lifecycleScope.launch {
+                                    var matchedPoseName: String? = null
 
-                                // 3. Extract Player Pose (Skip if they are the Narrator!)
-                                if (!isDirector && myChar != null) {
-                                    val actionText = extractActionText(text)
+                                    // 3. Extract Player Pose (Skip if they are the Narrator!)
+                                    if (!isDirector && myChar != null) {
+                                        val actionText = extractActionText(text)
 
-                                    if (actionText != null) {
-                                        val actionVector = getVectorForText(text)
-                                        val activeSessionId = sessionProfile?.sessionId
+                                        if (actionText != null) {
+                                            val actionVector = getVectorForText(text)
+                                            val activeSessionId = sessionProfile?.sessionId
 
-                                        if (actionVector != null && activeSessionId != null) {
-                                            val wardrobeOutfits = fetchWardrobeForBaseId(sessionId, myChar.baseCharacterId!!)
-                                            Log.d("PosingEngine", "STEP 3: Fetched ${wardrobeOutfits.size} outfits from DB for ${myChar.name}")
-                                            val currentOutfit = wardrobeOutfits.find { it.name == myChar.currentOutfit }
+                                            if (actionVector != null && activeSessionId != null) {
+                                                val wardrobeOutfits = fetchWardrobeForBaseId(
+                                                    sessionId,
+                                                    myChar.baseCharacterId!!
+                                                )
+                                                Log.d(
+                                                    "PosingEngine",
+                                                    "STEP 3: Fetched ${wardrobeOutfits.size} outfits from DB for ${myChar.name}"
+                                                )
+                                                val currentOutfit =
+                                                    wardrobeOutfits.find { it.name == myChar.currentOutfit }
 
-                                            if (currentOutfit != null) {
-                                                var bestMatchName: String? = null
-                                                var highestScore = -1.0
+                                                if (currentOutfit != null) {
+                                                    var bestMatchName: String? = null
+                                                    var highestScore = -1.0
 
-                                                for (pose in currentOutfit.poseSlots) {
-                                                    if (pose.vector != null) {
-                                                        val score = calculateCosineSimilarity(actionVector, pose.vector!!)
-                                                        if (score > highestScore) {
-                                                            highestScore = score
-                                                            bestMatchName = pose.name
+                                                    for (pose in currentOutfit.poseSlots) {
+                                                        if (pose.vector != null) {
+                                                            val score = calculateCosineSimilarity(
+                                                                actionVector,
+                                                                pose.vector!!
+                                                            )
+                                                            if (score > highestScore) {
+                                                                highestScore = score
+                                                                bestMatchName = pose.name
+                                                            }
                                                         }
                                                     }
+                                                    matchedPoseName = bestMatchName
+                                                    Log.d(
+                                                        "PosingEngine",
+                                                        "Player matched '$actionText' to pose: $matchedPoseName (Score: $highestScore)"
+                                                    )
                                                 }
-                                                matchedPoseName = bestMatchName
-                                                Log.d("PosingEngine", "Player matched '$actionText' to pose: $matchedPoseName (Score: $highestScore)")
                                             }
                                         }
                                     }
+
+                                    // 4. Construct Message with the new Pose
+                                    val timestamp = com.google.firebase.Timestamp.now()
+                                    val newMessage = ChatMessage(
+                                        id = UUID.randomUUID().toString(),
+                                        senderId = finalSenderId,
+                                        displayName = finalDisplayName,
+                                        text = text,
+                                        timestamp = timestamp,
+                                        area = targetArea,
+                                        location = targetLocation,
+                                        visibility = true,
+                                        pose = matchedPoseName // <--- INJECT THE MATH WINNER HERE
+                                    )
+
+                                    // 5. Send to Firestore
+                                    val activeSessionId = sessionProfile?.sessionId ?: return@launch
+                                    val activeChatId = sessionProfile?.chatId ?: ""
+                                    SessionManager.sendMessage(
+                                        activeChatId,
+                                        activeSessionId,
+                                        newMessage
+                                    )
+                                    // 6. Memory Check
+                                    distributeMessageAndMemories(newMessage)
+                                    // 6. Trigger AI Loop
+                                    val userInput = newMessage.text
+                                    sendToAI(userInput)
                                 }
-
-                                // 4. Construct Message with the new Pose
-                                val timestamp = com.google.firebase.Timestamp.now()
-                                val newMessage = ChatMessage(
-                                    id = UUID.randomUUID().toString(),
-                                    senderId = finalSenderId,
-                                    displayName = finalDisplayName,
-                                    text = text,
-                                    timestamp = timestamp,
-                                    area = targetArea,
-                                    location = targetLocation,
-                                    visibility = true,
-                                    pose = matchedPoseName // <--- INJECT THE MATH WINNER HERE
-                                )
-
-                                // 5. Send to Firestore
-                                val activeSessionId = sessionProfile?.sessionId ?: return@launch
-                                val activeChatId = sessionProfile?.chatId ?: ""
-                                SessionManager.sendMessage(activeChatId, activeSessionId, newMessage)
-                                // 6. Memory Check
-                                distributeMessageAndMemories(newMessage)
-                                // 6. Trigger AI Loop
-                                val userInput = newMessage.text
-                                sendToAI(userInput)
                             }
                         }
                     }
+                } else if (currentState == ButtonState.INTERRUPT) {
+                    interruptAILoop()
+                    updateButtonState(ButtonState.SEND)
                 }
-            } else if (currentState == ButtonState.INTERRUPT) {
-                interruptAILoop()
-                updateButtonState(ButtonState.SEND)
+            }else{
+                Toast.makeText(this, "Host has set the chat to silent.", Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -2892,240 +3008,248 @@ class MainActivity : AppCompatActivity() {
             }
         }
         else if (actionType == "fusion") {
-            val progressDialog = androidx.appcompat.app.AlertDialog.Builder(this)
-                .setMessage("Initiating Fusion...")
-                .setCancelable(false)
-                .show()
+            if (sessionProfile.chatMode == "ONEONONE") {
+                Toast.makeText(this, "Cannot fuse in a One on One Chat.", Toast.LENGTH_SHORT).show()
+            } else {
+                val progressDialog = androidx.appcompat.app.AlertDialog.Builder(this)
+                    .setMessage("Initiating Fusion...")
+                    .setCancelable(false)
+                    .show()
 
-            lifecycleScope.launch(Dispatchers.IO) {
-                try {
-                    val db = FirebaseFirestore.getInstance()
-                    val sessionIdStr = sessionProfile?.sessionId ?: return@launch
-                    val currentRoster = sessionProfile?.slotRoster?.toList() ?: return@launch
+                lifecycleScope.launch(Dispatchers.IO) {
+                    try {
+                        val db = FirebaseFirestore.getInstance()
+                        val sessionIdStr = sessionProfile?.sessionId ?: return@launch
+                        val currentRoster = sessionProfile?.slotRoster?.toList() ?: return@launch
 
-                    val targetArea = slotToUpdate.lastActiveArea
-                    val targetLocation = slotToUpdate.lastActiveLocation
+                        val targetArea = slotToUpdate.lastActiveArea
+                        val targetLocation = slotToUpdate.lastActiveLocation
 
-                    // 1. Find ALL active components in the roster who share this fusion target
-                    val componentSlots = currentRoster.filter { slot ->
-                        slot.activityStatus && slot.linkedTo.any { it.type.lowercase() == "fusion" && it.targetId == link.targetId }
-                    }
-
-                    if (componentSlots.isEmpty()) {
-                        withContext(Dispatchers.Main) { progressDialog.dismiss() }
-                        return@launch
-                    }
-
-                    val componentNames = componentSlots.joinToString(", ") { it.name }
-                    val componentIds = componentSlots.map { it.slotId }.toSet()
-
-                    // 2. Build the dynamic "Unfuse" links to inject into the Fused character
-                    val unfuseLinks = componentSlots.map { comp ->
-                        CharacterLink(
-                            targetId = comp.slotId, // Use slotId so we know EXACTLY who to wake up later
-                            targetName = comp.name,
-                            targetAvatar = comp.avatarUri?: "",
-                            type = "unfuse",
-                            trigger = "Split back into components"
-                        )
-                    }
-
-                    val batch = db.batch()
-                    val sessionRef = db.collection("sessions").document(sessionIdStr)
-                    var fusedName = link.targetName
-                    val newRoster: List<SlotProfile>
-
-                    val existingIndex =
-                        currentRoster.indexOfFirst { it.baseCharacterId == link.targetId || it.slotId == link.targetId }
-
-                    if (existingIndex >= 0) {
-                        // A. FUSED CHARACTER ALREADY IN ROSTER (Re-fusion)
-                        val existingSlot = currentRoster[existingIndex]
-                        fusedName = existingSlot.name
-
-                        // Combine existing non-unfuse links with the fresh unfuse links
-                        val updatedLinks =
-                            existingSlot.linkedTo.filter { it.type.lowercase() != "unfuse" } + unfuseLinks
-
-                        newRoster = currentRoster.mapIndexed { index, slot ->
-                            if (index == existingIndex) {
-                                // Wake up the fused character
-                                slot.copy(
-                                    lastActiveArea = targetArea,
-                                    lastActiveLocation = targetLocation,
-                                    activityStatus = true,
-                                    linkedTo = updatedLinks
-                                )
-                            } else if (slot.slotId in componentIds) {
-                                // Put the components to sleep
-                                slot.copy(
-                                    activityStatus = false,
-                                    lastActiveArea = targetArea,
-                                    lastActiveLocation = targetLocation
-                                )
-                            } else {
-                                slot
-                            }
+                        // 1. Find ALL active components in the roster who share this fusion target
+                        val componentSlots = currentRoster.filter { slot ->
+                            slot.activityStatus && slot.linkedTo.any { it.type.lowercase() == "fusion" && it.targetId == link.targetId }
                         }
-                        batch.update(sessionRef, "slotRoster", newRoster)
 
-                    } else {
-                        // B. BRAND NEW FUSION: Fetch and Build
-                        if (currentRoster.size >= 50) {
-                            withContext(Dispatchers.Main) {
-                                progressDialog.dismiss()
-                                Toast.makeText(
-                                    this@MainActivity,
-                                    "Roster is full (Max 50). Cannot fuse.",
-                                    Toast.LENGTH_SHORT
-                                ).show()
-                            }
+                        if (componentSlots.isEmpty()) {
+                            withContext(Dispatchers.Main) { progressDialog.dismiss() }
                             return@launch
                         }
 
-                        val targetDoc =
-                            db.collection("characters").document(link.targetId).get().await()
-                        if (!targetDoc.exists()) {
-                            withContext(Dispatchers.Main) {
-                                progressDialog.dismiss()
-                                Toast.makeText(
-                                    this@MainActivity,
-                                    "Fusion target no longer exists.",
-                                    Toast.LENGTH_SHORT
-                                ).show()
+                        val componentNames = componentSlots.joinToString(", ") { it.name }
+                        val componentIds = componentSlots.map { it.slotId }.toSet()
+
+                        // 2. Build the dynamic "Unfuse" links to inject into the Fused character
+                        val unfuseLinks = componentSlots.map { comp ->
+                            CharacterLink(
+                                targetId = comp.slotId, // Use slotId so we know EXACTLY who to wake up later
+                                targetName = comp.name,
+                                targetAvatar = comp.avatarUri ?: "",
+                                type = "unfuse",
+                                trigger = "Split back into components"
+                            )
+                        }
+
+                        val batch = db.batch()
+                        val sessionRef = db.collection("sessions").document(sessionIdStr)
+                        var fusedName = link.targetName
+                        val newRoster: List<SlotProfile>
+
+                        val existingIndex =
+                            currentRoster.indexOfFirst { it.baseCharacterId == link.targetId || it.slotId == link.targetId }
+
+                        if (existingIndex >= 0) {
+                            // A. FUSED CHARACTER ALREADY IN ROSTER (Re-fusion)
+                            val existingSlot = currentRoster[existingIndex]
+                            fusedName = existingSlot.name
+
+                            // Combine existing non-unfuse links with the fresh unfuse links
+                            val updatedLinks =
+                                existingSlot.linkedTo.filter { it.type.lowercase() != "unfuse" } + unfuseLinks
+
+                            newRoster = currentRoster.mapIndexed { index, slot ->
+                                if (index == existingIndex) {
+                                    // Wake up the fused character
+                                    slot.copy(
+                                        lastActiveArea = targetArea,
+                                        lastActiveLocation = targetLocation,
+                                        activityStatus = true,
+                                        linkedTo = updatedLinks
+                                    )
+                                } else if (slot.slotId in componentIds) {
+                                    // Put the components to sleep
+                                    slot.copy(
+                                        activityStatus = false,
+                                        lastActiveArea = targetArea,
+                                        lastActiveLocation = targetLocation
+                                    )
+                                } else {
+                                    slot
+                                }
                             }
-                            return@launch
+                            batch.update(sessionRef, "slotRoster", newRoster)
+
+                        } else {
+                            // B. BRAND NEW FUSION: Fetch and Build
+                            if (currentRoster.size >= 50) {
+                                withContext(Dispatchers.Main) {
+                                    progressDialog.dismiss()
+                                    Toast.makeText(
+                                        this@MainActivity,
+                                        "Roster is full (Max 50). Cannot fuse.",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                }
+                                return@launch
+                            }
+
+                            val targetDoc =
+                                db.collection("characters").document(link.targetId).get().await()
+                            if (!targetDoc.exists()) {
+                                withContext(Dispatchers.Main) {
+                                    progressDialog.dismiss()
+                                    Toast.makeText(
+                                        this@MainActivity,
+                                        "Fusion target no longer exists.",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                }
+                                return@launch
+                            }
+                            val charData =
+                                targetDoc.toObject(CharacterProfile::class.java) ?: return@launch
+                            fusedName = charData.name
+
+                            // Fetch Wardrobe
+                            val wardrobeSnap = db.collection("characters").document(link.targetId)
+                                .collection("wardrobes").get().await()
+                            val cleanOutfits = wardrobeSnap.documents.mapNotNull { d ->
+                                val outfit = d.toObject(Outfit::class.java)
+                                outfit?.copy(poseSlots = outfit.poseSlots.map { it.copy(vector = null) }
+                                    .toMutableList())
+                            }
+
+                            val sessionWardrobeRef = sessionRef.collection("wardrobes")
+                            cleanOutfits.forEach { outfit ->
+                                val safeOutfitName =
+                                    outfit.name.replace("\\s+".toRegex(), "_").ifBlank { "default" }
+                                val docName = "${charData.id}_$safeOutfitName"
+                                batch.set(sessionWardrobeRef.document(docName), outfit)
+                            }
+
+                            // Combine DB links with dynamic unfuse links
+                            val combinedLinks = charData.linkedToMap.values.flatten() + unfuseLinks
+
+                            val newSlot = SlotProfile(
+                                slotId = charData.id,
+                                baseCharacterId = charData.id,
+                                name = charData.name,
+                                summary = charData.summary ?: "",
+                                personality = charData.personality ?: "",
+                                privateDescription = charData.privateDescription ?: "",
+                                backstory = charData.backstory ?: "",
+                                abilities = charData.abilities ?: "",
+                                exampleDialogue = charData.exampleDialogue,
+                                gender = charData.gender ?: "",
+                                height = charData.height ?: "",
+                                weight = charData.weight ?: "",
+                                eyeColor = charData.eyeColor ?: "",
+                                hairColor = charData.hairColor ?: "",
+                                physicalDescription = charData.physicalDescription ?: "",
+                                avatarUri = charData.avatarUri ?: "",
+                                bubbleColor = charData.bubbleColor ?: "#CCCCCC",
+                                textColor = charData.textColor ?: "#000000",
+                                sfwOnly = charData.sfwOnly,
+                                lorebookIds = charData.lorebookIds ?: emptyList(),
+                                linkedTo = combinedLinks, // <-- Injecting the unfuse links here!
+                                outfits = cleanOutfits,
+                                currentOutfit = charData.currentOutfit ?: "",
+                                lastActiveArea = targetArea,
+                                lastActiveLocation = targetLocation,
+                                activityStatus = true,
+                                lastSynced = com.google.firebase.Timestamp.now()
+                            )
+
+                            // Put components to sleep, update location, then append the new Fused character!
+                            val sleptRoster = currentRoster.map { slot ->
+                                if (slot.slotId in componentIds) {
+                                    slot.copy(
+                                        activityStatus = false,
+                                        lastActiveArea = targetArea,
+                                        lastActiveLocation = targetLocation
+                                    )
+                                } else {
+                                    slot
+                                }
+                            }
+                            newRoster = sleptRoster + newSlot
+                            batch.update(sessionRef, "slotRoster", newRoster)
                         }
-                        val charData =
-                            targetDoc.toObject(CharacterProfile::class.java) ?: return@launch
-                        fusedName = charData.name
 
-                        // Fetch Wardrobe
-                        val wardrobeSnap = db.collection("characters").document(link.targetId)
-                            .collection("wardrobes").get().await()
-                        val cleanOutfits = wardrobeSnap.documents.mapNotNull { d ->
-                            val outfit = d.toObject(Outfit::class.java)
-                            outfit?.copy(poseSlots = outfit.poseSlots.map { it.copy(vector = null) }
-                                .toMutableList())
-                        }
-
-                        val sessionWardrobeRef = sessionRef.collection("wardrobes")
-                        cleanOutfits.forEach { outfit ->
-                            val safeOutfitName =
-                                outfit.name.replace("\\s+".toRegex(), "_").ifBlank { "default" }
-                            val docName = "${charData.id}_$safeOutfitName"
-                            batch.set(sessionWardrobeRef.document(docName), outfit)
-                        }
-
-                        // Combine DB links with dynamic unfuse links
-                        val combinedLinks = charData.linkedToMap.values.flatten() + unfuseLinks
-
-                        val newSlot = SlotProfile(
-                            slotId = charData.id,
-                            baseCharacterId = charData.id,
-                            name = charData.name,
-                            summary = charData.summary ?: "",
-                            personality = charData.personality ?: "",
-                            privateDescription = charData.privateDescription ?: "",
-                            backstory = charData.backstory ?: "",
-                            abilities = charData.abilities ?: "",
-                            exampleDialogue = charData.exampleDialogue,
-                            gender = charData.gender ?: "",
-                            height = charData.height ?: "",
-                            weight = charData.weight ?: "",
-                            eyeColor = charData.eyeColor ?: "",
-                            hairColor = charData.hairColor ?: "",
-                            physicalDescription = charData.physicalDescription ?: "",
-                            avatarUri = charData.avatarUri ?: "",
-                            bubbleColor = charData.bubbleColor ?: "#CCCCCC",
-                            textColor = charData.textColor ?: "#000000",
-                            sfwOnly = charData.sfwOnly,
-                            lorebookIds = charData.lorebookIds ?: emptyList(),
-                            linkedTo = combinedLinks, // <-- Injecting the unfuse links here!
-                            outfits = cleanOutfits,
-                            currentOutfit = charData.currentOutfit ?: "",
-                            lastActiveArea = targetArea,
-                            lastActiveLocation = targetLocation,
-                            activityStatus = true,
-                            lastSynced = com.google.firebase.Timestamp.now()
+                        // 3. Generate the System Message
+                        val sysMsgId = "sys-${UUID.randomUUID()}"
+                        val sysMsg = mapOf(
+                            "id" to sysMsgId,
+                            "senderId" to "system",
+                            "role" to "system",
+                            "name" to "System",
+                            "text" to "[FUSION] A blinding light engulfs the area! $componentNames have fused together to become $fusedName!",
+                            "area" to targetArea,
+                            "location" to targetLocation,
+                            "timestamp" to FieldValue.serverTimestamp(),
+                            "visibility" to true,
+                            "type" to "event",
+                            "bubbleColor" to "#fbbf24", // Brilliant gold for fusion!
+                            "textColor" to "#000000"
                         )
 
-                        // Put components to sleep, update location, then append the new Fused character!
-                        val sleptRoster = currentRoster.map { slot ->
-                            if (slot.slotId in componentIds) {
-                                slot.copy(
-                                    activityStatus = false,
-                                    lastActiveArea = targetArea,
-                                    lastActiveLocation = targetLocation
-                                )
-                            } else {
-                                slot
+                        batch.set(sessionRef.collection("messages").document(sysMsgId), sysMsg)
+
+                        // 4. Fan out message to everyone in the room (USING THE NEW ROSTER!)
+                        val peopleInRoom = newRoster.filter {
+                            it.lastActiveArea == targetArea && it.lastActiveLocation == targetLocation
+                        }
+                        val slotsToUpdate = peopleInRoom.map { it.slotId } + "narrator"
+
+                        slotsToUpdate.forEach { sId ->
+                            batch.set(
+                                sessionRef.collection("slotPersonalHistory").document(sId)
+                                    .collection("messages").document(sysMsgId), sysMsg
+                            )
+                        }
+
+                        batch.commit().await()
+
+                        // 5. UI Cleanup
+                        withContext(Dispatchers.Main) {
+                            sessionProfile = sessionProfile.copy(slotRoster = newRoster)
+                            chatAdapter?.updateSlotProfiles(newRoster)
+
+                            val sheetBox = findViewById<View>(R.id.characterSheetBox)
+                            if (sheetBox != null && sheetBox.visibility == View.VISIBLE) {
+                                // We pass link.targetId so it automatically opens the Fused character's sheet!
+                                refreshCharacterTabs(link.targetId)
                             }
-                        }
-                        newRoster = sleptRoster + newSlot
-                        batch.update(sessionRef, "slotRoster", newRoster)
-                    }
 
-                    // 3. Generate the System Message
-                    val sysMsgId = "sys-${UUID.randomUUID()}"
-                    val sysMsg = mapOf(
-                        "id" to sysMsgId,
-                        "senderId" to "system",
-                        "role" to "system",
-                        "name" to "System",
-                        "text" to "[FUSION] A blinding light engulfs the area! $componentNames have fused together to become $fusedName!",
-                        "area" to targetArea,
-                        "location" to targetLocation,
-                        "timestamp" to FieldValue.serverTimestamp(),
-                        "visibility" to true,
-                        "type" to "event",
-                        "bubbleColor" to "#fbbf24", // Brilliant gold for fusion!
-                        "textColor" to "#000000"
-                    )
-
-                    batch.set(sessionRef.collection("messages").document(sysMsgId), sysMsg)
-
-                    // 4. Fan out message to everyone in the room (USING THE NEW ROSTER!)
-                    val peopleInRoom = newRoster.filter {
-                        it.lastActiveArea == targetArea && it.lastActiveLocation == targetLocation
-                    }
-                    val slotsToUpdate = peopleInRoom.map { it.slotId } + "narrator"
-
-                    slotsToUpdate.forEach { sId ->
-                        batch.set(
-                            sessionRef.collection("slotPersonalHistory").document(sId)
-                                .collection("messages").document(sysMsgId), sysMsg
-                        )
-                    }
-
-                    batch.commit().await()
-
-                    // 5. UI Cleanup
-                    withContext(Dispatchers.Main) {
-                        sessionProfile = sessionProfile.copy(slotRoster = newRoster)
-                        chatAdapter?.updateSlotProfiles(newRoster)
-
-                        val sheetBox = findViewById<View>(R.id.characterSheetBox)
-                        if (sheetBox != null && sheetBox.visibility == View.VISIBLE) {
-                            // We pass link.targetId so it automatically opens the Fused character's sheet!
-                            refreshCharacterTabs(link.targetId)
+                            progressDialog.dismiss()
+                            linkDialog.dismiss()
+                            Toast.makeText(
+                                this@MainActivity,
+                                "Fusion complete!",
+                                Toast.LENGTH_SHORT
+                            )
+                                .show()
                         }
 
-                        progressDialog.dismiss()
-                        linkDialog.dismiss()
-                        Toast.makeText(this@MainActivity, "Fusion complete!", Toast.LENGTH_SHORT)
-                            .show()
-                    }
-
-                } catch (e: Exception) {
-                    Log.e("LinkEngine", "Failed to execute fusion:", e)
-                    withContext(Dispatchers.Main) {
-                        progressDialog.dismiss()
-                        Toast.makeText(
-                            this@MainActivity,
-                            "Failed to execute fusion.",
-                            Toast.LENGTH_SHORT
-                        ).show()
+                    } catch (e: Exception) {
+                        Log.e("LinkEngine", "Failed to execute fusion:", e)
+                        withContext(Dispatchers.Main) {
+                            progressDialog.dismiss()
+                            Toast.makeText(
+                                this@MainActivity,
+                                "Failed to execute fusion.",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
                     }
                 }
             }
@@ -4214,9 +4338,12 @@ class MainActivity : AppCompatActivity() {
 
                 // 2. Fetch Personal History for ALL components and sort by time
                 val combinedHistory = allRelevantSlotIds.flatMap { sId ->
-                    fetchPersonalHistory(sessionId, sId) // Assuming this returns a List<Message>
-                }.sortedBy { it.timestamp?.toDate()?.time ?: 0L } // Sort chronologically so the context makes sense
-                    .takeLast(10) // Take the 10 most recent across all minds
+                    fetchPersonalHistory(sessionId, sId)
+                }
+                    .filter { it.messageType != "system" }
+                    .distinctBy { it.id }
+                    .sortedBy { it.timestamp?.toDate()?.time ?: 0L }
+                    .takeLast(10)
 
                 val historyString = buildHistoryString(combinedHistory)
 
@@ -4412,7 +4539,10 @@ class MainActivity : AppCompatActivity() {
                 val nsfwRejectionPrompt = vnCheckedPrompt + nsfwRejection
                 val nsfwPrompt = vnCheckedPrompt + nsfwinstructions
 
-                val selectedModelId = slotProfile.modelId ?: sessionProfile.aiModel ?: "deepseek"
+                val selectedModelId = slotProfile.modelId?.takeIf { it.isNotBlank() }
+                    ?: sessionProfile.aiModel?.takeIf { it.isNotBlank() }
+                    ?: "nvidia"
+
                 Log.d("Model_debug", "using model: $selectedModelId the profile is ${sessionProfile.title} using ${sessionProfile.aiModel}")
                 when {
                     // Branch A: Existing Strict SFW logic
@@ -4441,42 +4571,25 @@ class MainActivity : AppCompatActivity() {
                 val topK = slotProfile.topK
                 val topP = slotProfile.topP
 
-                val responseText = withTimeoutOrNull(60_000L) {
+                val apiResult = withTimeoutOrNull(60_000L) {
                     when (apiRoute) {
-                        "openRouter" -> {
-                            Facilitator.callMixtralApi(
-                                finalPrompt,
-                                BuildConfig.MIXTRAL_API_KEY,
-                                selectedModelId,
-                                temp, topK, topP
-                            )
-                        }
-                        "mancer" -> {
-                            // NEW ROUTE!
-                            Facilitator.callMancerApi(
-                                finalPrompt,
-                                BuildConfig.MANCER_API_KEY,
-                                selectedModelId,
-                                temp, topK, topP
-                            )
-                        }
-                        "openAI" -> {
-                            Facilitator.callOpenAiApi(
-                                finalPrompt,
-                                BuildConfig.OPENAI_API_KEY,
-                                selectedModelId,
-                                temp, topK, topP
-                            )
-                        }
+                        "openRouter" -> Facilitator.callMixtralApi(finalPrompt, BuildConfig.MIXTRAL_API_KEY, selectedModelId, temp, topK, topP)
+                        "mancer" -> Facilitator.callMancerApi(finalPrompt, BuildConfig.MANCER_API_KEY, selectedModelId, temp, topK, topP)
+                        "openAI" -> Facilitator.callOpenAiApi(finalPrompt, BuildConfig.OPENAI_API_KEY, selectedModelId, temp, topK, topP)
                         else -> null
                     }
                 }
 
+                val responseText = apiResult?.content
+                val actualTokens = apiResult?.totalTokens ?: 0L
+
 
                 Log.d("ai_response", "raw response: $responseText")
+                Log.d("ai_response", "Actual tokens used: $actualTokens")
 
                 if (responseText == null) {
                     Log.e("AI_CYCLE", "The AI request timed out after 60 seconds.")
+                    logMonthlyAnalytics(selectedModelId, sessionProfile.chatMode, sessionProfile.chatId, "timeout", 0L)
                     withContext(Dispatchers.Main) {
                         Toast.makeText(this@MainActivity, "The AI took too long to respond. Please try again.", Toast.LENGTH_SHORT).show()
                         setSlotTyping(sessionId, nextSlotId, false)
@@ -4492,11 +4605,12 @@ class MainActivity : AppCompatActivity() {
                     sessionProfile.slotRoster
                 )
                 withContext(Dispatchers.Main) { updateButtonState(ButtonState.WAITING) }
+                val estimatedTokens = (responseText.length / 4).toLong()
 
                 // bad response check
                 if (result.messages == null) {
                     Log.e("AI_CYCLE", "The AI response is bad.")
-
+                    logMonthlyAnalytics(selectedModelId, sessionProfile.chatMode, sessionProfile.chatId, "misformat", 0L)
                     var isPremium = false
                     val userId = FirebaseAuth.getInstance().currentUser?.uid
 
@@ -4565,6 +4679,17 @@ class MainActivity : AppCompatActivity() {
                             }
                         }
                     }
+                }
+
+                // LOG THE SUCCESS
+                if (activationRound == 1) {
+                    logMonthlyAnalytics(
+                        selectedModelId,
+                        sessionProfile.chatMode,
+                        sessionProfile.chatId,
+                        "success",
+                        actualTokens
+                    )
                 }
 
                 Log.d("ai_response", "recieved: $result")
@@ -4958,7 +5083,9 @@ class MainActivity : AppCompatActivity() {
                 val nsfwRejectionPrompt = vnCheckedPrompt + nsfwRejection + "\n You also roleplay any NPC's as needed. Describe what they do and say"
                 val nsfwPrompt = vnCheckedPrompt + nsfwinstructions + "\n You also roleplay any NPC's as needed. Describe what they do and say"
 
-                val selectedModelId = slotProfile.modelId ?: sessionProfile.aiModel ?: "deepseek"
+                val selectedModelId = slotProfile.modelId?.takeIf { it.isNotBlank() }
+                    ?: sessionProfile.aiModel?.takeIf { it.isNotBlank() }
+                    ?: "nvidia"
 
 
                 when {
@@ -4989,40 +5116,25 @@ class MainActivity : AppCompatActivity() {
                 val topK = slotProfile.topK
                 val topP = slotProfile.topP
 
-                val responseText = withTimeoutOrNull(60_000L) {
+                val apiResult = withTimeoutOrNull(60_000L) {
                     when (apiRoute) {
-                        "openRouter" -> {
-                            Facilitator.callMixtralApi(
-                                finalPrompt,
-                                BuildConfig.MIXTRAL_API_KEY,
-                                selectedModelId,
-                                temp, topK, topP
-                            )
-                        }
-                        "mancer" -> {
-                            // NEW ROUTE!
-                            Facilitator.callMancerApi(
-                                finalPrompt,
-                                BuildConfig.MANCER_API_KEY,
-                                selectedModelId,
-                                temp, topK, topP
-                            )
-                        }
-                        "openAI" -> {
-                            Facilitator.callOpenAiApi(
-                                finalPrompt,
-                                BuildConfig.OPENAI_API_KEY,
-                                selectedModelId,
-                                temp, topK, topP
-                            )
-                        }
+                        "openRouter" -> Facilitator.callMixtralApi(finalPrompt, BuildConfig.MIXTRAL_API_KEY, selectedModelId, temp, topK, topP)
+                        "mancer" -> Facilitator.callMancerApi(finalPrompt, BuildConfig.MANCER_API_KEY, selectedModelId, temp, topK, topP)
+                        "openAI" -> Facilitator.callOpenAiApi(finalPrompt, BuildConfig.OPENAI_API_KEY, selectedModelId, temp, topK, topP)
                         else -> null
                     }
                 }
-                Log.d("ai_response", "Ai raw: $responseText")
+
+                // 2. Unpack the data
+                val responseText = apiResult?.content
+                val actualTokens = apiResult?.totalTokens ?: 0L
+
+                Log.d("ai_response", "raw response: $responseText")
+                Log.d("ai_response", "Actual tokens used: $actualTokens")
 
                 if (responseText == null) {
                     Log.e("AI_CYCLE", "The AI request timed out after 60 seconds.")
+                    logMonthlyAnalytics(selectedModelId, sessionProfile.chatMode, sessionProfile.chatId, "timeout", 0L)
                     withContext(Dispatchers.Main) {
                         Toast.makeText(this@MainActivity, "The AI took too long to respond. Please try again.", Toast.LENGTH_SHORT).show()
                         setSlotTyping(sessionId, nextSlotId, false)
@@ -5043,6 +5155,7 @@ class MainActivity : AppCompatActivity() {
                 if (result.messages == null) {
                     Log.e("AI_CYCLE", "The AI response is bad.")
 
+                    logMonthlyAnalytics(selectedModelId, sessionProfile.chatMode, sessionProfile.chatId, "misformat", 0L)
                     var isPremium = false
                     val userId = FirebaseAuth.getInstance().currentUser?.uid
 
@@ -5075,6 +5188,18 @@ class MainActivity : AppCompatActivity() {
                     return@launch
                 }
 
+                val estimatedTokens = (responseText.length / 4).toLong()
+
+                // LOG THE SUCCESS
+                if (activationRound == 1) {
+                    logMonthlyAnalytics(
+                        selectedModelId,
+                        sessionProfile.chatMode,
+                        sessionProfile.chatId,
+                        "success",
+                        actualTokens
+                    )
+                }
                 if (activationRound == 1) {
                     val userId = FirebaseAuth.getInstance().currentUser?.uid
                     if (userId != null) {
@@ -5272,9 +5397,12 @@ class MainActivity : AppCompatActivity() {
 
                 // 2. Fetch Personal History for ALL components and sort by time
                 val combinedHistory = allRelevantSlotIds.flatMap { sId ->
-                    fetchPersonalHistory(sessionId, sId) // Assuming this returns a List<Message>
-                }.sortedBy { it.timestamp?.toDate()?.time ?: 0L } // Sort chronologically so the context makes sense
-                    .takeLast(10) // Take the 10 most recent across all minds
+                    fetchPersonalHistory(sessionId, sId)
+                }
+                    .filter { it.messageType != "system" }
+                    .distinctBy { it.id }
+                    .sortedBy { it.timestamp?.toDate()?.time ?: 0L }
+                    .takeLast(10)
 
                 val historyString = buildHistoryString(combinedHistory)
 
@@ -5492,7 +5620,9 @@ class MainActivity : AppCompatActivity() {
                 val nsfwRejectionPrompt = vnCheckedPrompt + nsfwRejection
                 val nsfwPrompt = vnCheckedPrompt + nsfwinstructions
 
-                val selectedModelId = slotProfile.modelId ?: sessionProfile.aiModel ?: "deepseek"
+                val selectedModelId = slotProfile.modelId?.takeIf { it.isNotBlank() }
+                    ?: sessionProfile.aiModel?.takeIf { it.isNotBlank() }
+                    ?: "nvidia"
 
                 val finalPrompt = if (isStrictSfw){
                     nsfwRejectionPrompt
@@ -5505,39 +5635,25 @@ class MainActivity : AppCompatActivity() {
                 val topK = slotProfile.topK
                 val topP = slotProfile.topP
 
-                val responseText = withTimeoutOrNull(60_000L) {
+                val apiResult = withTimeoutOrNull(60_000L) {
                     when (apiRoute) {
-                        "openRouter" -> {
-                            Facilitator.callMixtralApi(
-                                finalPrompt,
-                                BuildConfig.MIXTRAL_API_KEY,
-                                selectedModelId,
-                                temp, topK, topP
-                            )
-                        }
-                        "mancer" -> {
-                            // NEW ROUTE!
-                            Facilitator.callMancerApi(
-                                finalPrompt,
-                                BuildConfig.MANCER_API_KEY,
-                                selectedModelId,
-                                temp, topK, topP
-                            )
-                        }
-                        "openAI" -> {
-                            Facilitator.callOpenAiApi(
-                                finalPrompt,
-                                BuildConfig.OPENAI_API_KEY,
-                                selectedModelId,
-                                temp, topK, topP
-                            )
-                        }
+                        "openRouter" -> Facilitator.callMixtralApi(finalPrompt, BuildConfig.MIXTRAL_API_KEY, selectedModelId, temp, topK, topP)
+                        "mancer" -> Facilitator.callMancerApi(finalPrompt, BuildConfig.MANCER_API_KEY, selectedModelId, temp, topK, topP)
+                        "openAI" -> Facilitator.callOpenAiApi(finalPrompt, BuildConfig.OPENAI_API_KEY, selectedModelId, temp, topK, topP)
                         else -> null
                     }
                 }
 
+                // 2. Unpack the data
+                val responseText = apiResult?.content
+                val actualTokens = apiResult?.totalTokens ?: 0L
+
+                Log.d("ai_response", "raw response: $responseText")
+                Log.d("ai_response", "Actual tokens used: $actualTokens")
+
                 if (responseText == null) {
                     Log.e("AI_CYCLE", "The AI request timed out after 60 seconds.")
+                    logMonthlyAnalytics(selectedModelId, sessionProfile.chatMode, sessionProfile.chatId, "timeout", 0L)
                     withContext(Dispatchers.Main) {
                         Toast.makeText(this@MainActivity, "The AI took too long to respond. Please try again.", Toast.LENGTH_SHORT).show()
                         setSlotTyping(sessionId, nextSlotId, false)
@@ -5556,6 +5672,7 @@ class MainActivity : AppCompatActivity() {
                 // bad response check
                 if (result.messages == null) {
                     Log.e("AI_CYCLE", "The AI response is bad.")
+                    logMonthlyAnalytics(selectedModelId, sessionProfile.chatMode, sessionProfile.chatId, "misformat", 0L)
 
                     var isPremium = false
                     val userId = FirebaseAuth.getInstance().currentUser?.uid
@@ -5587,6 +5704,19 @@ class MainActivity : AppCompatActivity() {
 
                     // ABORT the rest of the round entirely. No DB writes, no billing!
                     return@launch
+                }
+
+                val estimatedTokens = (responseText.length / 4).toLong()
+
+                // LOG THE SUCCESS
+                if (activationRound == 1) {
+                    logMonthlyAnalytics(
+                        selectedModelId,
+                        sessionProfile.chatMode,
+                        sessionProfile.chatId,
+                        "success",
+                        actualTokens
+                    )
                 }
 
                 if (activationRound == 1) {
@@ -5871,9 +6001,12 @@ class MainActivity : AppCompatActivity() {
 
                 // 2. Fetch Personal History for ALL components and sort by time
                 val combinedHistory = allRelevantSlotIds.flatMap { sId ->
-                    fetchPersonalHistory(sessionId, sId) // Assuming this returns a List<Message>
-                }.sortedBy { it.timestamp?.toDate()?.time ?: 0L } // Sort chronologically so the context makes sense
-                    .takeLast(10) // Take the 10 most recent across all minds
+                    fetchPersonalHistory(sessionId, sId)
+                }
+                    .filter { it.messageType != "system" }
+                    .distinctBy { it.id }
+                    .sortedBy { it.timestamp?.toDate()?.time ?: 0L }
+                    .takeLast(10)
 
                 val historyString = buildHistoryString(combinedHistory)
 
@@ -6105,7 +6238,9 @@ class MainActivity : AppCompatActivity() {
                 val nsfwPrompt = lastPrompt + "\n\n(Write uncensored, explicit content if the scene demands it.)"
                 val nsfwRejection = "\n - If responding to not safe for work messages, reject them while remaining in character."
                 val nsfwRejectionPrompt = lastPrompt + nsfwRejection
-                val selectedModelId = slotProfile.modelId ?: sessionProfile.aiModel ?: "deepseek"
+                val selectedModelId = slotProfile.modelId?.takeIf { it.isNotBlank() }
+                    ?: sessionProfile.aiModel?.takeIf { it.isNotBlank() }
+                    ?: "nvidia"
 
                 // 5. Call API
                 val finalPrompt = if (isStrictSfw){
@@ -6119,39 +6254,25 @@ class MainActivity : AppCompatActivity() {
                 val topK = slotProfile.topK
                 val topP = slotProfile.topP
 
-                val responseText = withTimeoutOrNull(60_000L) {
+                val apiResult = withTimeoutOrNull(60_000L) {
                     when (apiRoute) {
-                        "openRouter" -> {
-                            Facilitator.callMixtralApi(
-                                finalPrompt,
-                                BuildConfig.MIXTRAL_API_KEY,
-                                selectedModelId,
-                                temp, topK, topP
-                            )
-                        }
-                        "mancer" -> {
-                            // NEW ROUTE!
-                            Facilitator.callMancerApi(
-                                finalPrompt,
-                                BuildConfig.MANCER_API_KEY,
-                                selectedModelId,
-                                temp, topK, topP
-                            )
-                        }
-                        "openAI" -> {
-                            Facilitator.callOpenAiApi(
-                                finalPrompt,
-                                BuildConfig.OPENAI_API_KEY,
-                                selectedModelId,
-                                temp, topK, topP
-                            )
-                        }
+                        "openRouter" -> Facilitator.callMixtralApi(finalPrompt, BuildConfig.MIXTRAL_API_KEY, selectedModelId, temp, topK, topP)
+                        "mancer" -> Facilitator.callMancerApi(finalPrompt, BuildConfig.MANCER_API_KEY, selectedModelId, temp, topK, topP)
+                        "openAI" -> Facilitator.callOpenAiApi(finalPrompt, BuildConfig.OPENAI_API_KEY, selectedModelId, temp, topK, topP)
                         else -> null
                     }
                 }
 
+                // 2. Unpack the data
+                val responseText = apiResult?.content
+                val actualTokens = apiResult?.totalTokens ?: 0L
+
+                Log.d("ai_response", "raw response: $responseText")
+                Log.d("ai_response", "Actual tokens used: $actualTokens")
+
                 if (responseText == null) {
                     Log.e("AI_CYCLE", "The AI request timed out.")
+                    logMonthlyAnalytics(selectedModelId, sessionProfile.chatMode, sessionProfile.chatId, "timeout", 0L)
                     withContext(Dispatchers.Main) {
                         Toast.makeText(this@MainActivity, "The AI took too long to respond. Please try again.", Toast.LENGTH_SHORT).show()
                         setSlotTyping(sessionId, nextSlotId, false)
@@ -6167,6 +6288,7 @@ class MainActivity : AppCompatActivity() {
                 // 7. Error Guard Clause
                 if (result.messages == null) {
                     Log.e("AI_CYCLE", "The AI response is bad.")
+                    logMonthlyAnalytics(selectedModelId, sessionProfile.chatMode, sessionProfile.chatId, "misformat", 0L)
                     var isPremium = false
                     val uid = FirebaseAuth.getInstance().currentUser?.uid
 
@@ -6187,6 +6309,18 @@ class MainActivity : AppCompatActivity() {
                     return@launch // Abort!
                 }
 
+                val estimatedTokens = (responseText.length / 4).toLong()
+
+                // LOG THE SUCCESS
+                if (activationRound == 1) {
+                    logMonthlyAnalytics(
+                        selectedModelId,
+                        sessionProfile.chatMode,
+                        sessionProfile.chatId,
+                        "success",
+                        actualTokens
+                    )
+                }
                 // 8. Billing
                 if (activationRound == 1) {
                     val uid = FirebaseAuth.getInstance().currentUser?.uid
@@ -6841,6 +6975,16 @@ class MainActivity : AppCompatActivity() {
 
                 val isPremium = snapshot.getBoolean("isPremium") ?: false
                 if (isPremium) {
+                    val currentCount = worldCounter + 1
+                    if (currentCount >= 10) {
+                        // Launch the suspend function in the background
+                        lifecycleScope.launch(Dispatchers.IO) {
+                            triggerLivingWorldEngine()
+                        }
+                        worldCounter = 0
+                    } else {
+                        worldCounter = currentCount
+                    }
                     onLimitCheckPassed()
                     return@addOnSuccessListener
                 }
@@ -7006,6 +7150,108 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+    }
+
+    suspend fun triggerLivingWorldEngine() {
+        val db = FirebaseFirestore.getInstance()
+
+        // 1. Where are the human players right now?
+        val playerLocations = sessionProfile.slotRoster
+            .filter { it.profileType == "player" }
+            .map { "${it.lastActiveArea}_${it.lastActiveLocation}" }
+
+        // 2. Find all bots who are off-screen
+        val offScreenBots = sessionProfile.slotRoster
+            .filter { it.profileType == "bot" && "${it.lastActiveArea}_${it.lastActiveLocation}" !in playerLocations }
+
+        if (offScreenBots.isEmpty()) {
+            Log.d("WorldEngine", "No off-screen bots available to simulate.")
+            return
+        }
+
+        // 3. Group by exact location and pick one random group to simulate
+        val groupedByLocation = offScreenBots.groupBy { "${it.lastActiveArea}_${it.lastActiveLocation}" }
+        val randomZone = groupedByLocation.keys.randomOrNull() ?: return
+        val targetBots = groupedByLocation[randomZone] ?: return
+
+        val targetArea = targetBots.first().lastActiveArea
+        val targetLocation = targetBots.first().lastActiveLocation
+        val characterNames = targetBots.joinToString(", ") { it.name }
+
+        // 4. Fetch the recent history of the room to give the AI context
+        // (We just grab the history of the first bot in the group)
+        val representativeBotId = targetBots.first().slotId
+        val recentHistory = fetchPersonalHistory(sessionId, representativeBotId)
+            .filter { it.messageType != "system" }
+            .takeLast(5)
+
+        // Convert those ChatMessage objects to a clean string for the prompt
+        val historyString = recentHistory.joinToString("\n") { "${it.displayName}: ${it.text}" }
+
+        // 5. Build the Shadow Prompt
+        val shadowPrompt = """
+        You are the background simulator for a living RPG world.
+        The human players are not here. The following characters are currently at $targetLocation in $targetArea: $characterNames.
+        Based on the session description and their recent history, generate a brief (1-2 sentence) event or conversation that happens between them right now.
+        Write it from a narrator's perspective.
+        
+        Recent History:
+        $historyString
+    """.trimIndent()
+
+        // 6. Execute your AI Call
+        val aiResponse = sendToAI(shadowPrompt) // Replace with your actual AI generation function
+
+        // 7. Package the Shadow Message
+        val shadowEventId = "shadow-${UUID.randomUUID()}"
+        val shadowMessage = mapOf(
+            "id" to shadowEventId,
+            "senderId" to "system",
+            "displayName" to "World Engine",
+            "text" to "[Meanwhile at $targetLocation] $aiResponse",
+            "area" to targetArea,
+            "location" to targetLocation,
+            "timestamp" to FieldValue.serverTimestamp(),
+            "visibility" to false, // Crucial: Keeps it off the main chat screen
+            "messageType" to "shadow_event"
+        )
+
+        // 8. Distribute to the target bots and manage their memory counters
+        val batch = db.batch()
+        val sessionRef = db.collection("sessions").document(sessionId)
+        var rosterUpdated = false
+        val newRoster = sessionProfile.slotRoster.toMutableList()
+
+        targetBots.forEach { bot ->
+            // A. Inject into their personal history
+            batch.set(
+                sessionRef.collection("slotPersonalHistory").document(bot.slotId)
+                    .collection("messages").document(shadowEventId),
+                shadowMessage
+            )
+
+            // B. Update the memory counter
+            val rosterIndex = newRoster.indexOfFirst { it.slotId == bot.slotId }
+            if (rosterIndex != -1) {
+                val currentCount = bot.memoryCounter + 1
+                if (currentCount >= 10) {
+                    // Trigger memory consolidation asynchronously
+                    consolidateMemory(bot.slotId)
+                    newRoster[rosterIndex] = bot.copy(memoryCounter = 0)
+                } else {
+                    newRoster[rosterIndex] = bot.copy(memoryCounter = currentCount)
+                }
+                rosterUpdated = true
+            }
+        }
+
+        // 9. Commit the updates
+        if (rosterUpdated) {
+            batch.update(sessionRef, "slotRoster", newRoster)
+        }
+        batch.commit().addOnSuccessListener {
+            Log.d("WorldEngine", "Simulated event at $targetLocation successfully.")
+        }
     }
 
     private fun extractActionText(message: String): String? {
@@ -7458,8 +7704,12 @@ class MainActivity : AppCompatActivity() {
         val db = FirebaseFirestore.getInstance()
 
         // 1. Find everyone in the room (The Sender + The Bystanders)
-        val recipients = sessionProfile.slotRoster.filter { slot ->
-            slot.lastActiveArea == newMessage.area && slot.lastActiveLocation == newMessage.location
+        val recipients = if (newMessage.area == "all" && newMessage.location == "all"){
+            sessionProfile.slotRoster
+        } else {
+            sessionProfile.slotRoster.filter { slot ->
+                slot.lastActiveArea == newMessage.area && slot.lastActiveLocation == newMessage.location
+            }
         }
 
         var rosterUpdated = false
@@ -7474,7 +7724,11 @@ class MainActivity : AppCompatActivity() {
                 val slotIndex = updatedRoster.indexOfFirst { it.slotId == slot.slotId }
                 if (slotIndex != -1) {
                     val currentSlot = updatedRoster[slotIndex]
-                    val newCount = currentSlot.memoryCounter + 1
+                    val newCount = if (newMessage.messageType =="system"){
+                        currentSlot.memoryCounter
+                    } else {
+                        currentSlot.memoryCounter + 1
+                    }
 
                     if (newCount >= 10) {
                         // FIRE THE ENGINE!
@@ -7505,7 +7759,7 @@ class MainActivity : AppCompatActivity() {
                 val slot = sessionProfile.slotRoster.find { it.slotId == slotId } ?: return@launch
 
                 // 1. Fetch their recent personal history (Context!)
-                val recentMessages = fetchPersonalHistory(sessionId, slotId).takeLast(15)
+                val recentMessages = fetchPersonalHistory(sessionId, slotId).filter { it.messageType != "system" }.takeLast(15)
                 if (recentMessages.size < 5) return@launch // Not enough context yet
 
                 val transcript = buildHistoryString(recentMessages)
@@ -7529,18 +7783,21 @@ class MainActivity : AppCompatActivity() {
                 """.trimIndent()
 
                 // 3. Call the AI (Using your existing routing! You can hardcode a fast/cheap model here if you want)
-                val modelToUse = sessionProfile.aiModel ?: "Grok 4.1"
+                val modelToUse = sessionProfile.aiModel ?: "nvidia"
                 val apiRoute = getApiRoute(modelToUse)
 
-                val rawResponse = when (apiRoute) {
+                val apiResult = when (apiRoute) {
                     "openRouter" -> Facilitator.callMixtralApi(prompt, BuildConfig.MIXTRAL_API_KEY, modelToUse, null, null, null)
                     "mancer" -> Facilitator.callMancerApi(prompt, BuildConfig.MANCER_API_KEY, modelToUse, null, null, null)
                     "openAI" -> Facilitator.callOpenAiApi(prompt, BuildConfig.OPENAI_API_KEY, modelToUse, null, null, null)
                     else -> null
                 } ?: return@launch
 
-                // 4. Parse the JSON
-                val cleanJson = rawResponse.substringAfter("{").substringBeforeLast("}")
+                // REACH INTO THE BUCKET AND GET THE STRING!
+                val rawText = apiResult.content ?: return@launch
+
+                // 4. Parse the JSON using the rawText string
+                val cleanJson = rawText.substringAfter("{").substringBeforeLast("}")
                 val finalJson = "{$cleanJson}"
 
                 // Temporary data class just for parsing
@@ -8503,46 +8760,24 @@ class MainActivity : AppCompatActivity() {
                 """.trimIndent()
                 Log.d("event", "generating prompt: $prompt")
                 // 2. Call your AI API (Adjust this to match your OpenRouter/Facilitator implementation!)
-                val modelToUse = sessionProfile.aiModel ?: "Grok 4.1"
+                val modelToUse = sessionProfile.aiModel ?: "nvidia"
 
                 val apiRoute = getApiRoute(modelToUse)
 
-                val rawResponse =
-                    when (apiRoute) {
-                        "openRouter" -> {
-                            Facilitator.callMixtralApi(
-                                prompt,
-                                BuildConfig.MIXTRAL_API_KEY,
-                                modelToUse,
-                                null, null, null
-                            )
-                        }
-                        "mancer" -> {
-                            // NEW ROUTE!
-                            Facilitator.callMancerApi(
-                                prompt,
-                                BuildConfig.MANCER_API_KEY,
-                                modelToUse,
-                                null, null, null
-                            )
-                        }
-                        "openAI" -> {
-                            Facilitator.callOpenAiApi(
-                                prompt,
-                                BuildConfig.OPENAI_API_KEY,
-                                modelToUse,
-                                null, null, null
-                            )
-                        }
-                        else -> null
-                    }
+                val apiResult = when (apiRoute) {
+                    "openRouter" -> Facilitator.callMixtralApi(prompt, BuildConfig.MIXTRAL_API_KEY, modelToUse, null, null, null)
+                    "mancer" -> Facilitator.callMancerApi(prompt, BuildConfig.MANCER_API_KEY, modelToUse, null, null, null)
+                    "openAI" -> Facilitator.callOpenAiApi(prompt, BuildConfig.OPENAI_API_KEY, modelToUse, null, null, null)
+                    else -> null
+                } ?: return@launch
 
-                if (rawResponse != null) {
+                // REACH INTO THE BUCKET AND GET THE STRING!
+                val rawText = apiResult.content ?: return@launch
+
+
+                if (rawText != null) {
                     // 3. Clean the response (LLMs love to wrap JSON in markdown blocks)
-                    val cleanJson = rawResponse
-                        .substringAfter("```json")
-                        .substringBeforeLast("```")
-                        .trim()
+                    val cleanJson = rawText.substringAfter("{").substringBeforeLast("}")
 
                     // 4. Parse the JSON
                     val generatedEvent = Gson().fromJson(cleanJson, ScenarioEvent::class.java)
@@ -8568,7 +8803,7 @@ class MainActivity : AppCompatActivity() {
                     }
                 }
 
-                Log.d("event", "Returned:$rawResponse")
+                Log.d("event", "Returned:$rawText")
             } catch (e: Exception) {
                 Log.e("AiEventGenerator", "Error generating event", e)
                 withContext(Dispatchers.Main) {
@@ -8576,6 +8811,38 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
+    }
+
+    private fun logMonthlyAnalytics(modelId: String, chatMode: String, chatId: String, status: String, tokens: Long) {
+        val userId = FirebaseAuth.getInstance().currentUser?.uid ?: return
+        val db = FirebaseFirestore.getInstance()
+
+        // Get "2026-05"
+        val currentMonth = java.text.SimpleDateFormat("yyyy-MM", java.util.Locale.getDefault()).format(java.util.Date())
+        val monthlyReportRef = db.collection("users").document(userId)
+            .collection("monthly_reports").document(currentMonth)
+
+        val monthlyUpdates = hashMapOf<String, Any>(
+            "messagesPerModel.$modelId" to com.google.firebase.firestore.FieldValue.increment(1)
+        )
+
+        // Sort the session type
+        if (chatMode == "ONEONONE") {
+            monthlyUpdates["characterSessions.$chatId"] = com.google.firebase.firestore.FieldValue.increment(1)
+        } else {
+            monthlyUpdates["groupChatSessions.$chatId"] = com.google.firebase.firestore.FieldValue.increment(1)
+        }
+
+        // Add specific stats based on what happened
+        when (status) {
+            "timeout" -> monthlyUpdates["timeoutsPerModel.$modelId"] = com.google.firebase.firestore.FieldValue.increment(1)
+            "misformat" -> monthlyUpdates["misformatsPerModel.$modelId"] = com.google.firebase.firestore.FieldValue.increment(1)
+            "success" -> monthlyUpdates["totalTokens"] = com.google.firebase.firestore.FieldValue.increment(tokens)
+        }
+
+        // Fire and forget!
+        monthlyReportRef.set(monthlyUpdates, com.google.firebase.firestore.SetOptions.merge())
+            .addOnFailureListener { e -> android.util.Log.e("Analytics", "Failed to log stats", e) }
     }
 
     private fun updateUserActiveSlot(slotId: String?) {

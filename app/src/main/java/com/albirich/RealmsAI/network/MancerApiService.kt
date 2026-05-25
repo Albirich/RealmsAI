@@ -1,5 +1,7 @@
 package com.albirich.RealmsAI.network
 
+import com.google.gson.annotations.SerializedName
+import com.squareup.moshi.Json
 import retrofit2.http.Body
 import retrofit2.http.POST
 
@@ -18,7 +20,14 @@ data class MancerChatRequest(
 )
 
 data class MancerChatResponse(
-    val choices: List<Choice>
+    val id: String,
+    val choices: List<MancerChoice>,
+    val usage: MancerUsage? = null
 ) {
-    data class Choice(val message: Message)
+    data class MancerChoice(val message: Message)
 }
+data class MancerUsage(
+    @Json(name = "prompt_tokens") val promptTokens: Long = 0,
+    @Json(name = "completion_tokens") val completionTokens: Long = 0,
+    @Json(name = "total_tokens") val totalTokens: Long = 0
+)

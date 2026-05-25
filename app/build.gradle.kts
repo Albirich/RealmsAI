@@ -23,8 +23,8 @@ android {
         applicationId = "com.albirich.RealmsAI"
         minSdk        = 23
         targetSdk     = 35
-        versionCode   = 9
-        versionName   = "0.3.6"
+        versionCode   = 13
+        versionName   = "1.0.1"
 
         // grab your secrets
         val openaiKey  = localProps.getProperty("OPENAI_API_KEY",  "")
@@ -90,6 +90,9 @@ dependencies {
     implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
     implementation("com.squareup.okhttp3:okhttp:4.10.0")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+
+    //Payment
+    implementation("com.android.billingclient:billing:6.2.1")
 
 
     // AndroidX & UI

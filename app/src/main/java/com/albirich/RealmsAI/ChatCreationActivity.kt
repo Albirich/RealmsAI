@@ -570,6 +570,11 @@ class ChatCreationActivity : AppCompatActivity() {
             originalCharacterIds
         }
 
+        if (finalCharacterIds.isEmpty()) {
+            Toast.makeText(this, "You must select at least one character to start a chat!", Toast.LENGTH_SHORT).show()
+            return
+        }
+
         val authorId = FirebaseAuth.getInstance().currentUser?.uid ?: ""
 
         val profile = ChatProfile(

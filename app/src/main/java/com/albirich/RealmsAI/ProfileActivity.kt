@@ -3,6 +3,7 @@ package com.albirich.RealmsAI
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.util.Log
 import android.view.View
 import android.widget.*
 import androidx.activity.result.contract.ActivityResultContracts
@@ -10,6 +11,11 @@ import androidx.appcompat.app.AlertDialog
 import com.bumptech.glide.Glide
 import com.albirich.RealmsAI.models.MessageStatus
 import com.albirich.RealmsAI.models.UserProfile
+import com.android.billingclient.api.BillingClient
+import com.android.billingclient.api.BillingClientStateListener
+import com.android.billingclient.api.BillingResult
+import com.android.billingclient.api.Purchase
+import com.android.billingclient.api.QueryPurchasesParams
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.storage.FirebaseStorage
@@ -165,7 +171,7 @@ class ProfileActivity : BaseActivity() {
             }
             checkHandleUniqueAndSet(pickedHandle)
         }
-
+        verifySubscriptionStatus()
         loadProfile()
     }
 
@@ -242,17 +248,37 @@ class ProfileActivity : BaseActivity() {
 
                 // 4. --- UPGRADE BUTTON LOGIC ---
                 val upgradeBtn = findViewById<Button>(R.id.upgradeButton)
+
                 if (isPremium) {
-                    upgradeBtn.visibility = View.GONE
-                    statsTv.text = ""
+                    upgradeBtn.visibility = View.VISIBLE
+                    upgradeBtn.text = "Manage Subscription"
+
+                    upgradeBtn.setOnClickListener {
+                        // Deep link directly to the Google Play Store subscription page for RealmsAI
+                        try {
+                            val uri = android.net.Uri.parse("https://play.google.com/store/account/subscriptions?sku=realms_premium_monthly&package=com.albirich.RealmsAI")
+                            val intent = Intent(Intent.ACTION_VIEW, uri)
+                            startActivity(intent)
+                        } catch (e: android.content.ActivityNotFoundException) {
+                            // Fallback if the specific link fails for some reason
+                            val genericUri = android.net.Uri.parse("https://play.google.com/store/account/subscriptions")
+                            startActivity(Intent(Intent.ACTION_VIEW, genericUri))
+                        }
+                    }
+
+                    statsTv.text = "Unlimited"
                     statsTv.setTextColor(android.graphics.Color.parseColor("#FFD700")) // Gold
+
                 } else {
                     upgradeBtn.visibility = View.VISIBLE
+                    upgradeBtn.text = "Upgrade to Founder" // Make sure to reset the text for free users
+
                     upgradeBtn.setOnClickListener {
                         startActivity(Intent(this@ProfileActivity, UpgradeActivity::class.java))
                     }
-                    statsTv.text = "Messages Today:\n $count / 50"
-                    if (count >= 50) {
+
+                    statsTv.text = "Messages Today:\n $count / 70"
+                    if (count >= 70) {
                         statsTv.setTextColor(android.graphics.Color.RED)
                     } else {
                         statsTv.setTextColor(android.graphics.Color.WHITE)
@@ -484,6 +510,71 @@ class ProfileActivity : BaseActivity() {
                 verifyEmailBtn.isEnabled = true
                 verifyEmailBtn.text = "Verify Email"
             }
+    }
+
+    private fun verifySubscriptionStatus() {
+        val user = FirebaseAuth.getInstance().currentUser ?: return
+        val db = FirebaseFirestore.getInstance()
+        val userRef = db.collection("users").document(user.uid)
+
+        val billingClient = BillingClient.newBuilder(this)
+            .setListener { _, _ -> } // Empty listener because we are just querying
+            .enablePendingPurchases()
+            .build()
+
+        billingClient.startConnection(object : BillingClientStateListener {
+            override fun onBillingSetupFinished(billingResult: BillingResult) {
+                if (billingResult.responseCode == BillingClient.BillingResponseCode.OK) {
+
+                    // Query Google Play for active subscriptions
+                    billingClient.queryPurchasesAsync(
+                        QueryPurchasesParams.newBuilder()
+                            .setProductType(BillingClient.ProductType.SUBS)
+                            .build()
+                    ) { result, purchases ->
+
+                        Log.d("BillingCheck", "Google Play found ${purchases.size} active subscriptions in cache.")
+                        for (p in purchases) {
+                            Log.d("BillingCheck", "Ghost Sub: ${p.products}, AutoRenewing: ${p.isAutoRenewing}")
+                        }
+
+                        val hasActiveSub = purchases.any { purchase ->
+                            purchase.products.contains("realms_premium_monthly") &&
+                                    purchase.purchaseState == Purchase.PurchaseState.PURCHASED
+                        }
+
+                        // Ask Firestore what the database currently thinks your status is
+                        userRef.get().addOnSuccessListener { snapshot ->
+                            val currentDbPremiumStatus = snapshot.getBoolean("isPremium") ?: false
+
+                            // If Google says NO, but Firestore says YES -> Downgrade them!
+                            if (!hasActiveSub && currentDbPremiumStatus) {
+                                userRef.update("isPremium", false).addOnSuccessListener {
+                                    runOnUiThread {
+                                        Toast.makeText(this@ProfileActivity, "Subscription expired.", Toast.LENGTH_SHORT).show()
+                                        // Refresh the activity so your onCreate UI logic runs again
+                                        recreate()
+                                    }
+                                }
+                            }
+                            // Failsafe: If Google says YES, but Firestore says NO -> Upgrade them!
+                            else if (hasActiveSub && !currentDbPremiumStatus) {
+                                userRef.update("isPremium", true).addOnSuccessListener {
+                                    runOnUiThread {
+                                        Toast.makeText(this@ProfileActivity, "Subscription restored.", Toast.LENGTH_SHORT).show()
+                                        recreate()
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            override fun onBillingServiceDisconnected() {
+                // Can be ignored for a simple status check
+            }
+        })
     }
 
     private fun grantVerifiedBadge(userId: String) {

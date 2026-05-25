@@ -42,7 +42,8 @@ data class SessionProfile(
     var enabledModes: MutableList<String> = mutableListOf(),
     var modeSettings: MutableMap<String, Any> = mutableMapOf(),
     val globalLorebookIds: List<String> = emptyList(),
-    val pinnedMessages: MutableList<String> = mutableListOf()
+    val pinnedMessages: MutableList<String> = mutableListOf(),
+    var silent: Boolean = false
 )
 
 // ----------------------

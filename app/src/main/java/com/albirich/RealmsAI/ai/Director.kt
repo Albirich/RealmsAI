@@ -40,7 +40,13 @@ object Director {
         try {
             Log.d("Director", "[Mixtral] Prompt:\n$prompt")
             val engine = com.albirich.RealmsAI.network.MixtralEngine(ApiClients.mixtral)
-            engine.getBotOutput(prompt)
+
+            // 1. Get the bucket
+            val apiResult = engine.getBotOutput(prompt)
+
+            // 2. Open the bucket and return just the String!
+            apiResult.content ?: ""
+
         } catch (ex: Exception) {
             Log.e("Director", "Error calling Mixtral API", ex)
             ""

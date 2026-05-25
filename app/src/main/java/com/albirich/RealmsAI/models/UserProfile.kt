@@ -26,3 +26,22 @@ data class UserProfile(
     @set:PropertyName("isDev")
     var isDev: Boolean = false
 )
+
+data class MonthlyReport(
+    val monthId: String = "", // e.g., "2026-05"
+
+    // --- API & MODEL HEALTH ---
+    val messagesPerModel: Map<String, Int> = emptyMap(),
+    val timeoutsPerModel: Map<String, Int> = emptyMap(),
+    val misformatsPerModel: Map<String, Int> = emptyMap(),
+    val totalTokens: Long = 0,
+
+    // --- ENGAGEMENT STATS ---
+    val daysActive: Int = 0,
+    val sessionsHosted: Int = 0,
+    val sessionsJoined: Int = 0,
+
+    // --- "WRAPPED" DATA ---
+    val characterSessions: Map<String, Int> = emptyMap(),
+    val groupChatSessions: Map<String, Int> = emptyMap()
+)

@@ -548,8 +548,9 @@ class SessionLandingActivity : AppCompatActivity() {
                         }
 
                         // 3. The AI finished! Dismiss dialog and jump into the game.
-                        if (sessionStarted && !isProceedingToGame) { // <-- ADD FLAG CHECK HERE
-                            isProceedingToGame = true // <-- SET TO TRUE TO PREVENT LOOPS
+                        if (sessionStarted && !isProceedingToGame) {
+                            logSessionEngagement(isHost = false)
+                            isProceedingToGame = true
 
                             FirebaseFirestore.getInstance()
                                 .collection("sessions")
@@ -586,7 +587,7 @@ class SessionLandingActivity : AppCompatActivity() {
             AlertDialog.Builder(this@SessionLandingActivity)
                 .setTitle("Characters")
                 .setMessage(
-                    "You can add up to 20 characters. Click and hold a character for more options.\n" +
+                    "You can add up to 50 characters. Click and hold a character for more options.\n" +
                             "Profile takes you to the character's profile.\n" +
                             "Replace will replace the character in that position (good for switching another characters relationships with the new character).\n" +
                             "Remove removes the character from the list.\n" +
@@ -595,19 +596,44 @@ class SessionLandingActivity : AppCompatActivity() {
                 .setPositiveButton("OK", null)
                 .show()
         }
+
         addcharacter.setOnClickListener {
-            if (sessionProfile?.slotRoster!!.size >= 20) {
-                Toast.makeText(
-                    this,
-                    "You can only have 20 characters/personas per session.",
-                    Toast.LENGTH_SHORT
-                ).show()
-            } else {
-                val intent = Intent(this, CharacterSelectionActivity::class.java)
-                intent.putExtra("TEMP_SELECTION_MODE", true)
-                intent.putExtra("MAX_SELECT", 1)
-                startActivityForResult(intent, 101)
-            }
+            val currentRosterSize = sessionProfile?.slotRoster?.size ?: 0
+            val isOneOnOne = sessionProfile?.chatMode.equals("ONEONONE", ignoreCase = true)
+
+            // 1. Check if the Host is Premium
+            val hostId = sessionProfile?.userList?.firstOrNull() ?: return@setOnClickListener
+
+            FirebaseFirestore.getInstance().collection("users").document(hostId).get()
+                .addOnSuccessListener { userDoc ->
+                    val hostIsPremium = userDoc.getBoolean("isPremium") ?: false
+                    val maxAllowed = if (hostIsPremium) 50 else 20
+
+                    // 2. Enforce the Limits
+                    if (currentRosterSize >= maxAllowed && !isOneOnOne) {
+                        Toast.makeText(
+                            this,
+                            "The Host's plan only allows $maxAllowed characters per session.",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                        return@addOnSuccessListener
+                    }
+
+                    if (currentRosterSize >= 2 && isOneOnOne) {
+                        Toast.makeText(
+                            this,
+                            "You can only have 2 characters in One on One sessions.",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                        return@addOnSuccessListener
+                    }
+
+                    // 3. Proceed to selection
+                    val intent = Intent(this, CharacterSelectionActivity::class.java)
+                    intent.putExtra("TEMP_SELECTION_MODE", true)
+                    intent.putExtra("MAX_SELECT", 1)
+                    startActivityForResult(intent, 101)
+                }
         }
 
         // --- Relationship button ---
@@ -696,8 +722,7 @@ class SessionLandingActivity : AppCompatActivity() {
                 return@setOnClickListener
             } else {
                 Log.d("session_start", "ready")
-                // checkPermissions()
-                startNewSession(stripModes = false)
+                checkPermissions()
             }
         }
     }
@@ -705,12 +730,10 @@ class SessionLandingActivity : AppCompatActivity() {
     private fun checkPermissions() {
         Log.d("session_start", "checking permissions")
         val rosterCount = sessionProfile?.slotRoster?.size ?: 0
-        val userList =
-            sessionProfile?.userList ?: listOf(FirebaseAuth.getInstance().currentUser!!.uid)
 
         // Show a temporary loading indicator while we check permissions
         val loadingDialog = AlertDialog.Builder(this)
-            .setMessage("Checking party permissions...")
+            .setMessage("Checking Host permissions...")
             .setCancelable(false)
             .create()
         loadingDialog.show()
@@ -718,25 +741,13 @@ class SessionLandingActivity : AppCompatActivity() {
         lifecycleScope.launch {
             try {
                 val db = FirebaseFirestore.getInstance()
+                val currentUserId = FirebaseAuth.getInstance().currentUser!!.uid
 
-                // 1. Fetch ALL users in the lobby to check Premium status
-                // (Firestore 'whereIn' is limited to 10, assuming lobby size <= 10. If >10, you'd need chunking)
-                val usersSnap = db.collection("users")
-                    .whereIn(FieldPath.documentId(), userList.take(10))
-                    .get()
-                    .await()
-
-                val freeUsers = usersSnap.documents.filter {
-                    it.getBoolean("isPremium") != true
-                }.map { it.getString("name") ?: "Unknown User" }
-
-                val anyoneIsFree = freeUsers.isNotEmpty()
-                val currentUserIsFree =
-                    freeUsers.contains(usersSnap.documents.find { it.id == FirebaseAuth.getInstance().currentUser!!.uid }
-                        ?.getString("name"))
+                // 1. Fetch ONLY the Host's Premium status (Cheaper and faster!)
+                val userDoc = db.collection("users").document(currentUserId).get().await()
+                val hostIsPremium = userDoc.getBoolean("isPremium") ?: false
 
                 // 2. Check for Active Modes
-                // Check both sessionProfile and chatProfile to be safe
                 val currentModes = (sessionProfile?.enabledModes ?: mutableListOf()) +
                         (chatProfile?.enabledModes ?: mutableListOf())
                 val hasSpecialModes =
@@ -744,16 +755,13 @@ class SessionLandingActivity : AppCompatActivity() {
 
                 loadingDialog.dismiss() // Check complete
 
-                // --- CHECK 1: CHARACTER LIMITS (Existing Logic) ---
-                // We base the limit on the HOST (Current User/Creator) or the Lowest Common Denominator?
-                // Usually, the Host's limit defines the session capacity.
-                val hostIsPremium = !currentUserIsFree // Assuming 'you' are the host starting it
-                val charLimit = if (hostIsPremium) 20 else 10
+                // --- CHECK 1: CHARACTER LIMITS ---
+                val charLimit = if (hostIsPremium) 50 else 20
 
                 if (rosterCount > charLimit) {
                     AlertDialog.Builder(this@SessionLandingActivity)
                         .setTitle("Character Limit Exceeded")
-                        .setMessage("You have $rosterCount characters, but the limit is $charLimit.\n\nReduce characters or Upgrade to Premium.")
+                        .setMessage("You have $rosterCount characters, but the Free tier limit is $charLimit.\n\nReduce characters or Upgrade to Premium to host larger lobbies.")
                         .setPositiveButton("Upgrade") { _, _ ->
                             startActivity(
                                 Intent(
@@ -767,24 +775,22 @@ class SessionLandingActivity : AppCompatActivity() {
                     return@launch
                 }
 
-                // --- CHECK 2: SPECIAL MODES (New Logic) ---
-                if (anyoneIsFree && hasSpecialModes) {
-                    // We must pause and ask
+                // --- CHECK 2: SPECIAL MODES ---
+                if (!hostIsPremium && hasSpecialModes) {
+                    // The Host is free, but trying to start a session with premium modes
                     withContext(Dispatchers.Main) {
                         AlertDialog.Builder(this@SessionLandingActivity)
                             .setTitle("Premium Features Detected")
                             .setMessage(
-                                "This session uses Special Modes (RPG, VN, etc.) which require all players to be Premium.\n\n" +
-                                        "The following users are on the Free plan:\n${
-                                            freeUsers.joinToString(
-                                                ", "
-                                            )
-                                        }\n\n" +
-                                        "You can have them Upgrade and reinvite them or start a Standard Session (Sandbox) without special modes."
+                                "This session uses Special Modes (RPG, VN, etc.) which require the Host to have a Premium plan.\n\n" +
+                                        "You can Upgrade to unlock these modes for everyone, or start a Standard Session (Sandbox)."
                             )
                             .setPositiveButton("Start Standard Session") { _, _ ->
                                 // PROCEED: Strip modes and continue
                                 startNewSession(stripModes = true)
+                            }
+                            .setNeutralButton("Upgrade") { _, _ ->
+                                startActivity(Intent(this@SessionLandingActivity, UpgradeActivity::class.java))
                             }
                             .setNegativeButton("Cancel", null)
                             .show()
@@ -792,7 +798,7 @@ class SessionLandingActivity : AppCompatActivity() {
                     return@launch // Stop here, wait for dialog choice
                 }
 
-                // If we get here, everyone is Premium OR no special modes are active.
+                // If we get here, the Host is Premium OR no special modes are active.
                 Log.d("session_start", "permissions good starting session")
                 startNewSession(stripModes = false)
 
@@ -818,10 +824,10 @@ class SessionLandingActivity : AppCompatActivity() {
                 val userId = FirebaseAuth.getInstance().currentUser!!.uid
 
                 // Fetch "isPremium" directly from Firestore to prevent cheating
-//                val userDoc =
-//                    FirebaseFirestore.getInstance().collection("users").document(userId).get()
-//                        .await()
-//                val isPremium = userDoc.getBoolean("isPremium") ?: false
+                val userDoc =
+                    FirebaseFirestore.getInstance().collection("users").document(userId).get()
+                        .await()
+                val isPremium = userDoc.getBoolean("isPremium") ?: false
 
                 val sessionId = lobbySessionId ?: error("Session ID missing!")
                 val docRef = db.collection("sessions").document(sessionId)
@@ -840,9 +846,9 @@ class SessionLandingActivity : AppCompatActivity() {
                     return@launch
                 }
                 // DEFINE LIMITS
-//                val charLimit = if (isPremium) 20 else 10 // Tweak these numbers as needed
+                val charLimit = if (isPremium) 50 else 20 // Tweak these numbers as needed
 
-                val charLimit = 50
+
                 if (rosterCount > charLimit) {
                     // Creating the popup
                     AlertDialog.Builder(this@SessionLandingActivity)
@@ -855,6 +861,7 @@ class SessionLandingActivity : AppCompatActivity() {
                         .show()
                     return@launch // STOP EXECUTION
                 }
+                logSessionEngagement(isHost = true)
 
                 // --- 4. START THE BUILD PROCESS ---
                 showCharacterProgressDialog(sessionProfile?.slotRoster!!.size)
@@ -1189,8 +1196,7 @@ class SessionLandingActivity : AppCompatActivity() {
         )
 
         val rpgSettingsRaw = session?.modeSettings?.get("rpg") as? String
-        val vnSettingsRaw = (session?.modeSettings?.get("vn") as? String)
-            ?: (session?.modeSettings?.get("visual_novel") as? String)
+        val vnSettingsRaw = session?.modeSettings?.get("vn") as? String
 
         val areasJson = gson.toJson(session?.areas ?: emptyList<Area>())
 
@@ -1351,18 +1357,28 @@ class SessionLandingActivity : AppCompatActivity() {
             sessionProfile
         )
 
-        val raw = try {
-            Facilitator.callActivationAI(prompt, BuildConfig.OPENAI_API_KEY, "deepseek",
+        // 1. Get the bucket (and return an empty bucket if it crashes)
+        val apiResult = try {
+            Facilitator.callActivationAI(prompt, BuildConfig.OPENAI_API_KEY, "nvidia",
                 null, null, null)
         } catch (e: Exception) {
             Log.e("MysteryTimeline", "AI call failed", e)
-            ""
+            com.albirich.RealmsAI.ai.AiResponseData(null, 0L) // Return an empty bucket
         }
 
+        // 2. Open the bucket and pull out the text
+        val raw = apiResult.content ?: ""
+        val tokens = apiResult.totalTokens
+
+        // (Optional) Since you pay for these tokens too, you can log them!
+        // logMonthlyAnalytics("nvidia", sessionProfile.chatMode, sessionProfile.chatId, if (raw.isEmpty()) "timeout" else "success", tokens)
+
+        // Now 'raw' is a standard String again, so these functions work perfectly!
         Log.d("timeline", "raw: ${raw.take(600)}")
 
         // Extract JSON safely
         val jsonStart = raw.indexOf('{')
+        // ... (the rest of your code stays exactly the same!)
         val jsonEnd = raw.lastIndexOf('}')
         val json = if (jsonStart != -1 && jsonEnd > jsonStart) raw.substring(
             jsonStart,
@@ -1507,14 +1523,17 @@ class SessionLandingActivity : AppCompatActivity() {
     ${sessionRelationships.joinToString(separator = "\n") { "- ${it.type} to ${it.toName}" }}
 """.trimIndent()
 
-        val aiResponse = if (sessionProfile.sfwOnly == true) {
+        var modelToUse = "openai" // Ensure a default is set for the sfw check!
+
+        // 1. Get the BUCKET
+        val apiResult = if (sessionProfile.sfwOnly == true) {
             Facilitator.callOpenAiApi(
                 prompt = aiPrompt,
                 BuildConfig.OPENAI_API_KEY,
                 modelToUse,
                 null, null, null
             )
-        }else {
+        } else {
             modelToUse = "mistral_small"
             Facilitator.callMixtralApi(
                 aiPrompt,
@@ -1523,6 +1542,14 @@ class SessionLandingActivity : AppCompatActivity() {
                 null, null, null
             )
         }
+
+        // 2. Open the BUCKET and get the String!
+        val aiResponse = apiResult.content ?: ""
+        val tokensUsed = apiResult.totalTokens
+
+        // (Optional) Log the tokens since Harmonization is a massive prompt that costs you money!
+        // logMonthlyAnalytics(modelToUse, "SYSTEM", sessionProfile.sessionId, if(aiResponse.isEmpty()) "timeout" else "success", tokensUsed)
+
         Log.d("session_start", "${profile.name} has been harmonized. summary ${aiResponse}")
 
         // --- 3. Update Result Class to capture location ---
@@ -1584,7 +1611,7 @@ class SessionLandingActivity : AppCompatActivity() {
 
         val slotId = UUID.randomUUID().toString()
 
-// --- 4.5 NEW RAG SYSTEM: Embed and Save Background Memories ---
+        // --- 4.5 NEW RAG SYSTEM: Embed and Save Background Memories ---
         val db = FirebaseFirestore.getInstance()
         val memoryRef = db.collection("sessions")
             .document(sessionProfile.sessionId)
@@ -2258,7 +2285,7 @@ class SessionLandingActivity : AppCompatActivity() {
                 val type = if (rawId.startsWith("persona:")) "persona" else "character"
                 val id = rawId.removePrefix("persona:")
 
-                if (sessionProfile?.slotRoster?.size ?: 0 < 20) {
+                if (sessionProfile?.slotRoster?.size ?: 0 < 50) {
                     if (sessionProfile?.slotRoster?.any { it.baseCharacterId == id } == true) {
                         Toast.makeText(
                             this,
@@ -3739,11 +3766,17 @@ private suspend fun generateMurderSetup(
 
     val prompt = PromptBuilder.buildMurderSeedingPrompt(slots, rpgSettingsIn, murderIn, sessionProfile)
 
-    val raw = try {
-        Facilitator.callActivationAI(prompt, BuildConfig.OPENAI_API_KEY, "openai-gpt-4o", null, null, null)
+    val apiResult = try {
+        Facilitator.callActivationAI(prompt, BuildConfig.OPENAI_API_KEY, "nvidia",
+            null, null, null)
     } catch (e: Exception) {
-        Log.e("MurderSeed", "AI call failed", e); ""
+        Log.e("MysteryTimeline", "AI call failed", e)
+        com.albirich.RealmsAI.ai.AiResponseData(null, 0L) // Return an empty bucket
     }
+
+    // 2. Open the bucket and pull out the text
+    val raw = apiResult.content ?: ""
+    val tokens = apiResult.totalTokens
 
     // Extract JSON
     val jsonStart = raw.indexOf('{')
@@ -3817,6 +3850,24 @@ private suspend fun generateMurderSetup(
     Log.d("ai_response", "updating $updatedMurder")
 
     updatedRpg to updatedMurder
+}
+
+private fun logSessionEngagement(isHost: Boolean) {
+    val userId = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid ?: return
+    val db = com.google.firebase.firestore.FirebaseFirestore.getInstance()
+
+    val currentMonth = java.text.SimpleDateFormat("yyyy-MM", java.util.Locale.getDefault()).format(java.util.Date())
+    val reportRef = db.collection("users").document(userId).collection("monthly_reports").document(currentMonth)
+
+    // Pick the right bucket
+    val fieldToUpdate = if (isHost) "sessionsHosted" else "sessionsJoined"
+
+    val update = hashMapOf<String, Any>(
+        fieldToUpdate to com.google.firebase.firestore.FieldValue.increment(1)
+    )
+
+    reportRef.set(update, com.google.firebase.firestore.SetOptions.merge())
+        .addOnFailureListener { e -> android.util.Log.e("Analytics", "Failed to log engagement", e) }
 }
 
 

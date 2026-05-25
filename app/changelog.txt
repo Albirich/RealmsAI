@@ -1,29 +1,27 @@
-3.6 Linked characters 2 and Character card imports:
+3.8 Character Creation Ease Update:
 
-added password reset button.
+- fixed a few bugs causing crashes
 
-Character Links:
-          Inseparable -  When posing places characters avatar in front or behind the linked character.
-                Characters will appear in the same slot as the linked character, NOT the other way around.
-                Link character from linked character to get it to work both ways.
-                When linking characters depth matters and must be the same throughout all links in a group.
-                Depth is 1, furthest back, to 4, closest forward.
-                You as a creator must adjust pose images in the cropper so they don't completely overlap.
+- Importing update: Importing character cards will now call an AI to separate information into the correct fields.
 
-          Timeskip - Replace this character with the linked character, similar to switch but will be done for everyone with a timeskip link all at once.
-                Timeskip button is found under the options.
-                Use ONLY the number of years for the time skip.
-                Selecting a number of years to skip will skip everyone for that year and all years up to that point.
+- Character Creation Assistant: Added an AI to the character creation page to help.
+    Button on the bottom right will open a chatbox.
+    The AI will chat with you so you can bounce ideas off of.
+    The AI can fill out different fields:
+        name,
+        summary,
+        personality,
+        mature traits,
+        backstory,
+        greeting,
+        scenario,
+        abilities,
+        physical information
 
-          Telepathy - Removed (will be readded when whispering feature is added in)
 
-Character import: In character creation a new button to import character cards. If a .png is used the avatar will be used, if a json is used there will be no avatar added.
-        Character profiles may have fields too large for our platform, may have to used and separated into our fields.
+APP:
 
-Custom news post: You can now type out a custom post for your followers social tab
-
-In Session Character Sheets: Added the name of the user controlling the character/"AI Controlled"
-
+- Fixed a formatting error in the in session options
 
 ----ROADMAP----
 
